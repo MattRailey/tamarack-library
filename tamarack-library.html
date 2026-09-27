@@ -464,7 +464,8 @@
   .coll-chip button{ background:none; color:var(--steel); min-height:0; padding:0 6px; font-size:1.05rem; line-height:1; }
   .coll-in-row{ display:flex; gap:6px; margin-top:6px; } .coll-in-row input{ flex:1; } .coll-in-row button{ min-height:36px; padding:6px 12px; }
   .scan-round svg{ display:block; margin:auto; }
-  #scan-bg{ z-index:260; } #walk-bg{ z-index:230; }
+  #scan-bg{ z-index:260; } #ph-bg{ z-index:240; }
+  .ph-item{ display:flex; gap:10px; align-items:center; font-size:.8rem; padding:6px 0; border-top:1px solid var(--line); } .ph-item img{ width:46px; height:46px; object-fit:cover; border-radius:4px; } #walk-bg{ z-index:230; }
   .scan-modal{ max-width:520px; }
   .sc-view{ position:relative; background:#111; border-radius:8px; overflow:hidden; aspect-ratio:4/3; margin:8px 0 6px; }
   .sc-view video{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -533,6 +534,7 @@
           <div class="seg" id="view-seg"><button data-view="feed">Feed</button><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
           <button class="secondary" id="btn-more-filters">Filters</button>
           <button id="btn-scan" class="add-round scan-round secondary" aria-label="Scan a barcode" title="Scan a barcode to add books"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="3" y="5" width="2" height="14"/><rect x="6.5" y="5" width="1" height="14"/><rect x="9" y="5" width="2" height="14"/><rect x="12.5" y="5" width="1" height="14"/><rect x="15" y="5" width="3" height="14"/><rect x="19.5" y="5" width="1.5" height="14"/></svg></button>
+          <button id="btn-photos" class="add-round scan-round secondary" aria-label="Send photos to Claude" title="Send shelf or book photos to Claude"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg></button>
           <button id="btn-add" class="add-round" aria-label="Add book" title="Add book">+</button>
         </div>
         <div id="more-filters" class="hide" style="margin-top:12px;">
@@ -878,6 +880,27 @@
       </div>
     </div>
     <div id="sc-result"></div>
+  </div>
+</div>
+
+
+<!-- photos for Claude -->
+<div class="modal-bg" id="ph-bg">
+  <div class="modal scan-modal">
+    <button class="modal-close" id="ph-close" aria-label="Close">&times;</button>
+    <h3>Send photos to Claude</h3>
+    <p class="note" style="margin-top:0;">Snap a whole shelf, a close-up of spines, or a book’s title page. The photos go to <b>photos/inbox</b> in the Railey Library Dropbox folder, labeled with where they were taken — next time you chat, say “check the photo inbox” and Claude adds or fixes the books.</p>
+    <div class="grid">
+      <div><label>Room</label><input id="ph-room" list="dl-room"></div>
+      <div><label>Bookcase</label><input id="ph-case" list="dl-case"></div>
+      <div><label>Shelf (optional)</label><input id="ph-shelf" list="dl-shelf"></div>
+      <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
+      <div style="grid-column:1/-1;"><label>Note for Claude (optional)</label><input id="ph-note" placeholder="e.g. left half of shelf 2 · these are new from the thrift store"></div>
+    </div>
+    <div class="row" style="margin-top:12px;"><button id="ph-take">Take or choose photos</button></div>
+    <input type="file" id="ph-file" accept="image/*" multiple class="hide">
+    <div id="ph-status" class="note"></div>
+    <div id="ph-sent"></div>
   </div>
 </div>
 
@@ -2481,10 +2504,14 @@ function gotCode(raw){
   try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
   handleIsbn(d);
 }
-$('sc-go').onclick=()=>{ const d=isbn13($('sc-isbn').value); if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
+$('sc-go').onclick=()=>{ const d=isbn13($('sc-isbn').value) || (!$('sc-isbn').value.trim() && lastCode) || ''; if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
 $('sc-isbn').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('sc-go').onclick(); } });
 async function isbnLookup(code){
   const docs = await bookSearch('', '', code);
+  if(!docs.some(x=>x.title)){ try{ const r=await fetch('https://openlibrary.org/isbn/'+code+'.json'); if(r.ok){ const j=await r.json(); let au=[];
+      for(const a of (j.authors||[]).slice(0,3)){ try{ const ra=await fetch('https://openlibrary.org'+a.key+'.json'); if(ra.ok) au.push((await ra.json()).name); }catch(e){} }
+      docs.push({ src:'Open Library', title:j.title+(j.subtitle?': '+j.subtitle:''), authors:au, year:(String(j.publish_date||'').match(/\d{4}/)||[''])[0], isbn:[code], publisher:(j.publishers||[])[0]||'',
+        pages:j.number_of_pages?String(j.number_of_pages):'', subjects:j.subjects||[], cover:(j.covers&&j.covers[0]>0)?'https://covers.openlibrary.org/b/id/'+j.covers[0]+'-M.jpg':'' }); } }catch(e){} }
   const d = docs.find(x=>x.title) || null;
   if(!d) return null;
   const f=docFill(d);
@@ -2493,7 +2520,7 @@ async function isbnLookup(code){
     about, coverUrl: f.coverUrl || (docs.find(x=>x.cover)||{}).cover || '' };
 }
 async function handleIsbn(code){
-  scanBusy=true;
+  scanBusy=true; lastCode=code; lastCodeAt=Date.now();
   const box=$('sc-result');
   box.innerHTML='<div class="note">Looking up '+code+'…</div>';
   const have = scanMode.kind==='add' ? findByIsbn(code) : [];
@@ -2509,7 +2536,7 @@ async function handleIsbn(code){
   }
   let html='';
   if(have.length) html+='<div class="sc-have">Already in the library: '+have.map(b=>'<a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a> — '+esc(locText(b))).join('<br>')+'</div>';
-  html += info.title ? scanCard(info) : '<div class="note">Couldn’t find ISBN '+code+' online — you can add it by hand.</div>';
+  html += info.title ? scanCard(info) : '<div class="sc-have">The barcode read fine (ISBN '+code+'), but the free book databases don’t have this one — common for self-published, print-on-demand'+(/^9798/.test(code)?' (ISBNs starting 979-8 are usually Amazon self-published)':'')+' and very new books. Tap <b>Add by hand</b>: the ISBN and shelf spot are filled in, and you can snap the cover there.</div>';
   html += '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(have.length?'Add another copy':'Add to library')+'</button>':'')
     +'<button class="secondary" id="sc-edit">'+(info.title?'Edit first':'Add by hand')+'</button><button class="secondary" id="sc-again">Next book</button></div>';
   box.innerHTML=html;
@@ -2649,6 +2676,51 @@ $('wk-close').onclick=closeWalk;
 const _renderUnid=renderUnid; renderUnid=function(){ _renderUnid(); const n=live().filter(b=>isUnid(b)&&b.idPhoto).length;
   document.querySelectorAll('#un-list .un-row').forEach(r=>{ const b=byId(r.dataset.id); if(b && b.idPhoto) r.querySelector('.n').insertAdjacentHTML('afterbegin','📷 '); });
   if(n) $('un-summary').textContent += ' · '+n+' photo'+(n===1?'':'s')+' waiting for Claude'; };
+
+/* ============================================================
+   Photos for Claude — shelf / spine / title-page pictures go to
+   /Railey Library/photos/inbox/, labeled with where they were taken.
+   ============================================================ */
+function openPhotos(){
+  const L=ui.phLoc||{};
+  $('ph-room').value=L.room||$('f-room').value||''; $('ph-case').value=L.bookcase||$('f-case').value||''; $('ph-shelf').value=L.shelf||'';
+  $('ph-kind').value=L.kind||'shelf'; $('ph-note').value=''; $('ph-status').textContent='';
+  $('ph-bg').classList.add('open'); lockPage();
+}
+$('btn-photos').onclick=openPhotos;
+$('ph-close').onclick=()=>{ $('ph-bg').classList.remove('open'); unlockPage(); };
+$('ph-take').onclick=async()=>{ if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; } $('ph-file').click(); };
+$('ph-file').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+  const t=await dbxToken(); if(!t){ toast('Dropbox isn’t connected'); return; }
+  const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
+  ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
+  const note=$('ph-note').value.trim();
+  const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+  const d=new Date(), stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+String(d.getSeconds()).padStart(2,'0');
+  const base=[stamp, slug(loc.room)||'no-room', slug(loc.bookcase)||'no-bookcase', loc.shelf?'shelf-'+slug(loc.shelf):'', loc.kind, note?slug(note):''].filter(Boolean).join(' ');
+  let ok=0, fail=0;
+  for(let i=0;i<files.length;i++){
+    $('ph-status').textContent='Sending '+(i+1)+' of '+files.length+'…';
+    try{
+      const blob=await shrinkPhoto(files[i], loc.kind==='book'?1800:2600);
+      const path='/Railey Library/photos/inbox/'+base+(files.length>1?' '+(i+1):'')+'.jpg';
+      const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+        'Dropbox-API-Arg':JSON.stringify({ path, mode:'add', autorename:true, mute:true }) }, body:blob });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      ok++;
+      const url=URL.createObjectURL(blob);
+      $('ph-sent').insertAdjacentHTML('afterbegin','<div class="ph-item"><img src="'+url+'" alt=""><span>✓ '+esc([loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')||'Sent')+(note?' — '+esc(note):'')+'</span></div>');
+    }catch(err){ fail++; }
+  }
+  if(note){
+    // keep the note with the photos as a small text file too
+    try{ await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({ path:'/Railey Library/photos/inbox/'+base+' NOTE.txt', mode:'add', autorename:true, mute:true }) }, body:new Blob([note+'\n\n'+JSON.stringify(loc)]) }); }catch(e){}
+  }
+  $('ph-status').textContent = fail ? ok+' sent, '+fail+' failed — try those again.' : ok+' photo'+(ok===1?'':'s')+' sent to the inbox. Add more, or close when you’re done.';
+  $('ph-note').value='';
+};
 
 if(ui.sort) $('f-sort').value = ui.sort;
 syncViewSeg();
