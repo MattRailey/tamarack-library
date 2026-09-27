@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Library">
+<meta name="theme-color" content="#1c2438">
+<title>Tamarack Library</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231c2438'/%3E%3Crect x='7' y='7' width='5' height='18' rx='1' fill='%232f7cf6'/%3E%3Crect x='13.5' y='9' width='5' height='16' rx='1' fill='%23fff'/%3E%3Crect x='20' y='8' width='5' height='17' rx='1' fill='%23aab2c8' transform='rotate(8 22.5 16.5)'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --blueprint:#2f7cf6; --blueprint-light:#1f63d6;
+    --navy:#1c2438; --navy-light:#2a3450;
+    --line:#e3e5e9; --paper:#f5f6f8; --ink:#1f2430; --steel:#697086;
+    --rust:#d0453c; --ok:#0ca678; --amber:#b7791f;
+    --sans:Arial, Helvetica, 'Segoe UI', sans-serif;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); min-height:100vh; padding-bottom:env(safe-area-inset-bottom); }
+  header{ background:#fff; padding:calc(env(safe-area-inset-top) + 14px) 24px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+  header h1{ font-size:1.2rem; font-weight:700; margin:0; color:var(--navy); }
+  header .meta{ font-size:.72rem; color:var(--steel); text-align:right; line-height:1.5; }
+  .sync-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--steel); margin-right:5px; vertical-align:middle; }
+  .sync-dot.ok{ background:var(--ok); } .sync-dot.warn{ background:var(--amber); } .sync-dot.err{ background:var(--rust); }
+  .layout{ display:flex; }
+  nav{ width:200px; flex-shrink:0; background:var(--navy); padding:16px 0; min-height:calc(100vh - 60px); }
+  nav button{ display:block; width:100%; text-align:left; background:none; border:none; border-left:3px solid transparent; border-radius:0; padding:11px 18px; font-family:var(--sans); font-size:.88rem; font-weight:400; color:#aab2c8; cursor:pointer; margin-bottom:1px; }
+  nav button:hover{ background:var(--navy-light); color:#fff; }
+  nav button.active{ border-left-color:var(--blueprint); color:#fff; font-weight:600; background:var(--navy-light); }
+  main{ flex:1; padding:22px 26px 90px; min-width:0; }
+  .panel{ display:none; } .panel.active{ display:block; }
+  h2{ font-size:1.15rem; font-weight:700; margin:0 0 4px; }
+  h3{ font-size:.95rem; margin:0 0 8px; color:var(--navy); }
+  .sub{ color:var(--steel); font-size:.85rem; margin:0 0 16px; max-width:70ch; line-height:1.45; }
+  .note{ font-size:.76rem; color:var(--steel); margin-top:6px; line-height:1.45; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; box-shadow:0 1px 2px rgba(20,20,40,.04); }
+  label{ display:block; font-size:.76rem; color:var(--steel); margin-bottom:4px; }
+  input, select, textarea{ width:100%; padding:9px 10px; border:1px solid var(--line); background:#fff; font-family:var(--sans); font-size:16px; border-radius:6px; color:var(--ink); min-height:44px; }
+  textarea{ min-height:80px; resize:vertical; }
+  select{ -webkit-appearance:none; appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--steel) 50%),linear-gradient(135deg,var(--steel) 50%,transparent 50%); background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%; background-size:5px 5px; background-repeat:no-repeat; padding-right:28px; }
+  input[type=checkbox]{ width:auto; min-height:0; margin:0; }
+  button{ background:var(--blueprint); color:#fff; border:none; padding:10px 16px; border-radius:6px; font-family:var(--sans); font-size:.85rem; font-weight:600; cursor:pointer; min-height:40px; }
+  button:hover{ background:var(--blueprint-light); }
+  button.secondary{ background:#fff; color:var(--blueprint); border:1px solid var(--line); }
+  button.secondary:hover{ border-color:var(--blueprint); }
+  button.danger{ background:#fff; color:var(--rust); border:1px solid var(--line); }
+  button.danger:hover{ border-color:var(--rust); }
+  button:disabled{ opacity:.45; cursor:not-allowed; }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  label.check{ display:flex; align-items:center; gap:7px; font-size:.85rem; color:var(--ink); margin:0; }
+  .hide{ display:none !important; }
+
+  /* filters (same pattern as Detail Catalog) */
+  .lb-filters{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:10px; }
+  .lb-filters .full{ grid-column:1/-1; }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button{ background:#fff; color:var(--steel); border:none; border-radius:0; padding:8px 14px; min-height:38px; }
+  .seg button.active{ background:var(--blueprint); color:#fff; }
+  .seg button:not(:last-child){ border-right:1px solid var(--line); }
+  .summary{ font-size:.85rem; color:var(--steel); }
+
+  /* book cards */
+  .lb-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .bk{ position:relative; display:flex; gap:12px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+  .bk:hover{ border-color:var(--blueprint); box-shadow:0 1px 4px rgba(20,20,40,.08); }
+  .bk.selected{ outline:3px solid var(--blueprint); outline-offset:-3px; }
+  .cover{ width:54px; height:80px; flex:none; border-radius:3px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,.18); }
+  .cover img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cover .ph{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:.95rem; letter-spacing:.02em; }
+  .bk-body{ min-width:0; flex:1; }
+  .bk h4{ margin:0 0 3px; font-size:.9rem; color:var(--navy); line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .bk .au{ font-size:.78rem; color:var(--ink); margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bk .loc{ font-size:.72rem; color:var(--steel); margin-bottom:6px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:4px; }
+  .chip{ font-size:.66rem; padding:2px 7px; border-radius:999px; background:var(--paper); color:var(--steel); white-space:nowrap; }
+  .chip.read{ background:#e3f6ef; color:#07785a; }
+  .chip.reading{ background:#e3eefc; color:#1f4f96; }
+  .chip.loan{ background:#fde6df; color:#a33b17; font-weight:600; }
+  .chip.review{ background:#fff1d6; color:#8a5a00; font-weight:600; }
+  .chip.stars{ color:#b7791f; background:#fff8e6; }
+  .selbox{ position:absolute; top:8px; right:8px; width:22px; height:22px; border:2px solid var(--steel); border-radius:4px; background:#fff; display:flex; align-items:center; justify-content:center; color:#fff; font-size:.8rem; font-weight:700; }
+  .bk.selected .selbox{ background:var(--blueprint); border-color:var(--blueprint); }
+
+  /* compact list view */
+  .lb-list{ background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .lr{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .lr:last-child{ border-bottom:none; }
+  .lr:hover{ background:#eef3f8; }
+  .lr.selected{ background:#e3eefc; }
+  .lr .t{ flex:1; min-width:0; }
+  .lr .t b{ display:block; font-size:.86rem; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lr .t span{ font-size:.74rem; color:var(--steel); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+  .lr .l{ font-size:.72rem; color:var(--steel); text-align:right; flex:none; max-width:45%; }
+  .more-wrap{ text-align:center; margin:16px 0; }
+  .empty{ color:var(--steel); font-size:.9rem; padding:30px 10px; text-align:center; }
+
+  /* shelves */
+  details.room{ background:#fff; border:1px solid var(--line); border-radius:8px; margin-bottom:12px; }
+  details.room > summary{ padding:13px 16px; font-weight:700; color:var(--navy); cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+  details.room > summary::-webkit-details-marker{ display:none; }
+  details.room > summary::after{ content:'\25B8'; color:var(--steel); transition:transform .15s; }
+  details.room[open] > summary::after{ transform:rotate(90deg); }
+  .room-body{ padding:0 16px 14px; }
+  .case{ border-top:1px solid var(--line); padding-top:10px; margin-top:4px; }
+  .case-h{ font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#7a8493; margin:4px 0 8px; }
+  .shelf{ background:#f4f5f7; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:8px; }
+  .shelf-h{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.8rem; font-weight:600; margin-bottom:6px; flex-wrap:wrap; }
+  .shelf-h .acts{ display:flex; gap:6px; }
+  .shelf-h .acts button{ padding:4px 9px; min-height:30px; font-size:.74rem; }
+  .spines{ display:flex; flex-direction:column; gap:2px; }
+  .sp{ display:flex; gap:8px; align-items:baseline; font-size:.82rem; padding:5px 6px; border-radius:5px; cursor:pointer; background:#fff; }
+  .sp:hover{ background:#eef3f8; }
+  .sp .n{ color:var(--steel); font-size:.72rem; width:26px; text-align:right; flex:none; }
+  .sp .a{ color:var(--steel); font-size:.74rem; margin-left:auto; text-align:right; }
+
+  /* import */
+  .dropzone{ border:2px dashed var(--line); border-radius:8px; background:#fff; padding:22px; text-align:center; font-size:.88rem; color:var(--steel); cursor:pointer; }
+  .dropzone.dragover{ border-color:var(--blueprint); background:#eaf1f8; }
+  ol.steps{ margin:6px 0 0 18px; padding:0; font-size:.85rem; line-height:1.6; }
+  .pv-table-wrap{ max-height:360px; overflow:auto; border:1px solid var(--line); border-radius:6px; margin-top:10px; }
+  table{ width:100%; border-collapse:collapse; font-size:.8rem; }
+  th, td{ text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th{ background:#fafbfc; font-weight:700; color:var(--steel); font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; position:sticky; top:0; }
+  tr.dup td{ background:#fff8e6; }
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+  .stat{ background:var(--paper); border-radius:8px; padding:10px 12px; }
+  .stat b{ display:block; font-size:1.3rem; color:var(--navy); }
+  .stat span{ font-size:.74rem; color:var(--steel); }
+
+  /* modal (Detail Catalog pattern) */
+  .modal-bg{ position:fixed; inset:0; background:rgba(20,24,40,.6); display:none; align-items:center; justify-content:center; z-index:200; padding:20px; }
+  .modal-bg.open{ display:flex; }
+  .modal{ background:#fff; border-radius:10px; max-width:760px; width:100%; max-height:88vh; overflow:auto; padding:20px; }
+  .modal-close{ float:right; background:none; border:none; font-size:1.5rem; color:var(--steel); cursor:pointer; line-height:1; padding:0 4px; min-height:0; }
+  .modal-close:hover{ background:none; color:var(--ink); }
+  .m-top{ display:flex; gap:14px; margin-bottom:14px; }
+  .m-top .cover{ width:80px; height:118px; }
+  .m-top h3{ font-size:1.05rem; margin:2px 0 4px; }
+  .m-sec{ font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#7a8493; margin:16px 0 8px; }
+  .stars-in{ display:flex; gap:2px; }
+  .stars-in button{ background:none; border:none; color:#d4d7de; font-size:1.6rem; padding:0 2px; min-height:0; line-height:1; }
+  .stars-in button.on{ color:#e0a82e; }
+  .stars-in button:hover{ background:none; }
+  .nav-arrow{ position:fixed; top:50%; transform:translateY(-50%); z-index:201; background:rgba(255,255,255,.92); border:1px solid var(--line); color:var(--ink); width:44px; height:44px; border-radius:50%; font-size:1.6rem; line-height:1; display:none; align-items:center; justify-content:center; box-shadow:0 1px 6px rgba(0,0,0,.2); padding:0; }
+  .nav-arrow:hover{ background:#fff; }
+  .modal-bg.open .nav-arrow{ display:flex; }
+  .nav-prev{ left:14px; } .nav-next{ right:14px; }
+  .lookup-res{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .lk{ display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:.8rem; }
+  .lk img{ width:34px; height:50px; object-fit:cover; background:var(--paper); flex:none; }
+  .lk .x{ flex:1; min-width:0; }
+  .lk button{ padding:5px 10px; min-height:32px; font-size:.76rem; }
+  .batchbar{ position:sticky; top:0; z-index:50; border-left:4px solid var(--blueprint); }
+
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px); background:var(--navy); color:#fff; padding:10px 18px; border-radius:8px; font-size:.85rem; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:300; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:900px){
+    header{ padding:calc(env(safe-area-inset-top) + 10px) 16px 10px; }
+    .layout{ flex-direction:column; }
+    nav{ width:100%; min-height:0; padding:0; display:flex; overflow-x:auto; position:sticky; top:0; z-index:60; }
+    nav button{ flex:1; text-align:center; border-left:none; border-bottom:3px solid transparent; padding:12px 10px; white-space:nowrap; }
+    nav button.active{ border-bottom-color:var(--blueprint); }
+    main{ padding:16px 16px 80px; }
+    .lb-grid{ grid-template-columns:1fr; }
+    .nav-arrow{ width:38px; height:38px; font-size:1.3rem; top:auto; bottom:calc(16px + env(safe-area-inset-bottom)); transform:none; }
+    .nav-prev{ left:12px; } .nav-next{ right:12px; }
+    .modal-bg{ padding:10px; }
+    .modal{ max-height:92vh; padding:16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tamarack Library</h1>
+  <div class="meta"><div id="hdr-count">—</div><div><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Local only</span></div></div>
+</header>
+<div class="layout">
+  <nav id="nav">
+    <button data-panel="library" class="active">Library</button>
+    <button data-panel="shelves">Shelves</button>
+    <button data-panel="import">Import</button>
+    <button data-panel="data">Data &amp; Sync</button>
+  </nav>
+  <main>
+    <!-- LIBRARY -->
+    <section class="panel active" id="library">
+      <h2>Library</h2>
+      <p class="sub">Search every book in the house by title, author, notes, or who has it. Tap a book to see where it lives or edit it.</p>
+      <div class="card">
+        <input type="search" id="f-q" placeholder="Search books…" autocomplete="off" style="font-size:17px;">
+        <div class="row" style="margin:10px 0 0; justify-content:space-between;">
+          <div class="seg" id="scope-seg"><button data-scope="all" class="active">Anything</button><button data-scope="title">Title</button><button data-scope="author">Author</button></div>
+          <button class="secondary" id="btn-more-filters">More filters</button>
+        </div>
+        <div id="more-filters" class="hide" style="margin-top:12px;">
+        <div class="lb-filters">
+          <select id="f-room"><option value="">Room — any</option></select>
+          <select id="f-case"><option value="">Bookcase — any</option></select>
+          <select id="f-shelf"><option value="">Shelf — any</option></select>
+          <select id="f-status">
+            <option value="">Read status — any</option>
+            <option value="unread">Unread</option>
+            <option value="reading">Reading</option>
+            <option value="read">Read</option>
+          </select>
+          <select id="f-genre"><option value="">Genre — any</option></select>
+          <select id="f-loan">
+            <option value="">Loaned — any</option>
+            <option value="out">Loaned out</option>
+            <option value="in">On the shelf</option>
+          </select>
+          <select id="f-rating">
+            <option value="">Rating — any</option>
+            <option value="5">★★★★★</option>
+            <option value="4">★★★★ and up</option>
+            <option value="3">★★★ and up</option>
+            <option value="1">Rated</option>
+            <option value="0">Not rated</option>
+          </select>
+          <select id="f-sort">
+            <option value="title">Sort: Title</option>
+            <option value="author">Sort: Author</option>
+            <option value="location">Sort: Shelf location</option>
+            <option value="added">Sort: Recently added</option>
+            <option value="rating">Sort: Rating</option>
+            <option value="value">Sort: Value</option>
+          </select>
+        </div>
+        <div class="row" style="justify-content:space-between;">
+          <label class="check"><input type="checkbox" id="f-review"> Needs review only</label>
+          <div class="row">
+            <button class="secondary" id="btn-reset">Clear filters</button>
+            <div class="seg" id="view-seg"><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
+          </div>
+        </div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button id="btn-add">+ Add book</button>
+          <button class="secondary" id="btn-select">Select multiple…</button>
+        </div>
+      </div>
+
+      <div class="card batchbar hide" id="batchbar">
+        <div class="row">
+          <strong id="batch-count">0 selected</strong>
+          <button id="btn-batch-edit">Edit selected…</button>
+          <button class="secondary" id="btn-batch-all">Select all shown</button>
+          <button class="secondary" id="btn-batch-clear">Clear</button>
+          <button class="danger" id="btn-batch-del">Delete</button>
+          <button class="secondary" id="btn-batch-done">Done</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:10px 16px;"><div class="summary" id="summary"></div></div>
+      <div id="results"></div>
+      <div class="more-wrap hide" id="more-wrap"><button class="secondary" id="btn-more">Show more</button></div>
+    </section>
+
+    <!-- SHELVES -->
+    <section class="panel" id="shelves">
+      <h2>Shelves</h2>
+      <p class="sub">Every room, bookcase, and shelf, with books in order from the left. Handy for putting things back, or checking a shelf against what's actually on it.</p>
+      <div class="card">
+        <div class="lb-filters" style="margin:0;">
+          <select id="s-room"><option value="">All rooms</option></select>
+          <input type="search" id="s-q" placeholder="Highlight a title…" autocomplete="off">
+        </div>
+      </div>
+      <div id="shelf-tree"></div>
+    </section>
+
+    <!-- IMPORT -->
+    <section class="panel" id="import">
+      <h2>Import</h2>
+      <p class="sub">Bring in books from shelf photos (via Claude), a CSV from a spreadsheet, or another library export.</p>
+      <div class="card">
+        <h3>Adding books from shelf photos</h3>
+        <ol class="steps">
+          <li>Photograph a bookcase in good light, a shelf or two per photo, close enough that spine text is readable. Leaning, angled, and sideways-stacked books are fine as they are; for a tall stack, an extra close-up helps.</li>
+          <li>Send the photos to Claude in chat and say which room and bookcase it is. Claude counts the shelves (1 = top) and each book's place from the left, reads the spines, and sends back a <b>tamarack-library-import.json</b> file. Books in a sideways stack share one spot, lettered top to bottom (5a, 5b, 5c…).</li>
+          <li>Load that file below, check the preview, and import. Books Claude wasn't sure about come in flagged <b>Needs review</b>.</li>
+          <li>Afterward, run <b>Look up missing details</b> on the Data &amp; Sync tab to fill in covers, ISBNs, and years from Open Library.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Load a file</h3>
+        <div class="dropzone" id="dropzone">Tap to choose a .json or .csv file, or drag one here<input type="file" id="imp-file" accept=".json,.csv,application/json,text/csv" class="hide"></div>
+        <p class="note">Or paste JSON / CSV text:</p>
+        <textarea id="imp-text" placeholder='{"books":[{"title":"…","author":"…","room":"Living Room","bookcase":"A","shelf":"1","position":1}]}'></textarea>
+        <div class="row" style="margin-top:8px;"><button class="secondary" id="btn-parse">Preview pasted text</button></div>
+      </div>
+      <div class="card hide" id="imp-preview">
+        <h3>Preview</h3>
+        <p class="note" style="margin-top:0;">Fill these in to apply to any row that's missing them (useful when one file is one shelf).</p>
+        <div class="grid" style="margin-bottom:12px;">
+          <div><label>Room</label><input id="imp-room" list="dl-room"></div>
+          <div><label>Bookcase</label><input id="imp-case" list="dl-case"></div>
+          <div><label>Shelf</label><input id="imp-shelf" list="dl-shelf"></div>
+        </div>
+        <div id="imp-stats" class="summary"></div>
+        <div class="row" style="margin-top:10px;" id="imp-dup-row">
+          <div style="min-width:240px;flex:1;">
+            <label>Books already in the library</label>
+            <select id="imp-dups">
+              <option value="skip">Skip them</option>
+              <option value="move">Update their shelf location</option>
+              <option value="add">Add them anyway (separate copies)</option>
+            </select>
+          </div>
+        </div>
+        <div class="pv-table-wrap"><table><thead><tr><th>#</th><th>Title</th><th>Author</th><th>Location</th><th></th></tr></thead><tbody id="imp-rows"></tbody></table></div>
+        <div class="row" style="margin-top:12px;">
+          <button id="btn-do-import">Import</button>
+          <button class="secondary" id="btn-cancel-import">Cancel</button>
+        </div>
+      </div>
+      <div class="card" id="undo-card">
+        <h3>Undo an import</h3>
+        <p class="note" style="margin-top:0;" id="undo-text">No imports yet.</p>
+        <button class="danger" id="btn-undo-import" disabled>Undo last import</button>
+      </div>
+    </section>
+
+    <!-- DATA -->
+    <section class="panel" id="data">
+      <h2>Data &amp; Sync</h2>
+      <p class="sub">Your catalog saves on this device as you go and syncs to Dropbox so it's the same on your phone and desktop.</p>
+      <div class="card">
+        <h3>Dropbox</h3>
+        <p class="note" style="margin-top:0;" id="dbx-status">Checking…</p>
+        <div id="dbx-appkey-row" style="margin-top:8px;max-width:420px;"><label>Dropbox App key (from the "Railey Library" app in the Dropbox App Console)</label><input id="dbx-appkey" autocomplete="off" spellcheck="false"></div>
+        <div class="row" style="margin-top:8px;"><button id="btn-connect">Connect Dropbox</button><button id="btn-sync">Sync now</button><button class="secondary" id="btn-disconnect">Disconnect</button></div>
+        <p class="note">The library has its own Dropbox connection, separate from your other apps. The catalog lives in <b>Dropbox/Railey Library/tamarack-library.json</b>. Connect once on each phone or computer. Changes from two devices are merged book by book, so editing on your phone and desktop never wipes out the other's changes.</p>
+        <p class="note">Redirect URI for the Dropbox app settings: <code id="dbx-redirect"></code></p>
+      </div>
+      <div class="card">
+        <h3>At a glance</h3>
+        <div class="stat-grid" id="stats"></div>
+        <div id="room-stats" style="margin-top:12px;"></div>
+      </div>
+      <div class="card">
+        <h3>Look up missing details</h3>
+        <p class="note" style="margin-top:0;">Searches Open Library (free) for each book missing a cover or ISBN and fills in cover, ISBN, year, publisher, and page count, only when the title and author clearly match. Nothing you've typed gets overwritten.</p>
+        <div class="row" style="margin-top:8px;"><button id="btn-lookup-all">Look up missing details</button><button class="secondary hide" id="btn-lookup-stop">Stop</button></div>
+        <p class="note" id="lookup-progress"></p>
+      </div>
+      <div class="card">
+        <h3>Backup &amp; export</h3>
+        <div class="row">
+          <button class="secondary" id="btn-export-json">Download backup (.json)</button>
+          <button class="secondary" id="btn-export-csv">Export spreadsheet (.csv)</button>
+          <button class="secondary" id="btn-restore">Merge a backup file…</button>
+          <input type="file" id="restore-file" accept=".json,application/json" class="hide">
+        </div>
+        <p class="note">Merging a backup adds any books it has that you don't, and keeps whichever version of each book was edited most recently. It never deletes anything.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- book modal -->
+<div class="modal-bg" id="modal-bg">
+  <button class="nav-arrow nav-prev" id="m-prev" title="Previous (←)">&#8249;</button>
+  <button class="nav-arrow nav-next" id="m-next" title="Next (→)">&#8250;</button>
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <button class="modal-close" id="m-close" aria-label="Close">&times;</button>
+    <div class="m-top">
+      <div class="cover" id="m-cover"></div>
+      <div style="min-width:0;flex:1;">
+        <h3 id="m-title">Book</h3>
+        <div class="note" id="m-sub" style="margin-top:0;"></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div style="grid-column:1/-1;"><label>Title</label><input id="e-title"></div>
+      <div style="grid-column:1/-1;"><label>Author</label><input id="e-author" list="dl-author"></div>
+      <div><label>Series</label><input id="e-series" list="dl-series"></div>
+      <div><label>Series #</label><input id="e-seriesNo" inputmode="decimal"></div>
+      <div><label>Genre</label><input id="e-genre" list="dl-genre"></div>
+      <div style="grid-column:1/-1;"><label>Keywords (searchable — topics, settings, anything you'd search by)</label><input id="e-subjects" placeholder="e.g. hobbits, dragons, middle-earth"></div>
+      <div><label>Format</label><select id="e-format"><option value=""></option><option>Hardcover</option><option>Paperback</option><option>Mass-market paperback</option><option>Spiral / binder</option><option>Other</option></select></div>
+    </div>
+    <div class="m-sec">Where it lives</div>
+    <div class="grid">
+      <div><label>Room</label><input id="e-room" list="dl-room"></div>
+      <div><label>Bookcase</label><input id="e-bookcase" list="dl-case"></div>
+      <div><label>Shelf (1 = top)</label><input id="e-shelf" list="dl-shelf"></div>
+      <div><label>Position from left</label><input id="e-position" inputmode="numeric"></div>
+    </div>
+    <div class="m-sec">Reading &amp; loans</div>
+    <div class="grid">
+      <div><label>Status</label><select id="e-status"><option value="unread">Unread</option><option value="reading">Reading</option><option value="read">Read</option></select></div>
+      <div><label>Rating</label><div class="stars-in" id="e-stars"></div></div>
+      <div><label>Loaned to</label><input id="e-loanedTo" list="dl-loan" placeholder="Nobody"></div>
+      <div><label>Loaned on</label><input id="e-loanedDate" type="date"></div>
+    </div>
+    <div class="row" style="margin-top:8px;"><button class="secondary hide" id="btn-returned">Mark returned</button></div>
+    <div class="m-sec">Details</div>
+    <div class="grid">
+      <div><label>Value ($)</label><input id="e-value" inputmode="decimal"></div>
+      <div><label>ISBN</label><input id="e-isbn" inputmode="numeric"></div>
+      <div><label>Year</label><input id="e-year" inputmode="numeric"></div>
+      <div><label>Publisher</label><input id="e-publisher"></div>
+      <div><label>Pages</label><input id="e-pages" inputmode="numeric"></div>
+      <div style="grid-column:1/-1;"><label>Notes</label><textarea id="e-notes"></textarea></div>
+    </div>
+    <label class="check" style="margin-top:10px;"><input type="checkbox" id="e-review"> Needs review (check the title/author against the actual book)</label>
+    <div class="m-sec">Open Library</div>
+    <button class="secondary" id="btn-lookup">Look up cover &amp; details</button>
+    <div class="lookup-res" id="lookup-res"></div>
+    <div class="row" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;">
+      <button id="btn-save">Save</button>
+      <button class="secondary" id="btn-cancel">Cancel</button>
+      <span style="flex:1;"></span>
+      <button class="danger" id="btn-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- batch edit modal -->
+<div class="modal-bg" id="batch-bg">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" id="b-close" aria-label="Close">&times;</button>
+    <h3 id="b-title">Edit selected</h3>
+    <p class="note" style="margin-top:0;">Only fields you fill in are changed. Leave a field blank to keep each book's own value.</p>
+    <div class="grid">
+      <div><label>Room</label><input id="b-room" list="dl-room"></div>
+      <div><label>Bookcase</label><input id="b-bookcase" list="dl-case"></div>
+      <div><label>Shelf</label><input id="b-shelf" list="dl-shelf"></div>
+      <div><label>Status</label><select id="b-status"><option value="">(keep)</option><option value="unread">Unread</option><option value="reading">Reading</option><option value="read">Read</option></select></div>
+      <div><label>Genre</label><input id="b-genre" list="dl-genre"></div>
+      <div><label>Needs review</label><select id="b-review"><option value="">(keep)</option><option value="no">Clear flag</option><option value="yes">Flag</option></select></div>
+    </div>
+    <div class="row" style="margin-top:16px;"><button id="b-apply">Apply</button><button class="secondary" id="b-cancel">Cancel</button></div>
+  </div>
+</div>
+
+<datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
+<datalist id="dl-author"></datalist><datalist id="dl-series"></datalist><datalist id="dl-genre"></datalist><datalist id="dl-loan"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   Storage model
+   ------------------------------------------------------------
+   One JSON store: { format, version, updatedAt, books:[...] }.
+   Every book carries its own `updatedAt` (ms). Deleting a book
+   keeps a small tombstone { id, deleted:true, updatedAt } so a
+   delete on one device propagates instead of the book coming
+   back from another device's copy. Merging two stores (local vs
+   Dropbox, or a restored backup) keeps the newer version of
+   each book, so nothing is lost when two devices edit
+   different books between syncs.
+   ============================================================ */
+const STORE_KEY  = 'tamarack_library_store_v1';
+const PREV_KEY   = 'tamarack_library_store_prev';   // previous save, one step back, just in case
+const UI_KEY     = 'tamarack_library_ui';
+// The library has its OWN Dropbox app and login — completely separate from Time Tracker / Field Reference.
+const DEFAULT_DBX_APP_KEY = '';                               // filled in once the "Railey Library" Dropbox app exists; can also be pasted on the Data & Sync tab
+const DBX_APPKEY_KEY  = 'tamarack_library_dropbox_appkey';
+const DBX_TOKENS_KEY  = 'tamarack_library_dropbox_tokens';    // library-only key
+const DBX_VERIFIER_KEY= 'tamarack_library_dropbox_pkce';
+const DBX_PATH        = '/Railey Library/tamarack-library.json';
+function dbxAppKey(){ return (lsGet(DBX_APPKEY_KEY) || DEFAULT_DBX_APP_KEY || '').trim(); }
+function redirectUri(){ return location.origin + location.pathname.replace(/\.html$/,''); } // one URI whether opened with or without .html
+const PAGE = 120;
+
+const $ = id => document.getElementById(id);
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(){ return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function norm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+function normKey(s){ return norm(s).replace(/^(the|a|an)\s+/,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+function natCmp(a,b){ return String(a||'').localeCompare(String(b||''), undefined, {numeric:true, sensitivity:'base'}); }
+function posCmp(a,b){ const x=String(a.position||''), y=String(b.position||''); if(!x||!y) return x?-1:y?1:0; return natCmp(x,y); }
+function todayLocal(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtLocalDate(ymd){ if(!ymd) return ''; const p=ymd.split('-').map(Number); if(p.length!==3||!p[0]) return ymd; return new Date(p[0],p[1]-1,p[2]).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+function money(n){ return '$' + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0, maximumFractionDigits:2}); }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'), 2600); }
+
+function emptyStore(){ return { format:'tamarack-library', version:1, updatedAt:0, books:[], imports:[] }; }
+function validStore(s){ return s && typeof s==='object' && Array.isArray(s.books); }
+function loadStore(){
+  const raw = lsGet(STORE_KEY);
+  if(!raw) return emptyStore();
+  try{ const s = JSON.parse(raw); if(validStore(s)){ if(!Array.isArray(s.imports)) s.imports=[]; return s; } }catch(e){}
+  // Main copy unreadable — fall back to the previous save rather than starting empty.
+  try{ const p = JSON.parse(lsGet(PREV_KEY)||''); if(validStore(p)){ if(!Array.isArray(p.imports)) p.imports=[]; return p; } }catch(e){}
+  return emptyStore();
+}
+let store = loadStore();
+
+function writeLocal(){
+  const prev = lsGet(STORE_KEY);
+  if(prev) lsSet(PREV_KEY, prev);
+  if(!lsSet(STORE_KEY, JSON.stringify(store))){
+    toast('Could not save on this device (storage full?) — download a backup from Data & Sync.');
+  }
+}
+function commit(){               // call after any user change
+  store.updatedAt = Date.now();
+  writeLocal();
+  markDirty();
+  schedulePush();
+  refreshAll();
+}
+function live(){ return store.books.filter(b=>!b.deleted); }
+function byId(id){ return store.books.find(b=>b.id===id); }
+
+function mergeStores(a, b){
+  const map = new Map();
+  for(const bk of a.books) map.set(bk.id, bk);
+  for(const bk of b.books){
+    const cur = map.get(bk.id);
+    if(!cur || (bk.updatedAt||0) > (cur.updatedAt||0)) map.set(bk.id, bk);
+  }
+  const imp = new Map();
+  for(const i of (a.imports||[]).concat(b.imports||[])) if(i && i.id) imp.set(i.id, Object.assign({}, imp.get(i.id)||{}, i));
+  const imports = [...imp.values()].sort((x,y)=>(x.at||0)-(y.at||0)).slice(-20);
+  return { format:'tamarack-library', version:1, updatedAt:Math.max(a.updatedAt||0, b.updatedAt||0), books:[...map.values()], imports };
+}
+function sig(s){ return s.books.map(b=>b.id+':'+(b.updatedAt||0)+(b.deleted?'x':'')).sort().join('|') + '#' + (s.imports||[]).map(i=>i.id+(i.undone?'u':'')).join(','); }
+
+/* ============================================================
+   Dropbox sync (the library's own Dropbox app — see top of script)
+   ============================================================ */
+function dbxTokens(){ try{ const r=lsGet(DBX_TOKENS_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+async function dbxToken(){
+  const t = dbxTokens();
+  if(!t || !t.refresh_token && !t.access_token) return null;
+  if(t.expires_at && t.expires_at - 60000 > Date.now()) return t;
+  if(!t.refresh_token) return t;
+  try{
+    const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({ grant_type:'refresh_token', refresh_token:t.refresh_token, client_id:dbxAppKey() }) });
+    const j = await r.json();
+    if(!j.access_token) return null;
+    t.access_token = j.access_token; t.expires_at = Date.now() + j.expires_in*1000;
+    lsSet(DBX_TOKENS_KEY, JSON.stringify(t));
+    return t;
+  }catch(e){ return null; }
+}
+async function dbxDownload(){
+  const t = await dbxToken();
+  if(!t) return { connected:false };
+  const r = await fetch('https://content.dropboxapi.com/2/files/download', { method:'POST',
+    headers:{ 'Authorization':'Bearer '+t.access_token, 'Dropbox-API-Arg':JSON.stringify({path:DBX_PATH}) } });
+  if(r.status===409) return { connected:true, data:null, rev:null };   // no file yet
+  if(r.status===401) return { connected:false, expired:true };
+  if(!r.ok) throw new Error('download failed (HTTP '+r.status+')');
+  let rev = null;
+  try{ rev = JSON.parse(r.headers.get('Dropbox-API-Result')||'{}').rev || null; }catch(e){}
+  const data = JSON.parse(await r.text());
+  if(!validStore(data)) throw new Error('the Dropbox file isn\'t a library file — not touching it');
+  if(!Array.isArray(data.imports)) data.imports = [];
+  return { connected:true, data, rev };
+}
+async function dbxUpload(s, rev){
+  const t = await dbxToken();
+  if(!t) return { ok:false };
+  // With a rev: only succeeds if nobody else wrote the file since we read it.
+  // Without one (first upload): 'add' fails rather than clobbering a file that appeared meanwhile.
+  const mode = rev ? { '.tag':'update', update:rev } : 'add';
+  const r = await fetch('https://content.dropboxapi.com/2/files/upload', { method:'POST',
+    headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({ path:DBX_PATH, mode, autorename:false, mute:true }) },
+    body: JSON.stringify(s) });
+  if(r.ok) return { ok:true };
+  if(r.status===409) return { ok:false, conflict:true };
+  throw new Error('upload failed (HTTP '+r.status+')');
+}
+
+function b64url(bytes){ return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+async function dbxConnect(){
+  const key = dbxAppKey();
+  if(!key){ toast('Paste the Dropbox App key first'); $('dbx-appkey').focus(); return; }
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  lsSet(DBX_VERIFIER_KEY, verifier);
+  location.href = 'https://www.dropbox.com/oauth2/authorize?' + new URLSearchParams({ client_id:key, response_type:'code',
+    code_challenge:challenge, code_challenge_method:'S256', token_access_type:'offline', redirect_uri:redirectUri() });
+}
+async function dbxHandleRedirect(){
+  const q = new URLSearchParams(location.search);
+  if(!q.has('code') && !q.has('error')) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if(q.has('error')){ toast('Dropbox connection cancelled'); return; }
+  const verifier = lsGet(DBX_VERIFIER_KEY);
+  if(!verifier){ toast('Dropbox sign-in expired — tap Connect again'); return; }
+  try{
+    const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({ grant_type:'authorization_code', code:q.get('code'), client_id:dbxAppKey(), code_verifier:verifier, redirect_uri:redirectUri() }) });
+    const j = await r.json();
+    if(!j.access_token) throw new Error(j.error_description || j.error || 'no token');
+    lsSet(DBX_TOKENS_KEY, JSON.stringify({ access_token:j.access_token, refresh_token:j.refresh_token, expires_at:Date.now()+j.expires_in*1000 }));
+    try{ localStorage.removeItem(DBX_VERIFIER_KEY); }catch(e){}
+    toast('Dropbox connected');
+  }catch(e){ toast('Dropbox connection failed: '+e.message); }
+}
+function dbxDisconnect(){
+  if(!confirm('Disconnect Dropbox on this device? Your books stay saved here and in Dropbox.')) return;
+  try{ localStorage.removeItem(DBX_TOKENS_KEY); }catch(e){}
+  lastSyncAt=0; setSync('', 'Local only (Dropbox not connected)'); renderDbxCard();
+}
+function renderDbxCard(){
+  const on = !!dbxTokens();
+  $('dbx-appkey').value = dbxAppKey();
+  $('dbx-appkey-row').classList.toggle('hide', on || !!DEFAULT_DBX_APP_KEY);
+  $('btn-connect').classList.toggle('hide', on);
+  $('btn-disconnect').classList.toggle('hide', !on);
+  $('btn-sync').classList.toggle('hide', !on);
+  $('dbx-redirect').textContent = redirectUri();
+}
+let syncing=false, syncAgain=false, pushTimer=null, lastSyncAt=0, lastSyncedSig=lsGet('tamarack_library_synced_sig')||'';
+function markDirty(){ if(dbxTokens()) setSync('warn','Unsynced changes…'); }
+function setSync(kind, text){
+  $('sync-dot').className = 'sync-dot' + (kind?' '+kind:'');
+  $('sync-text').textContent = text;
+  const d = $('dbx-status');
+  if(!dbxTokens()) d.innerHTML = '<b>Not connected on this device.</b> Your catalog is saved on this device only until you connect Dropbox below.';
+  else d.textContent = text;
+}
+function schedulePush(){ if(!dbxTokens()) return; clearTimeout(pushTimer); pushTimer=setTimeout(syncNow, 1500); }
+async function syncNow(){
+  if(!dbxTokens()){ setSync('', 'Local only (Dropbox not connected)'); return; }
+  if(syncing){ syncAgain=true; return; }
+  syncing=true; setSync('warn','Syncing…');
+  try{
+    let done=false;
+    for(let attempt=0; attempt<4 && !done; attempt++){
+      const remote = await dbxDownload();
+      if(!remote.connected){ setSync('err', remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
+      const merged = remote.data ? mergeStores(store, remote.data) : store;
+      if(sig(merged)!==sig(store)){ store = merged; writeLocal(); refreshAll(); }
+      if(remote.data && sig(merged)===sig(remote.data)){ done=true; break; }
+      const up = await dbxUpload(merged, remote.rev);
+      if(up.ok){ done=true; break; }
+      if(!up.conflict) throw new Error('upload failed');
+      // someone else saved in between — loop: re-download, re-merge, retry
+    }
+    if(done){
+      lastSyncAt=Date.now(); lastSyncedSig=sig(store); lsSet('tamarack_library_synced_sig', lastSyncedSig);
+      setSync('ok','Synced ' + new Date(lastSyncAt).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
+    } else setSync('err','Sync kept conflicting — try again');
+  }catch(e){ setSync('err','Sync failed: '+e.message); }
+  finally{
+    syncing=false;
+    if(syncAgain){ syncAgain=false; syncNow(); }
+  }
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-lastSyncAt>15000) syncNow(); });
+
+/* ============================================================
+   Derived lists (rooms, bookcases, …)
+   ============================================================ */
+function uniq(arr){ return [...new Set(arr.filter(v=>v!==undefined && v!==null && String(v).trim()!=='').map(v=>String(v).trim()))].sort(natCmp); }
+function fillSelect(sel, values, anyLabel){
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">'+esc(anyLabel)+'</option>' + values.map(v=>'<option>'+esc(v)+'</option>').join('');
+  sel.value = values.includes(cur) ? cur : '';
+}
+function fillDatalist(id, values){ $(id).innerHTML = values.map(v=>'<option value="'+esc(v)+'">').join(''); }
+function refreshLists(){
+  const L = live();
+  const room = $('f-room').value, bc = $('f-case').value;
+  fillSelect($('f-room'), uniq(L.map(b=>b.room)), 'Room — any');
+  fillSelect($('f-case'), uniq(L.filter(b=>!$('f-room').value || b.room===$('f-room').value).map(b=>b.bookcase)), 'Bookcase — any');
+  fillSelect($('f-shelf'), uniq(L.filter(b=>(!$('f-room').value || b.room===$('f-room').value) && (!$('f-case').value || b.bookcase===$('f-case').value)).map(b=>b.shelf)), 'Shelf — any');
+  fillSelect($('f-genre'), uniq(L.map(b=>b.genre)), 'Genre — any');
+  fillSelect($('s-room'), uniq(L.map(b=>b.room)), 'All rooms');
+  fillDatalist('dl-room', uniq(L.map(b=>b.room)));
+  fillDatalist('dl-case', uniq(L.map(b=>b.bookcase)));
+  fillDatalist('dl-shelf', uniq(L.map(b=>b.shelf)));
+  fillDatalist('dl-author', uniq(L.map(b=>b.author)));
+  fillDatalist('dl-series', uniq(L.map(b=>b.series)));
+  fillDatalist('dl-genre', uniq(L.map(b=>b.genre)));
+  fillDatalist('dl-loan', uniq(L.map(b=>b.loanedTo)));
+}
+
+/* ============================================================
+   Covers
+   ============================================================ */
+function hue(s){ let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))>>>0; return h%360; }
+function initials(t){ return normKey(t).split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?'; }
+function coverUrl(b, size){
+  if(b.coverUrl) return size==='L' ? b.coverUrl.replace(/-[SM]\.jpg$/,'-L.jpg') : b.coverUrl;
+  const isbn = String(b.isbn||'').replace(/[^0-9Xx]/g,'');
+  if(isbn.length===10 || isbn.length===13) return 'https://covers.openlibrary.org/b/isbn/'+isbn+'-'+(size||'M')+'.jpg?default=false';
+  return '';
+}
+function coverHTML(b, size){
+  const ph = '<div class="ph" style="background:hsl('+hue(b.title)+',38%,42%)">'+esc(initials(b.title))+'</div>';
+  const u = coverUrl(b, size);
+  if(!u) return ph;
+  return '<img loading="lazy" alt="" src="'+esc(u)+'" onerror="this.parentNode.innerHTML=this.dataset.ph" data-ph="'+esc(ph)+'">';
+}
+
+/* ============================================================
+   Search / filter
+   ============================================================ */
+function locText(b){
+  const p=[];
+  if(b.room) p.push(b.room);
+  if(b.bookcase) p.push('Case '+b.bookcase);
+  if(b.shelf) p.push('Shelf '+b.shelf);
+  if(b.position) p.push('#'+b.position);
+  return p.join(' · ') || 'No location yet';
+}
+function words(s){ return norm(s).replace(/[^a-z0-9]+/g,' ').trim(); }
+function hay(b){
+  // punctuation-free so "jrr tolkien", "J.R.R.", "tolkien's" all line up
+  const a = words(b.author);
+  return ' ' + [words(b.title), a, a.replace(/\b(\w) (?=\w\b)/g,'$1'), words(b.series), words(b.genre), words(b.subjects), words(b.notes), words(b.loanedTo),
+    words(b.publisher), words(b.isbn), words(b.year), words(b.room), words(b.bookcase), words(b.format)].join(' | ') + ' ';
+}
+function scopeText(b, scope){
+  if(scope==='title') return ' '+words(b.title)+' '+words(b.series)+' ';
+  if(scope==='author'){ const a=words(b.author); return ' '+a+' '+a.replace(/\b(\w) (?=\w\b)/g,'$1')+' '; }
+  return hay(b);
+}
+function edit1(a,b){ // true if one typo apart: a missing/extra/wrong letter, or two letters swapped
+  if(a===b) return true;
+  const la=a.length, lb=b.length; if(Math.abs(la-lb)>1) return false;
+  if(la===lb){ const d=[]; for(let k=0;k<la;k++) if(a[k]!==b[k]){ d.push(k); if(d.length>2) return false; }
+    if(d.length===2 && d[1]===d[0]+1 && a[d[0]]===b[d[1]] && a[d[1]]===b[d[0]]) return true; }
+  let i=0,j=0,d=0;
+  while(i<la && j<lb){
+    if(a[i]===b[j]){ i++; j++; continue; }
+    if(++d>1) return false;
+    if(la>lb) i++; else if(lb>la) j++; else { i++; j++; }
+  }
+  return d + (la-i) + (lb-j) <= 1;
+}
+function fuzzyHit(text, tok){
+  if(text.includes(tok)) return true;
+  if(tok.length<4) return false;
+  for(const w of text.split(/[ |]+/)){ if(w.length>=3 && (edit1(w, tok) || (w.length>tok.length && edit1(w.slice(0,tok.length), tok)))) return true; }
+  return false;
+}
+let lastFuzzy=false;
+function filtered(){
+  const q = words($('f-q').value).split(' ').filter(Boolean);
+  const scope = ui.scope || 'all';
+  const f = { room:$('f-room').value, bc:$('f-case').value, shelf:$('f-shelf').value, status:$('f-status').value,
+    genre:$('f-genre').value, loan:$('f-loan').value, rating:$('f-rating').value, review:$('f-review').checked };
+  const out=[], pool=[];
+  for(const b of live()){
+    if(f.room && b.room!==f.room) continue;
+    if(f.bc && b.bookcase!==f.bc) continue;
+    if(f.shelf && String(b.shelf)!==f.shelf) continue;
+    if(f.status && (b.status||'unread')!==f.status) continue;
+    if(f.genre && b.genre!==f.genre) continue;
+    if(f.loan==='out' && !b.loanedTo) continue;
+    if(f.loan==='in' && b.loanedTo) continue;
+    if(f.rating!==''){ const r=+b.rating||0, m=+f.rating; if(m===0 ? r!==0 : r<m) continue; }
+    if(f.review && !b.needsReview) continue;
+    pool.push(b);
+  }
+  // exact (substring) matching first; if nothing matches, allow one-letter typos
+  lastFuzzy=false;
+  for(const fuzzy of [false, true]){
+    if(fuzzy && (out.length || !q.length)) break;
+    for(const b of pool){
+      let score=0;
+      if(q.length){
+        const h=scopeText(b, scope), t=' '+words(b.title)+' ', a=' '+words(b.author)+' ';
+        let ok=true;
+        for(const tok of q){
+          if(!(fuzzy ? fuzzyHit(h,tok) : h.includes(tok))){ ok=false; break; }
+          if(t.includes(' '+tok)) score += t.startsWith(' '+tok)?7:6; else if(t.includes(tok)) score+=4; else if(a.includes(' '+tok)) score+=3; else score+=1;
+        }
+        if(!ok) continue;
+      }
+      out.push({b,score});
+    }
+    if(fuzzy) lastFuzzy = out.length>0;
+  }
+  const sort = $('f-sort').value;
+  const byTitle=(x,y)=>natCmp(normKey(x.b.title), normKey(y.b.title));
+  const authorKey=b=>{ const a=String(b.author||'').split(/[,&;]| and /)[0].trim(); const w=a.split(/\s+/); return norm(w[w.length-1]+' '+a); };
+  const cmp = {
+    title: byTitle,
+    author: (x,y)=>natCmp(authorKey(x.b),authorKey(y.b)) || natCmp(x.b.series,y.b.series) || (parseFloat(x.b.seriesNo)||0)-(parseFloat(y.b.seriesNo)||0) || byTitle(x,y),
+    location: (x,y)=>natCmp(x.b.room,y.b.room)||natCmp(x.b.bookcase,y.b.bookcase)||natCmp(x.b.shelf,y.b.shelf)||posCmp(x.b,y.b)||byTitle(x,y),
+    added: (x,y)=>(y.b.addedAt||0)-(x.b.addedAt||0),
+    rating: (x,y)=>(+y.b.rating||0)-(+x.b.rating||0)||byTitle(x,y),
+    value: (x,y)=>(+y.b.value||0)-(+x.b.value||0)||byTitle(x,y)
+  }[sort] || byTitle;
+  out.sort((x,y)=> q.length && sort==='title' ? (y.score-x.score)||cmp(x,y) : cmp(x,y));
+  return out.map(o=>o.b);
+}
+
+/* ============================================================
+   Library render
+   ============================================================ */
+const ui = Object.assign({ view:'grid' }, (()=>{ try{ return JSON.parse(lsGet(UI_KEY)||'{}'); }catch(e){ return {}; } })());
+let shown = PAGE, current = [], selectMode = false;
+const selected = new Set();
+
+function chipsHTML(b){
+  const c=[];
+  const st=b.status||'unread';
+  if(st==='read') c.push('<span class="chip read">Read</span>');
+  else if(st==='reading') c.push('<span class="chip reading">Reading</span>');
+  if(b.loanedTo) c.push('<span class="chip loan">Loaned: '+esc(b.loanedTo)+'</span>');
+  if(+b.rating) c.push('<span class="chip stars">'+'★'.repeat(+b.rating)+'</span>');
+  if(b.needsReview) c.push('<span class="chip review">Needs review</span>');
+  if(b.genre) c.push('<span class="chip">'+esc(b.genre)+'</span>');
+  if(+b.value) c.push('<span class="chip">'+money(b.value)+'</span>');
+  return c.join('');
+}
+function renderLibrary(resetPaging){
+  if(resetPaging) shown = PAGE;
+  current = filtered();
+  const all = live();
+  const slice = current.slice(0, shown);
+  const box = $('results');
+  if(!all.length){
+    box.innerHTML = '<div class="card empty">No books yet. Head to <b>Import</b> to load the file from your shelf photos, or tap <b>+ Add book</b>.</div>';
+  } else if(!current.length){
+    box.innerHTML = '<div class="card empty">No books match. Try fewer words or clear the filters.</div>';
+  } else if(ui.view==='list'){
+    box.innerHTML = '<div class="lb-list">' + slice.map(b=>
+      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">review</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
+    ).join('') + '</div>';
+  } else {
+    box.innerHTML = '<div class="lb-grid">' + slice.map(b=>
+      '<div class="bk'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'">'+(selectMode?'<div class="selbox">'+(selected.has(b.id)?'✓':'')+'</div>':'')+
+      '<div class="cover">'+coverHTML(b)+'</div><div class="bk-body"><h4>'+esc(b.title||'(untitled)')+'</h4><div class="au">'+esc(b.author||'Unknown author')+'</div><div class="loc">'+esc(locText(b))+'</div><div class="chips">'+chipsHTML(b)+'</div></div></div>'
+    ).join('') + '</div>';
+  }
+  $('more-wrap').classList.toggle('hide', current.length <= shown);
+  $('btn-more').textContent = 'Show more ('+(current.length-shown).toLocaleString()+' left)';
+  const loaned = current.filter(b=>b.loanedTo).length, read = current.filter(b=>b.status==='read').length;
+  const val = current.reduce((s,b)=>s+(+b.value||0),0), rev = current.filter(b=>b.needsReview).length;
+  $('summary').innerHTML = (lastFuzzy?'<span style="color:#8a5a00">No exact matches — showing close spellings.</span> ':'') + 'Showing <b>'+current.length.toLocaleString()+'</b> of '+all.length.toLocaleString()+' books'
+    + (read?' · '+read.toLocaleString()+' read':'') + (loaned?' · <span style="color:#a33b17">'+loaned+' loaned out</span>':'')
+    + (rev?' · <span style="color:#8a5a00">'+rev+' need review</span>':'') + (val?' · '+money(val)+' value':'');
+  $('hdr-count').textContent = all.length.toLocaleString() + ' book' + (all.length===1?'':'s');
+  updateBatchBar();
+  syncMoreBtn();
+}
+$('results').addEventListener('click', e=>{
+  const el = e.target.closest('[data-id]'); if(!el) return;
+  const id = el.dataset.id;
+  if(selectMode){ selected.has(id)?selected.delete(id):selected.add(id); renderLibrary(false); return; }
+  openBook(id, current.map(b=>b.id));
+});
+$('btn-more').onclick = ()=>{ shown += PAGE*2; renderLibrary(false); };
+['f-q'].forEach(id=>$(id).addEventListener('input', ()=>{ clearTimeout(renderLibrary._t); renderLibrary._t=setTimeout(()=>renderLibrary(true),120); }));
+['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-sort','f-review'].forEach(id=>$(id).addEventListener('change', ()=>{
+  if(id==='f-room'){ $('f-case').value=''; $('f-shelf').value=''; }
+  if(id==='f-case'){ $('f-shelf').value=''; }
+  if(id==='f-room'||id==='f-case') refreshLists();
+  ui.sort=$('f-sort').value; lsSet(UI_KEY, JSON.stringify(ui));
+  renderLibrary(true);
+}));
+$('btn-reset').onclick = ()=>{ ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); };
+document.querySelectorAll('#view-seg button').forEach(b=>b.onclick=()=>{ ui.view=b.dataset.view; lsSet(UI_KEY, JSON.stringify(ui)); syncViewSeg(); renderLibrary(false); });
+const SCOPE_PH = { all:'Search title, author, keyword…', title:'Search titles (and series)…', author:'Search authors…' };
+function syncScope(){ document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.toggle('active', b.dataset.scope===(ui.scope||'all'))); $('f-q').placeholder = SCOPE_PH[ui.scope||'all']; }
+document.querySelectorAll('#scope-seg button').forEach(b=>b.onclick=()=>{ ui.scope=b.dataset.scope; lsSet(UI_KEY, JSON.stringify(ui)); syncScope(); renderLibrary(true); $('f-q').focus(); });
+function activeFilterCount(){ return ['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating'].filter(id=>$(id).value).length + ($('f-review').checked?1:0); }
+function syncMoreBtn(){ const n=activeFilterCount(); $('btn-more-filters').textContent = (ui.moreOpen?'Fewer filters':'More filters') + (n?' ('+n+')':''); $('more-filters').classList.toggle('hide', !ui.moreOpen); }
+$('btn-more-filters').onclick = ()=>{ ui.moreOpen=!ui.moreOpen; lsSet(UI_KEY, JSON.stringify(ui)); syncMoreBtn(); };
+function syncViewSeg(){ document.querySelectorAll('#view-seg button').forEach(b=>b.classList.toggle('active', b.dataset.view===ui.view)); }
+
+/* batch select */
+function updateBatchBar(){ $('batchbar').classList.toggle('hide', !selectMode); $('batch-count').textContent = selected.size + ' selected'; $('btn-select').classList.toggle('hide', selectMode); }
+$('btn-select').onclick = ()=>{ selectMode=true; renderLibrary(false); };
+$('btn-batch-done').onclick = ()=>{ selectMode=false; selected.clear(); renderLibrary(false); };
+$('btn-batch-clear').onclick = ()=>{ selected.clear(); renderLibrary(false); };
+$('btn-batch-all').onclick = ()=>{ current.forEach(b=>selected.add(b.id)); renderLibrary(false); };
+$('btn-batch-del').onclick = ()=>{
+  if(!selected.size) return;
+  if(!confirm('Delete '+selected.size+' book'+(selected.size===1?'':'s')+'? This can\'t be undone (except from a backup).')) return;
+  const now=Date.now();
+  store.books = store.books.map(b=>selected.has(b.id)?{id:b.id, deleted:true, updatedAt:now}:b);
+  selected.clear(); commit(); toast('Deleted');
+};
+$('btn-batch-edit').onclick = ()=>{
+  if(!selected.size){ toast('Select some books first'); return; }
+  ['b-room','b-bookcase','b-shelf','b-genre'].forEach(id=>$(id).value=''); $('b-status').value=''; $('b-review').value='';
+  $('b-title').textContent = 'Edit '+selected.size+' book'+(selected.size===1?'':'s');
+  $('batch-bg').classList.add('open');
+};
+function closeBatch(){ $('batch-bg').classList.remove('open'); }
+$('b-close').onclick = closeBatch; $('b-cancel').onclick = closeBatch;
+$('b-apply').onclick = ()=>{
+  const ch = {};
+  const v = id=>$(id).value.trim();
+  if(v('b-room')) ch.room=v('b-room'); if(v('b-bookcase')) ch.bookcase=v('b-bookcase'); if(v('b-shelf')) ch.shelf=v('b-shelf');
+  if(v('b-status')) ch.status=v('b-status'); if(v('b-genre')) ch.genre=v('b-genre');
+  if(v('b-review')) ch.needsReview = v('b-review')==='yes';
+  if(!Object.keys(ch).length){ closeBatch(); return; }
+  const now=Date.now();
+  store.books = store.books.map(b=>selected.has(b.id)&&!b.deleted ? Object.assign({}, b, ch, {updatedAt:now}) : b);
+  closeBatch(); commit(); toast('Updated '+selected.size+' books');
+};
+
+/* ============================================================
+   Book modal
+   ============================================================ */
+const FIELDS = ['title','author','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','loanedTo','loanedDate','value','isbn','year','publisher','pages','notes'];
+let editId=null, navList=[], editRating=0, pendingCover=null, isNew=false;
+
+function starButtons(){
+  $('e-stars').innerHTML = [1,2,3,4,5].map(n=>'<button type="button" data-n="'+n+'" class="'+(n<=editRating?'on':'')+'" aria-label="'+n+' stars">★</button>').join('');
+}
+$('e-stars').addEventListener('click', e=>{ const n=+(e.target.dataset.n||0); if(!n) return; editRating = (editRating===n?0:n); starButtons(); });
+
+function fillForm(b){
+  FIELDS.forEach(f=>{ $('e-'+f).value = b[f]==null ? '' : b[f]; });
+  if(!$('e-status').value) $('e-status').value='unread';
+  editRating = +b.rating||0; starButtons();
+  $('e-review').checked = !!b.needsReview;
+  pendingCover = b.coverUrl || null;
+  $('m-title').textContent = b.title || (isNew?'New book':'(untitled)');
+  const bits=[]; if(b.author) bits.push(esc(b.author)); bits.push(esc(locText(b)));
+  if(b.loanedTo) bits.push('<span style="color:#a33b17;font-weight:600;">Loaned to '+esc(b.loanedTo)+(b.loanedDate?' on '+esc(fmtLocalDate(b.loanedDate)):'')+'</span>');
+  if(b.addedAt) bits.push('Added '+new Date(b.addedAt).toLocaleDateString());
+  $('m-sub').innerHTML = bits.join('<br>');
+  $('m-cover').innerHTML = coverHTML(b, 'M');
+  $('lookup-res').innerHTML = '';
+  $('btn-returned').classList.toggle('hide', !b.loanedTo);
+  $('btn-delete').classList.toggle('hide', isNew);
+}
+function formData(){
+  const o={};
+  FIELDS.forEach(f=>{ o[f] = $('e-'+f).value.trim(); });
+  o.rating = editRating;
+  o.needsReview = $('e-review').checked;
+  if(pendingCover) o.coverUrl = pendingCover;
+  if(o.loanedTo && !o.loanedDate) o.loanedDate = todayLocal();
+  if(!o.loanedTo) o.loanedDate = '';
+  return o;
+}
+function isDirty(){
+  if(isNew) return FIELDS.some(f=>$('e-'+f).value.trim() && f!=='status');
+  const b = byId(editId); if(!b) return false;
+  const d = formData();
+  return FIELDS.some(f=>String(b[f]==null?'':b[f]) !== String(d[f]) && !(f==='loanedDate' && !b.loanedDate))
+    || (+b.rating||0)!==d.rating || !!b.needsReview!==d.needsReview || (d.coverUrl||'')!==(b.coverUrl||'');
+}
+function openBook(id, list){
+  isNew=false; editId=id; navList=list||[id];
+  const b=byId(id); if(!b) return;
+  fillForm(b);
+  updateArrows();
+  $('modal-bg').classList.add('open');
+  $('modal').scrollTop=0;
+}
+function openNew(prefill){
+  isNew=true; editId=null; navList=[];
+  fillForm(Object.assign({status:'unread'}, prefill||{}));
+  updateArrows();
+  $('modal-bg').classList.add('open');
+  $('modal').scrollTop=0;
+  setTimeout(()=>$('e-title').focus(), 50);
+}
+function updateArrows(){
+  const i = navList.indexOf(editId);
+  $('m-prev').style.visibility = (!isNew && i>0) ? 'visible':'hidden';
+  $('m-next').style.visibility = (!isNew && i>=0 && i<navList.length-1) ? 'visible':'hidden';
+}
+function closeModal(){ $('modal-bg').classList.remove('open'); editId=null; isNew=false; }
+function saveBook(silent){
+  const d = formData();
+  if(!d.title){ toast('A title is needed'); $('e-title').focus(); return false; }
+  const now = Date.now();
+  if(isNew){
+    const b = Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'manual' }, d);
+    store.books.push(b); editId=b.id; isNew=false;
+  } else {
+    store.books = store.books.map(b=>b.id===editId ? Object.assign({}, b, d, {updatedAt:now}) : b);
+  }
+  commit();
+  if(!silent) toast('Saved');
+  return true;
+}
+function step(dir){
+  const i = navList.indexOf(editId); const j=i+dir;
+  if(i<0 || j<0 || j>=navList.length) return;
+  if(isDirty()){ if(confirm('Save your changes to this book first?')){ if(!saveBook(true)) return; } }
+  openBook(navList[j], navList);
+}
+$('m-prev').onclick=()=>step(-1); $('m-next').onclick=()=>step(1);
+$('m-close').onclick=()=>{ if(isDirty() && !confirm('Discard unsaved changes?')) return; closeModal(); };
+$('btn-cancel').onclick=$('m-close').onclick;
+$('modal-bg').addEventListener('click', e=>{ if(e.target===$('modal-bg')) $('m-close').onclick(); });
+$('btn-save').onclick=()=>{ if(saveBook()) closeModal(); };
+$('btn-delete').onclick=()=>{
+  const b=byId(editId); if(!b) return;
+  if(!confirm('Delete "'+(b.title||'this book')+'"?')) return;
+  store.books = store.books.map(x=>x.id===editId?{id:x.id, deleted:true, updatedAt:Date.now()}:x);
+  commit(); closeModal(); toast('Deleted');
+};
+$('btn-returned').onclick=()=>{ $('e-loanedTo').value=''; $('e-loanedDate').value=''; $('btn-returned').classList.add('hide'); };
+$('e-loanedTo').addEventListener('input', ()=>{ if($('e-loanedTo').value.trim() && !$('e-loanedDate').value) $('e-loanedDate').value=todayLocal(); });
+$('btn-add').onclick=()=>openNew({ room:$('f-room').value, bookcase:$('f-case').value, shelf:$('f-shelf').value });
+document.addEventListener('keydown', e=>{
+  if(!$('modal-bg').classList.contains('open')) return;
+  if(e.key==='Escape') $('m-close').onclick();
+  const tag=(e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||tag==='select') return;
+  if(e.key==='ArrowLeft') step(-1);
+  if(e.key==='ArrowRight') step(1);
+});
+
+/* ============================================================
+   Open Library lookups (free, no key)
+   ============================================================ */
+async function olSearch(title, author, isbn){
+  const p = new URLSearchParams({ limit:'6', fields:'key,title,author_name,first_publish_year,isbn,publisher,cover_i,number_of_pages_median,subject' });
+  const cleanIsbn = String(isbn||'').replace(/[^0-9Xx]/g,'');
+  if(cleanIsbn.length>=10) p.set('isbn', cleanIsbn);
+  else { if(title) p.set('title', title); if(author) p.set('author', author); }
+  const r = await fetch('https://openlibrary.org/search.json?'+p.toString());
+  if(!r.ok) throw new Error('Open Library HTTP '+r.status);
+  return (await r.json()).docs || [];
+}
+function cleanSubjects(list){ return uniq((list||[]).filter(x=>x.length<40 && !/accessible book|protected daisy|in library|large type|reading level|nyt:|fiction, general|open_syllabus|^\d/i.test(x)).map(x=>x.toLowerCase())).slice(0,10).join(', '); }
+function pickIsbn(doc){ const l=doc.isbn||[]; return l.find(x=>x.length===13 && x.startsWith('978')) || l.find(x=>x.length===13) || l[0] || ''; }
+function docFill(doc){
+  return { isbn:pickIsbn(doc), year:doc.first_publish_year?String(doc.first_publish_year):'', publisher:(doc.publisher||[])[0]||'',
+    pages:doc.number_of_pages_median?String(doc.number_of_pages_median):'', subjects:cleanSubjects(doc.subject), coverUrl:doc.cover_i?'https://covers.openlibrary.org/b/id/'+doc.cover_i+'-M.jpg':'' };
+}
+$('btn-lookup').onclick = async ()=>{
+  const box=$('lookup-res'); box.innerHTML='<div class="note">Searching Open Library…</div>';
+  try{
+    const docs = await olSearch($('e-title').value.trim(), $('e-author').value.trim(), $('e-isbn').value.trim());
+    if(!docs.length){ box.innerHTML='<div class="note">No matches. Try shortening the title or removing the author.</div>'; return; }
+    box.innerHTML = docs.map((d,i)=>'<div class="lk">'+(d.cover_i?'<img src="https://covers.openlibrary.org/b/id/'+d.cover_i+'-S.jpg" alt="">':'<img alt="">')+
+      '<div class="x"><b>'+esc(d.title)+'</b><br>'+esc((d.author_name||[]).join(', '))+(d.first_publish_year?' · '+d.first_publish_year:'')+'</div><button type="button" data-i="'+i+'">Use</button></div>').join('');
+    box.onclick = e=>{
+      const i=e.target.dataset.i; if(i===undefined) return;
+      const d=docs[+i], f=docFill(d);
+      // fill only empty fields — never overwrite what's been typed
+      ['isbn','year','publisher','pages','subjects'].forEach(k=>{ if(!$('e-'+k).value.trim() && f[k]) $('e-'+k).value=f[k]; });
+      if(!$('e-title').value.trim()) $('e-title').value=d.title||'';
+      if(!$('e-author').value.trim()) $('e-author').value=(d.author_name||[]).join(', ');
+      if(f.coverUrl){ pendingCover=f.coverUrl; $('m-cover').innerHTML='<img src="'+esc(f.coverUrl)+'" alt="">'; }
+      box.innerHTML='<div class="note">Filled in the blanks — tap Save to keep it.</div>';
+    };
+  }catch(err){ box.innerHTML='<div class="note">Lookup failed: '+esc(err.message)+'</div>'; }
+};
+
+function titleMatch(a,b){ const x=normKey(a), y=normKey(b); if(!x||!y) return false; if(x===y) return true; const xs=x.split(':')[0], ys=y.split(':')[0]; return (x.length>6 && y.startsWith(x)) || (y.length>6 && x.startsWith(y)) || normKey(xs)===normKey(ys); }
+function authorMatch(a, list){
+  if(!a) return true;
+  const last = normKey(String(a).split(/[,&;]| and /)[0]).split(' ').pop();
+  return (list||[]).some(n=>normKey(n).includes(last));
+}
+let lookupStop=false;
+$('btn-lookup-all').onclick = async ()=>{
+  const todo = live().filter(b=>(!b.coverUrl || !b.isbn) && !b.lookupDone && b.title);
+  if(!todo.length){ $('lookup-progress').textContent='Nothing to look up — every book already has a cover and ISBN (or was already checked).'; return; }
+  lookupStop=false; $('btn-lookup-all').disabled=true; $('btn-lookup-stop').classList.remove('hide');
+  let found=0, n=0;
+  for(const b of todo){
+    if(lookupStop) break;
+    n++; $('lookup-progress').textContent='Checking '+n+' of '+todo.length+'… ('+found+' filled in)';
+    try{
+      const docs = await olSearch(b.title, b.author, b.isbn);
+      const d = docs.find(x=>titleMatch(b.title, x.title) && authorMatch(b.author, x.author_name));
+      const cur = byId(b.id); if(!cur || cur.deleted) continue;
+      const ch = { lookupDone:true };
+      if(d){
+        const f=docFill(d);
+        ['isbn','year','publisher','pages','coverUrl','subjects'].forEach(k=>{ if(!cur[k] && f[k]) ch[k]=f[k]; });
+        if(Object.keys(ch).length>1) found++;
+      }
+      Object.assign(cur, ch, {updatedAt:Date.now()});
+      if(n%15===0){ commit(); }
+    }catch(e){ /* network hiccup: skip this one, it stays eligible next run */ }
+    await new Promise(r=>setTimeout(r, 400));
+  }
+  commit();
+  $('btn-lookup-all').disabled=false; $('btn-lookup-stop').classList.add('hide');
+  $('lookup-progress').textContent = (lookupStop?'Stopped. ':'Done. ') + 'Filled in details for '+found+' of '+n+' books checked.';
+};
+$('btn-lookup-stop').onclick = ()=>{ lookupStop=true; };
+
+/* ============================================================
+   Shelves
+   ============================================================ */
+function renderShelves(){
+  const roomF = $('s-room').value, q = norm($('s-q').value.trim());
+  const L = live().filter(b=>!roomF || b.room===roomF);
+  const tree = {};
+  for(const b of L){
+    const r=b.room||'(no room)', c=b.bookcase||'(no bookcase)', s=b.shelf||'(no shelf)';
+    ((tree[r]=tree[r]||{})[c]=tree[r][c]||{})[s] = (tree[r][c][s]||[]).concat(b);
+  }
+  const rooms = Object.keys(tree).sort(natCmp);
+  if(!rooms.length){ $('shelf-tree').innerHTML='<div class="card empty">No books yet.</div>'; return; }
+  const openRooms = new Set([...document.querySelectorAll('details.room[open]')].map(d=>d.dataset.room));
+  $('shelf-tree').innerHTML = rooms.map(r=>{
+    const cases = tree[r]; let count=0, hit=false;
+    const body = Object.keys(cases).sort(natCmp).map(c=>{
+      return '<div class="case"><div class="case-h">Bookcase '+esc(c)+'</div>' + Object.keys(cases[c]).sort(natCmp).map(s=>{
+        const books = cases[c][s].slice().sort((x,y)=>posCmp(x,y) || natCmp(normKey(x.title),normKey(y.title)));
+        count += books.length;
+        return '<div class="shelf"><div class="shelf-h"><span>Shelf '+esc(s)+' · '+books.length+' book'+(books.length===1?'':'s')+'</span><span class="acts">'+
+          '<button class="secondary" data-act="add" data-r="'+esc(r)+'" data-c="'+esc(c)+'" data-s="'+esc(s)+'">+ Book</button>'+
+          '<button class="secondary" data-act="renum" data-ids="'+books.map(b=>b.id).join(',')+'">Renumber</button></span></div><div class="spines">'+
+          books.map(b=>{ const h = q && hay(b).includes(q); if(h) hit=true;
+            return '<div class="sp" data-id="'+b.id+'" data-list="'+books.map(x=>x.id).join(',')+'"'+(h?' style="background:#fff1c2"':'')+'><span class="n">'+esc(b.position||'–')+'</span><span>'+esc(b.title)+(b.loanedTo?' <span class="chip loan">'+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' <span class="chip review">review</span>':'')+'</span><span class="a">'+esc(b.author||'')+'</span></div>'; }).join('')+
+          '</div></div>';
+      }).join('') + '</div>';
+    }).join('');
+    const open = openRooms.has(r) || rooms.length===1 || (q && hit);
+    return '<details class="room" data-room="'+esc(r)+'"'+(open?' open':'')+'><summary><span>'+esc(r)+'</span><span class="note" style="margin:0 10px 0 auto;">'+count+' books</span></summary><div class="room-body">'+body+'</div></details>';
+  }).join('');
+}
+$('shelf-tree').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-act]');
+  if(btn){
+    if(btn.dataset.act==='add') openNew({ room:btn.dataset.r.startsWith('(')?'':btn.dataset.r, bookcase:btn.dataset.c.startsWith('(')?'':btn.dataset.c, shelf:btn.dataset.s.startsWith('(')?'':btn.dataset.s });
+    if(btn.dataset.act==='renum'){
+      // Books in a sideways stack share one slot (5a, 5b…) — keep them together and keep their letters.
+      const ids = btn.dataset.ids.split(','); const now=Date.now(); let changed=0, slot=0, lastKey=null;
+      ids.forEach((id,i)=>{ const b=byId(id); if(!b) return;
+        const m = String(b.position||'').match(/^(\d+)\s*([a-z]*)$/i);
+        const key = m && m[2] ? m[1] : 'solo'+i;
+        if(key!==lastKey){ slot++; lastKey=key; }
+        const np = String(slot) + (m && m[2] ? m[2].toLowerCase() : '');
+        if(String(b.position)!==np){ b.position=np; b.updatedAt=now; changed++; } });
+      if(changed){ commit(); toast('Renumbered '+changed+' book'+(changed===1?'':'s')); } else toast('Already numbered in order');
+    }
+    return;
+  }
+  const sp = e.target.closest('.sp'); if(sp) openBook(sp.dataset.id, sp.dataset.list.split(','));
+});
+$('s-room').addEventListener('change', renderShelves);
+$('s-q').addEventListener('input', ()=>{ clearTimeout(renderShelves._t); renderShelves._t=setTimeout(renderShelves,150); });
+
+/* ============================================================
+   Import
+   ============================================================ */
+let pending = null;   // parsed rows awaiting confirmation
+const COLMAP = { title:['title','book','name'], author:['author','authors','by'], isbn:['isbn','isbn13','isbn10'], room:['room'], bookcase:['bookcase','case','bookshelf','shelf unit'],
+  shelf:['shelf','shelf #','shelf number','row'], position:['position','pos','# from left','from left','order'], status:['status','read status','read'], rating:['rating','stars'],
+  value:['value','price','$'], notes:['notes','note','comments'], loanedTo:['loaned to','loaned','lent to','loanedto'], genre:['genre','category','subject'], year:['year','published','pub year'],
+  publisher:['publisher'], series:['series'], seriesNo:['series #','series number','seriesno','book #'], format:['format','binding'], pages:['pages','page count'], confidence:['confidence'], subjects:['keywords','subjects','tags','topics'] };
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; continue; }
+    if(c==='"') q=true; else if(c===','){ row.push(f); f=''; } else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; } else if(c!=='\r') f+=c;
+  }
+  if(f!=='' || row.length){ row.push(f); rows.push(row); }
+  const head = (rows.shift()||[]).map(h=>norm(h).trim());
+  const idx = {}; for(const k in COLMAP){ const j = head.findIndex(h=>COLMAP[k].includes(h)); if(j>=0) idx[k]=j; }
+  if(idx.title===undefined) throw new Error('CSV needs a "Title" column');
+  return rows.filter(r=>r.some(x=>x.trim())).map(r=>{ const o={}; for(const k in idx) o[k]=(r[idx[k]]||'').trim(); return o; });
+}
+function parseImport(text){
+  text = text.replace(/^﻿/,'').trim();
+  if(!text) throw new Error('Nothing to import');
+  if(text[0]==='{' || text[0]==='['){
+    const j = JSON.parse(text);
+    const arr = Array.isArray(j) ? j : (j.books || j.items || []);
+    if(!Array.isArray(arr)) throw new Error('No "books" list in that file');
+    return { rows: arr.filter(b=>b && !b.deleted), isStore: !!(j && j.format==='tamarack-library') };
+  }
+  return { rows: parseCSV(text), isStore:false };
+}
+function cleanRow(r){
+  const s = v=> v==null ? '' : String(v).trim();
+  let status = norm(s(r.status));
+  status = /^(read|yes|y|true|done|finished)$/.test(status) ? 'read' : /reading|current/.test(status) ? 'reading' : 'unread';
+  const low = /low|unsure|uncertain|guess/.test(norm(s(r.confidence))) || r.needsReview===true;
+  return { title:s(r.title), author:s(r.author||(Array.isArray(r.authors)?r.authors.join(', '):r.authors)), series:s(r.series), seriesNo:s(r.seriesNo),
+    genre:s(r.genre), subjects:Array.isArray(r.subjects)?r.subjects.join(', '):s(r.subjects||r.keywords), format:s(r.format), room:s(r.room), bookcase:s(r.bookcase), shelf:s(r.shelf), position:s(r.position),
+    status, loanedTo:s(r.loanedTo), loanedDate:s(r.loanedDate), rating:Math.max(0,Math.min(5,parseInt(r.rating)||0)),
+    value:s(r.value).replace(/[$,]/g,''), isbn:s(r.isbn).replace(/[^0-9Xx]/g,''), year:s(r.year), publisher:s(r.publisher), pages:s(r.pages),
+    notes:s(r.notes), coverUrl:s(r.coverUrl), needsReview:low };
+}
+function dupKey(b){ return normKey(b.title)+'|'+normKey(String(b.author||'').split(/[,&;]| and /)[0]).split(' ').pop(); }
+function showPreview(parsed){
+  const rows = parsed.rows.map(cleanRow).filter(r=>r.title);
+  if(!rows.length) throw new Error('No books with titles found');
+  pending = { rows };
+  const existing = new Map(live().map(b=>[dupKey(b), b]));
+  const seen = new Set();
+  pending.rows.forEach(r=>{ const k=dupKey(r); r._dup = existing.get(k) || null; r._dupInFile = seen.has(k); seen.add(k); });
+  ['imp-room','imp-case','imp-shelf'].forEach(id=>$(id).value='');
+  drawPreview();
+  $('imp-preview').classList.remove('hide');
+  $('imp-preview').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function drawPreview(){
+  const R=pending.rows, dups=R.filter(r=>r._dup).length, low=R.filter(r=>r.needsReview).length;
+  $('imp-stats').innerHTML = '<b>'+R.length+'</b> books in file · <b>'+(R.length-dups)+'</b> new'
+    + (dups?' · <span style="color:#8a5a00">'+dups+' already in library</span>':'') + (low?' · '+low+' flagged for review':'');
+  $('imp-dup-row').classList.toggle('hide', !dups);
+  const dr=$('imp-room').value.trim(), dc=$('imp-case').value.trim(), ds=$('imp-shelf').value.trim();
+  $('imp-rows').innerHTML = R.slice(0,500).map((r,i)=>{
+    const loc = locText({ room:r.room||dr, bookcase:r.bookcase||dc, shelf:r.shelf||ds, position:r.position });
+    return '<tr class="'+(r._dup?'dup':'')+'"><td>'+(i+1)+'</td><td>'+esc(r.title)+'</td><td>'+esc(r.author)+'</td><td>'+esc(loc)+'</td><td>'+
+      (r._dup?'<span class="chip review">In library</span>':'')+(r.needsReview?' <span class="chip review">Review</span>':'')+'</td></tr>';
+  }).join('') + (R.length>500?'<tr><td colspan="5" class="note">…and '+(R.length-500)+' more</td></tr>':'');
+  $('btn-do-import').textContent = 'Import ' + R.length + ' book' + (R.length===1?'':'s');
+}
+['imp-room','imp-case','imp-shelf'].forEach(id=>$(id).addEventListener('input', ()=>{ if(pending) drawPreview(); }));
+function handleText(text){ try{ showPreview(parseImport(text)); }catch(e){ toast('Couldn\'t read that: '+e.message); } }
+$('dropzone').onclick = ()=>$('imp-file').click();
+$('imp-file').onchange = e=>{ const f=e.target.files[0]; if(!f) return; f.text().then(handleText); e.target.value=''; };
+['dragover','dragenter'].forEach(ev=>$('dropzone').addEventListener(ev, e=>{ e.preventDefault(); $('dropzone').classList.add('dragover'); }));
+['dragleave','drop'].forEach(ev=>$('dropzone').addEventListener(ev, e=>{ e.preventDefault(); $('dropzone').classList.remove('dragover'); }));
+$('dropzone').addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) f.text().then(handleText); });
+$('btn-parse').onclick = ()=>handleText($('imp-text').value);
+$('btn-cancel-import').onclick = ()=>{ pending=null; $('imp-preview').classList.add('hide'); };
+$('btn-do-import').onclick = ()=>{
+  if(!pending) return;
+  const dr=$('imp-room').value.trim(), dc=$('imp-case').value.trim(), ds=$('imp-shelf').value.trim();
+  const mode = $('imp-dups').value, now=Date.now(), batch='imp'+now.toString(36);
+  let added=0, moved=0, skipped=0;
+  for(const r of pending.rows){
+    const row = Object.assign({}, r); delete row._dup; delete row._dupInFile;
+    if(!row.room) row.room=dr; if(!row.bookcase) row.bookcase=dc; if(!row.shelf) row.shelf=ds;
+    if(r._dup && mode==='skip'){ skipped++; continue; }
+    if(r._dup && mode==='move'){
+      const b = byId(r._dup.id);
+      if(b){ Object.assign(b, { room:row.room||b.room, bookcase:row.bookcase||b.bookcase, shelf:row.shelf||b.shelf, position:row.position||b.position, updatedAt:now }); moved++; }
+      continue;
+    }
+    Object.keys(row).forEach(k=>{ if(row[k]==='' || row[k]===0 && k==='rating' || row[k]===false) delete row[k]; });
+    store.books.push(Object.assign({ status:'unread' }, row, { id:uid(), addedAt:now, updatedAt:now, source:'import', importBatch:batch }));
+    added++;
+  }
+  store.imports.push({ id:batch, at:now, added, label:(dr||dc||ds) ? [dr, dc&&'Case '+dc, ds&&'Shelf '+ds].filter(Boolean).join(' · ') : '' });
+  pending=null; $('imp-preview').classList.add('hide'); $('imp-text').value='';
+  commit();
+  toast('Imported '+added+(moved?', moved '+moved:'')+(skipped?', skipped '+skipped+' already in library':''));
+};
+function renderUndo(){
+  const last = [...store.imports].reverse().find(i=>!i.undone && i.added);
+  $('btn-undo-import').disabled = !last;
+  $('undo-text').textContent = last ? 'Last import: '+last.added+' books on '+new Date(last.at).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})+(last.label?' ('+last.label+')':'')+'. Undoing removes only the books that import added — edits you made to them since are lost too.' : 'No imports to undo.';
+}
+$('btn-undo-import').onclick = ()=>{
+  const last = [...store.imports].reverse().find(i=>!i.undone && i.added); if(!last) return;
+  const ids = live().filter(b=>b.importBatch===last.id).map(b=>b.id);
+  if(!confirm('Remove the '+ids.length+' books added by that import?')) return;
+  const now=Date.now(), set=new Set(ids);
+  store.books = store.books.map(b=>set.has(b.id)?{id:b.id, deleted:true, updatedAt:now}:b);
+  last.undone=true; commit(); toast('Removed '+ids.length+' books');
+};
+
+/* ============================================================
+   Data tab: stats, export, restore
+   ============================================================ */
+function renderData(){
+  const L=live();
+  const val=L.reduce((s,b)=>s+(+b.value||0),0);
+  const stat=(n,l)=>'<div class="stat"><b>'+n+'</b><span>'+l+'</span></div>';
+  $('stats').innerHTML = stat(L.length.toLocaleString(),'books') + stat(L.filter(b=>b.status==='read').length.toLocaleString(),'read')
+    + stat(L.filter(b=>b.loanedTo).length,'loaned out') + stat(L.filter(b=>b.needsReview).length,'need review')
+    + stat(uniq(L.map(b=>b.author)).length.toLocaleString(),'authors') + stat(money(val),'total value');
+  const rooms = {}; L.forEach(b=>{ const r=b.room||'(no room)'; rooms[r]=(rooms[r]||0)+1; });
+  $('room-stats').innerHTML = Object.keys(rooms).length ? '<table><thead><tr><th>Room</th><th style="text-align:right">Books</th></tr></thead><tbody>'
+    + Object.keys(rooms).sort(natCmp).map(r=>'<tr><td>'+esc(r)+'</td><td style="text-align:right">'+rooms[r].toLocaleString()+'</td></tr>').join('') + '</tbody></table>' : '';
+}
+function download(name, text, type){
+  const blob = new Blob([text], {type});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+$('btn-export-json').onclick = ()=>download('tamarack-library-backup-'+todayLocal()+'.json', JSON.stringify(store, null, 1), 'application/json');
+$('btn-export-csv').onclick = ()=>{
+  const cols=['title','author','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','value','isbn','year','publisher','pages','notes','needsReview'];
+  const q=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const lines=[cols.join(',')].concat(live().sort((a,b)=>natCmp(a.room,b.room)||natCmp(a.bookcase,b.bookcase)||natCmp(a.shelf,b.shelf)||posCmp(a,b)).map(b=>cols.map(c=>q(b[c])).join(',')));
+  download('tamarack-library-'+todayLocal()+'.csv', '﻿'+lines.join('\r\n'), 'text/csv');
+};
+$('btn-restore').onclick = ()=>$('restore-file').click();
+$('restore-file').onchange = async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const s = JSON.parse(await f.text());
+    if(!validStore(s)) throw new Error('not a library backup');
+    const before = live().length;
+    store = mergeStores(store, s); commit();
+    toast('Merged backup — '+(live().length-before)+' books added');
+  }catch(err){ toast('Couldn\'t merge: '+err.message); }
+};
+$('btn-sync').onclick = syncNow;
+$('btn-connect').onclick = dbxConnect;
+$('btn-disconnect').onclick = dbxDisconnect;
+$('dbx-appkey').addEventListener('change', ()=>{ lsSet(DBX_APPKEY_KEY, $('dbx-appkey').value.trim()); });
+$('sync-text').style.cursor='pointer'; $('sync-text').onclick = ()=>showPanel('data');
+
+/* ============================================================
+   Tabs + boot
+   ============================================================ */
+function showPanel(p){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.panel===p));
+  document.querySelectorAll('.panel').forEach(s=>s.classList.toggle('active', s.id===p));
+  if(p==='shelves') renderShelves();
+  if(p==='data') renderData();
+  if(p==='import') renderUndo();
+  ui.panel=p; lsSet(UI_KEY, JSON.stringify(ui));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showPanel(b.dataset.panel));
+function refreshAll(){
+  refreshLists();
+  renderLibrary(false);
+  if($('shelves').classList.contains('active')) renderShelves();
+  if($('data').classList.contains('active')) renderData();
+  if($('import').classList.contains('active')) renderUndo();
+}
+
+if(ui.sort) $('f-sort').value = ui.sort;
+syncViewSeg();
+syncScope();
+refreshLists();
+renderLibrary(true);
+showPanel(ui.panel || 'library');
+renderDbxCard();
+dbxHandleRedirect().then(()=>{ renderDbxCard(); setSync('', dbxTokens() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); });
+window.addEventListener('beforeunload', e=>{ if(pushTimer && dbxTokens() && sig(store)!==lastSyncedSig){ e.preventDefault(); e.returnValue=''; } });
+})();
+</script>
+</body>
+</html>
