@@ -507,6 +507,16 @@
   .wk-ps:hover, .wk-ps:active{ background:#efe6d3; color:var(--navy); border-color:var(--navy); }
   .wk-ps .n{ background:#fff1d6; color:#8a5a00; border-radius:999px; padding:0 7px; font-size:.72rem; }
   .wk-done{ text-align:center; padding:20px 0; }
+  .wk-addbtn{ width:100%; margin-top:12px; border-style:dashed !important; }
+  .wa-h{ font-family:var(--serif); font-size:1.25rem; color:var(--navy); margin:10px 0 2px; }
+  .wa-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:8px 0; }
+  .wa-side{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 4px; }
+  .wa-side button{ flex:1 1 30%; font-size:.8rem; padding:8px 6px; line-height:1.25; }
+  .wa-side button.secondary.on{ background:var(--navy); color:#fff8e8; border-color:var(--navy); }
+  .wa-ok{ background:#e6f4ee; color:#07583f; border-radius:8px; padding:8px 12px; margin:8px 0; font-size:.86rem; }
+  .wa-dup{ background:#fff1d6; border-radius:8px; padding:8px 10px; margin:8px 0; font-size:.86rem; }
+  .wa-dup .sc-m{ display:flex; justify-content:space-between; gap:8px; align-items:center; padding:6px 0; border-top:1px solid rgba(0,0,0,.08); }
+  @media (max-width:520px){ .wa-grid{ grid-template-columns:1fr 1fr; } .wa-grid > div:first-child{ grid-column:1/-1; } }
   .un-walk-btn{ margin-top:4px; }
 </style>
 </head>
@@ -643,7 +653,7 @@
             <button class="secondary" id="un-print">Print list</button>
           </div>
           <button id="un-walk" class="un-walk-btn">Start the walk-through</button>
-          <p class="note">The walk-through takes you to each one in turn — where it sits and what's on either side. Scan its barcode, type the title, or snap the title page and the photo goes to Dropbox for Claude to read.</p>
+          <p class="note">The walk-through takes you to each one in turn — where it sits and what's on either side. Scan its barcode, type the title, or snap the title page and the photo goes to Dropbox for Claude to read. Spot a book that isn’t in the catalog at all? Tap <b>＋ Found a book we missed</b> and it goes in right where it sits.</p>
           <p class="note">Books whose spine couldn't be read, listed by where they sit. Pull each one, check the title page, then tap it here to fill in the title and author (and clear “Needs review”).</p>
           <div class="search-row">
             <select id="un-room" class="genre-main"><option value="">All rooms</option></select>
@@ -933,6 +943,7 @@
     <div class="wk-head"><h3>Mystery books</h3><span id="wk-count"></span></div>
     <div id="wk-body"></div>
     <input type="file" id="wk-file" accept="image/*" capture="environment" class="hide">
+    <input type="file" id="wa-file" accept="image/*" capture="environment" class="hide">
   </div>
 </div>
 <datalist id="dl-coll"></datalist><datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
@@ -2651,8 +2662,8 @@ function walkShelves(){       // every shelf with mystery books, in walking orde
   return out;
 }
 function openWalk(startId){
-  if(!unidRows().some(isUnid)){ toast('Nothing unidentified here'); return; }
   $('walk-bg').classList.add('open'); lockPage();
+  if(!unidRows().some(isUnid)){ walkIds=[]; walkI=0; walkScope=null; openAddMissed(true); return; }
   if(typeof startId==='string'){ const b=byId(startId); startWalk(b?skeyOf(b):null); return; }
   drawPicker();
 }
@@ -2665,7 +2676,8 @@ function startWalk(scope){
 function drawPicker(){
   const S=walkShelves(); $('wk-count').textContent='';
   let html='<p class="note" style="margin-top:6px;">Pick the shelf you’re standing at — or go through the whole house, one shelf at a time.</p>'
-    +'<button id="wk-all" style="width:100%;margin-bottom:10px;">Whole house, in order ('+S.reduce((s,x)=>s+x.n,0)+' books)</button>';
+    +'<button id="wk-all" style="width:100%;margin-bottom:10px;">Whole house, in order ('+S.reduce((s,x)=>s+x.n,0)+' books)</button>'
+    +'<button class="secondary wk-addbtn" id="wk-add" style="margin:0 0 10px;">＋ Add a book we missed (any shelf)</button>';
   let lastRoom=null, lastCase=null;
   for(const s of S){
     if(s.b.room!==lastRoom){ html+='<div class="wk-pr">'+esc(s.b.room||'(no room)')+'</div>'; lastRoom=s.b.room; lastCase=null; }
@@ -2674,6 +2686,7 @@ function drawPicker(){
   }
   $('wk-body').innerHTML=html;
   $('wk-all').onclick=()=>startWalk(null);
+  $('wk-add').onclick=()=>openAddMissed(true);
   $('wk-body').querySelectorAll('[data-scope]').forEach(x=>x.onclick=()=>startWalk(x.dataset.scope));
 }
 function closeWalk(){ $('walk-bg').classList.remove('open'); unlockPage(); if($('import').classList.contains('active')) renderUnid(); }
@@ -2688,16 +2701,20 @@ function drawWalk(){
     $('wk-body').innerHTML='<div class="wk-done"><h3>Shelf done</h3><p class="note">'+(left?left+' left on this shelf (skipped or waiting on a photo).':'Every mystery book on this shelf is taken care of.')+'</p>'
       +(nxt?'<button id="wk-nxt" style="margin:4px;">Next shelf: '+esc([nxt.b.bookcase, shelfLabel(nxt.b)].filter(Boolean).join(' · '))+'</button>':'')
       +'<button class="secondary" id="wk-pick" style="margin:4px;">Pick another shelf</button>'
-      +(left?'<button class="secondary" id="wk-again" style="margin:4px;">Redo the skipped ones here</button>':'')+'</div>';
+      +(left?'<button class="secondary" id="wk-again" style="margin:4px;">Redo the skipped ones here</button>':'')
+      +'<button class="secondary wk-addbtn" id="wk-add">＋ Found a book we missed on this shelf</button></div>';
     if($('wk-nxt')) $('wk-nxt').onclick=()=>startWalk(nxt.key);
     $('wk-pick').onclick=drawPicker;
     if($('wk-again')) $('wk-again').onclick=()=>startWalk(walkScope);
+    $('wk-add').onclick=()=>openAddMissed();
     return;
   }
   if(walkI>=walkIds.length){
     $('wk-body').innerHTML='<div class="wk-done"><h3>That’s the end of the list</h3><p class="note">'+(left?left+' still unidentified (skipped or waiting on a photo).':'Everything here is identified — nice work.')+'</p>'
-      +(left?'<button class="secondary" id="wk-restart">Go through the skipped ones</button>':'')+'</div>';
+      +(left?'<button class="secondary" id="wk-restart">Go through the skipped ones</button>':'')
+      +'<button class="secondary wk-addbtn" id="wk-add">＋ Found a book we missed</button></div>';
     $('wk-count').textContent='';
+    $('wk-add').onclick=()=>openAddMissed();
     if($('wk-restart')) $('wk-restart').onclick=()=>{ walkIds=unidRows().filter(isUnid).map(b=>b.id); walkI=0; walkSkipped=new Set(); drawWalk(); };
     return;
   }
@@ -2724,6 +2741,7 @@ function drawWalk(){
     +'</div>'
     +'<div id="wk-form" class="hide"><div class="grid"><div style="grid-column:1/-1"><label>Title</label><input id="wk-title"></div><div style="grid-column:1/-1"><label>Author</label><input id="wk-author" list="dl-author"></div></div>'
     +'<div class="row" style="margin-top:10px;"><button id="wk-save">Save &amp; next</button><button class="secondary" id="wk-look">Look up cover &amp; details</button></div><div class="lookup-res" id="wk-look-res"></div></div>'
+    +'<button class="secondary wk-addbtn" id="wk-add">＋ Found a book we missed on this shelf</button>'
     +'<div class="row wk-foot"><button class="secondary" id="wk-back"'+(walkI?'':' disabled')+'>&larr; Back</button><button class="secondary" id="wk-skip">Skip</button><button class="secondary" id="wk-change">Change shelf</button><span style="flex:1"></span><button class="danger" id="wk-gone">Not here / not a book</button></div>';
   $('wk-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
     if(!info.title){ showWalkForm(); $('wk-title').focus(); walkPending={isbn:info.isbn}; toast('Not found online — type the title'); return; }
@@ -2732,6 +2750,7 @@ function drawWalk(){
   $('wk-photo').onclick=()=>$('wk-file').click();
   $('wk-skip').onclick=()=>{ walkSkipped.add(b.id); walkI++; drawWalk(); };
   $('wk-change').onclick=drawPicker;
+  $('wk-add').onclick=()=>openAddMissed();
   $('wk-back').onclick=()=>{ if(walkI>0){ walkI--; walkSkipped.delete(walkIds[walkI]); drawWalk(); } };
   $('wk-gone').onclick=()=>{
     if(!confirm('Remove this entry from the library? (Use this if there’s no book there, or it isn’t a book.)')) return;
@@ -2784,6 +2803,139 @@ function shrinkPhoto(file, max){
       c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(bl=>bl?res(bl):rej(new Error('photo failed')),'image/jpeg',0.82); };
     img.onerror=()=>rej(new Error('couldn’t read the photo')); img.src=url; });
 }
+
+/* ============================================================
+   Walk-through: add a book we missed. Pick where it sits (left or
+   right of the book you're looking at, or any spot on the shelf);
+   the books after it on that shelf shift over one. Scan, type, or
+   snap the title page (photo goes to Claude, like mystery books).
+   ============================================================ */
+let addCtx=null, addPending=null, addFromPicker=false;
+function posNum(p){ const m=String(p||'').trim().match(/^(\d+)\s*([a-z]*)$/i); return m?{n:+m[1], suf:m[2]}:null; }
+function openAddMissed(fromPicker){
+  addFromPicker=!!fromPicker;
+  let ref=null, l={room:'',bookcase:'',shelf:''};
+  if(!fromPicker){
+    if(walkI<walkIds.length) ref=walkCur();
+    else if(walkScope){ const p=walkScope.split('|'); l={room:p[0],bookcase:p[1],shelf:p[2]}; const m=live().filter(x=>skeyOf(x)===walkScope).sort(posCmp); ref=m[m.length-1]||null; }
+    else { const last=byId(walkIds[walkIds.length-1]); if(last) l={room:last.room||'',bookcase:last.bookcase||'',shelf:last.shelf||''}; }
+  } else if(ui.walkAddLoc){ l=Object.assign(l, ui.walkAddLoc); }
+  if(ref) l={room:ref.room||'',bookcase:ref.bookcase||'',shelf:String(ref.shelf||'')};
+  addCtx={ l, ref, side: ref?'right':'other' };
+  drawAddMissed();
+}
+function addLoc(){ return { room:$('wa-room').value.trim(), bookcase:$('wa-case').value.trim(), shelf:$('wa-shelf').value.trim() }; }
+function refOnShelf(l){ const r=addCtx.ref; return r && !r.deleted && r.room===l.room && r.bookcase===l.bookcase && String(r.shelf)===l.shelf && posNum(r.position); }
+function drawAddMissed(){
+  const {l, ref, side}=addCtx;
+  $('wk-count').textContent='';
+  const rt=ref?'<b>'+esc(ref.title)+'</b>':'';
+  $('wk-body').innerHTML=
+    '<div class="wa-h">Add a book we missed</div>'
+    +'<p class="note" style="margin:0 0 4px;">It goes into the catalog at the spot you pick — the books after it on the shelf move over one.</p>'
+    +'<div class="wa-grid"><div><label>Room</label><input id="wa-room" list="dl-room" value="'+esc(l.room)+'"></div>'
+    +'<div><label>Bookcase</label><input id="wa-case" list="dl-case" value="'+esc(l.bookcase)+'"></div>'
+    +'<div><label>Shelf</label><input id="wa-shelf" list="dl-shelf" value="'+esc(l.shelf)+'"></div></div>'
+    +'<label>Where on the shelf</label>'
+    +'<div class="wa-side" id="wa-sides">'
+      +(ref?'<button type="button" class="secondary'+(side==='left'?' on':'')+'" data-side="left">Just left of '+rt+'</button>'
+           +'<button type="button" class="secondary'+(side==='right'?' on':'')+'" data-side="right">Just right of '+rt+'</button>':'')
+      +'<button type="button" class="secondary'+(side==='other'?' on':'')+'" data-side="other">'+(ref?'Somewhere else':'Pick a spot')+'</button></div>'
+    +'<div id="wa-posbox" class="'+(side==='other'?'':'hide')+'"><input id="wa-pos" inputmode="numeric" placeholder="Spot from the left (e.g. 7) — leave blank if not sure" style="width:100%"></div>'
+    +'<div id="wa-ok"></div>'
+    +'<div class="wk-acts" style="margin-top:12px;"><button id="wa-scan">Scan barcode</button><button id="wa-photo">Photo of title page</button><button class="secondary" id="wa-type">Type title</button></div>'
+    +'<div id="wa-form" class="hide"><div class="grid"><div style="grid-column:1/-1"><label>Title</label><input id="wa-title"></div><div style="grid-column:1/-1"><label>Author</label><input id="wa-author" list="dl-author"></div></div>'
+    +'<div class="row" style="margin-top:10px;"><button id="wa-save">Add it</button><button class="secondary" id="wa-look">Look up cover &amp; details</button></div><div class="lookup-res" id="wa-look-res"></div></div>'
+    +'<div id="wa-res"></div>'
+    +'<div class="row wk-foot"><button class="secondary" id="wa-back">&larr; '+(addFromPicker&&!walkIds.length?'Pick a shelf':'Back to the walk-through')+'</button></div>';
+  $('wa-sides').onclick=e=>{ const t=e.target.closest('[data-side]'); if(!t) return; addCtx.side=t.dataset.side;
+    $('wa-sides').querySelectorAll('[data-side]').forEach(x=>x.classList.toggle('on', x===t)); $('wa-posbox').classList.toggle('hide', addCtx.side!=='other'); };
+  // typing a different shelf means "left/right of" no longer applies
+  ['wa-room','wa-case','wa-shelf'].forEach(id=>$(id).addEventListener('input',()=>{ const on=!!refOnShelf(addLoc());
+    $('wa-sides').querySelectorAll('[data-side="left"],[data-side="right"]').forEach(x=>x.classList.toggle('hide',!on));
+    if(!on && addCtx.side!=='other'){ addCtx.side='other'; $('wa-sides').querySelectorAll('[data-side]').forEach(x=>x.classList.toggle('on', x.dataset.side==='other')); $('wa-posbox').classList.remove('hide'); } }));
+  $('wa-back').onclick=()=>{ if(!walkIds.length || addFromPicker) drawPicker(); else drawWalk(); };
+  $('wa-type').onclick=()=>{ $('wa-form').classList.remove('hide'); $('wa-title').focus(); };
+  $('wa-photo').onclick=async()=>{ if(!checkLoc()) return; if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; } $('wa-file').click(); };
+  $('wa-scan').onclick=()=>{ if(!checkLoc()) return; openScanner({kind:'fill', onFound:info=>{
+    if(!info.title){ $('wa-form').classList.remove('hide'); addPending={isbn:info.isbn}; $('wa-title').focus(); toast('Not found online — type the title'); return; }
+    checkThenAdd(info); }}); };
+  $('wa-save').onclick=()=>{ const t=$('wa-title').value.trim(); if(!t){ toast('Type the title first'); return; }
+    checkThenAdd(Object.assign({ title:t, author:$('wa-author').value.trim() }, addPending||{})); };
+  $('wa-look').onclick=async()=>{
+    const box=$('wa-look-res'); const t=$('wa-title').value.trim(); if(!t){ toast('Type the title first'); return; }
+    box.innerHTML='<div class="note">Searching…</div>';
+    const docs=await bookSearch(cleanTitle(t), searchAuthor($('wa-author').value.trim()), '');
+    if(!docs.length){ box.innerHTML='<div class="note">No matches — just tap Add it.</div>'; return; }
+    box.innerHTML=docs.slice(0,6).map((d,i)=>'<div class="lk">'+(d.cover?'<img src="'+esc(d.cover)+'" alt="">':'<img alt="">')+'<div class="x"><b>'+esc(d.title)+'</b><br>'+esc(d.authors.join(', '))+(d.year?' · '+esc(d.year):'')+'</div><button type="button" data-i="'+i+'">Use</button></div>').join('');
+    box.onclick=e=>{ const i=e.target.dataset.i; if(i===undefined) return; const d=docs[+i], f=docFill(d);
+      checkThenAdd(Object.assign({ title:$('wa-title').value.trim()||d.title, author:$('wa-author').value.trim()||d.authors.join(', ') }, f, d.about?{about:d.about}:{})); };
+  };
+  addPending=null;
+}
+function checkLoc(){ const l=addLoc(); if(!l.room||!l.bookcase||!l.shelf){ toast('Fill in the room, bookcase and shelf first'); return false; } return true; }
+// the spot (number from the left) the new book takes, or null if unknown
+function addTarget(l){
+  if(addCtx.side!=='other' && refOnShelf(l)){ const p=posNum(addCtx.ref.position); return addCtx.side==='left'?p.n:p.n+1; }
+  const v=parseInt(($('wa-pos')||{}).value); return v>0?v:null;
+}
+// make room at spot n: every book at n or later on that shelf moves one to the right (stacked 5a/5b keep their letters)
+function makeRoom(l, n, now, skipId){
+  store.books=store.books.map(x=>{
+    if(x.deleted || x.id===skipId || x.room!==l.room || x.bookcase!==l.bookcase || String(x.shelf)!==l.shelf) return x;
+    const p=posNum(x.position); if(!p || p.n<n) return x;
+    return Object.assign({}, x, { position:String(p.n+1)+p.suf, updatedAt:now });
+  });
+}
+function placeBook(fields, l, moveId){
+  const n=addTarget(l), now=Date.now();
+  if(n!=null) makeRoom(l, n, now, moveId);
+  const spot={ room:l.room, bookcase:l.bookcase, shelf:l.shelf, position:n!=null?String(n):'' };
+  let b;
+  if(moveId){ store.books=store.books.map(x=>x.id===moveId?(b=Object.assign({}, x, fields, spot, { updatedAt:now })):x); }
+  else { b=Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'walk', status:'unread', lookupV:0 }, fields, spot); if(!b.coverUrl) delete b.coverUrl; store.books.push(b); }
+  commit();
+  ui.walkAddLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf}; lsSet(UI_KEY, JSON.stringify(ui));
+  // the next book found goes just right of this one, so a run of missed books lands in order
+  addCtx={ l:{room:l.room, bookcase:l.bookcase, shelf:l.shelf}, ref:b, side:n!=null?'right':'other' };
+  drawAddMissed();
+  $('wa-ok').innerHTML='<div class="wa-ok">✓ '+(moveId?'Moved':'Added')+' <b>'+esc(b.title)+'</b>'+(b.author&&!String(b.title).startsWith('(')?' — '+esc(b.author):'')+' · '+esc(locText(b))+'. Found another? Add it the same way.</div>';
+  toast((moveId?'Moved — ':'Added — ')+b.title);
+  return b;
+}
+function checkThenAdd(info){
+  if(!checkLoc()) return;
+  const l=addLoc();
+  const m=new Map();
+  if(info.isbn) findByIsbn(info.isbn).forEach(b=>m.set(b.id,b));
+  for(const b of live()){ if(m.size>=6) break; if(!String(b.title||'').startsWith('(') && titleMatch(info.title, b.title) && (!b.author || !info.author || authorMatch(b.author,[info.author]))) m.set(b.id,b); }
+  const clean={}; ['title','author','isbn','year','publisher','pages','subjects','about','coverUrl'].forEach(k=>{ if(info[k]) clean[k]=info[k]; });
+  if(!m.size){ placeBook(clean, l); return; }
+  const box=$('wa-res');
+  box.innerHTML='<div class="wa-dup"><b>This might already be in the library:</b>'
+    +[...m.values()].map(b=>'<div class="sc-m"><div><b>'+esc(b.title)+'</b>'+(b.author?' <span class="note" style="margin:0">'+esc(b.author)+'</span>':'')+'<div class="note" style="margin:0">'+esc(b.room?locText(b):'No shelf yet')+'</div></div>'
+      +'<button class="secondary" data-mv="'+b.id+'">'+(b.room?'It moved here':'That’s it — shelve it here')+'</button></div>').join('')
+    +'<div class="row" style="margin-top:8px;"><button id="wa-new">No — add it as '+( [...m.values()].some(b=>b.room)?'another copy':'a new book')+'</button></div></div>';
+  box.querySelectorAll('[data-mv]').forEach(x=>x.onclick=()=>{ const id=x.dataset.mv, keep={}; const old=byId(id);
+    ['isbn','year','publisher','pages','subjects','about','coverUrl'].forEach(k=>{ if(clean[k] && !old[k]) keep[k]=clean[k]; });
+    box.innerHTML=''; placeBook(keep, l, id); });
+  $('wa-new').onclick=()=>{ box.innerHTML=''; placeBook(clean, l); };
+}
+$('wa-file').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f || !addCtx) return;
+  const t=await dbxToken(); if(!t){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
+  const l=addLoc(); toast('Sending photo…');
+  try{
+    const blob=await shrinkPhoto(f, 1600), id=uid();
+    const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+    const path='/Railey Library/photos/identify/'+['found',slug(l.room),slug(l.bookcase),'shelf-'+slug(l.shelf),id].join(' ')+'.jpg';
+    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({ path, mode:'add', autorename:true, mute:true }).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)) }, body:blob });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const now=Date.now();
+    placeBook({ title:'(Found on walk-through — title-page photo sent)', needsReview:true, idPhoto:path, idPhotoAt:now, notes:'Added during a walk-through; title-page photo is in photos/identify for Claude to read.' }, l);
+  }catch(err){ toast('Couldn’t send the photo ('+err.message+') — try again'); }
+};
 $('un-walk').onclick=()=>openWalk();
 $('wk-close').onclick=closeWalk;
 // mark books whose title-page photo is waiting for Claude in the unidentified list
