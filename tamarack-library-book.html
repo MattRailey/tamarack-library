@@ -434,6 +434,19 @@
     main{ padding:8px 14px 10px 22px !important; }
     .panel > h2{ font-size:1.9rem !important; }
   }
+  /* Epilogue bookmark replaces the ⋯ button */
+  .menu-btn{ display:none !important; }
+  nav button:nth-child(3){ background:#4b3a5a !important; position:relative; }
+  nav button:nth-child(3).active{ background:var(--page) !important; color:var(--navy) !important; }
+  #nav-epi .sync-dot{ position:absolute; top:6px; right:6px; width:8px; height:8px; margin:0; box-shadow:0 0 0 2px #fff8e8; }
+  #nav-epi .sync-dot:not(.warn):not(.err){ display:none; }
+  .menu-pop{ top:34px !important; }
+  @media (max-width:760px){
+    nav button{ width:66px; font-size:.78rem !important; letter-spacing:.02em !important; padding-left:4px !important; padding-right:4px !important; }
+    nav button:nth-child(3).active{ background:var(--ribbon3) !important; color:#fff8e8 !important; }
+    .hdr-right{ left:auto !important; right:14px !important; top:70px !important; }
+    header{ padding-top:78px !important; }
+  }
 </style>
 </head>
 <body>
@@ -457,6 +470,7 @@
   <nav id="nav">
     <button data-panel="library" class="active">Library</button>
     <button data-panel="shelves">Shelves</button>
+    <button id="nav-epi" type="button">Epilogue</button>
   </nav>
   <main>
     <!-- LIBRARY -->
@@ -2221,6 +2235,7 @@ $('dbx-appkey').addEventListener('change', ()=>{ lsSet(DBX_APPKEY_KEY, $('dbx-ap
 function showPanel(p){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.panel===p));
   document.body.classList.toggle('behind-menu', p==='import'||p==='data');
+  $('nav-epi').classList.toggle('active', p==='import'||p==='data');
   document.querySelectorAll('.panel').forEach(s=>s.classList.toggle('active', s.id===p));
   if(p==='shelves') renderShelves();
   if(p==='data') renderData();
@@ -2229,6 +2244,9 @@ function showPanel(p){
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showPanel(b.dataset.panel));
+// Epilogue bookmark opens the old ⋯ menu (Import & Export, Data & Sync); the sync warning dot rides on it
+$('nav-epi').onclick=e=>{ e.stopPropagation(); $('menu-pop').classList.toggle('open'); };
+$('nav-epi').appendChild($('sync-dot'));
 $('menu-btn').onclick=e=>{ e.stopPropagation(); $('menu-pop').classList.toggle('open'); };
 document.addEventListener('click', e=>{ if(!e.target.closest('#menu-pop')) $('menu-pop').classList.remove('open'); });
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ $('menu-pop').classList.remove('open'); showPanel(b.dataset.go); });
