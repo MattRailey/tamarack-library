@@ -297,6 +297,9 @@
   @media (max-width:700px){ .search-row .seg button{ padding:8px 12px; } }
 
   .search-row.nowrap{ flex-wrap:nowrap; }
+  .genre-acts{ display:flex; gap:8px; align-items:center; flex:1 1 280px; min-width:0; }
+  .genre-acts .genre-main{ flex:1 1 auto; min-width:0; }
+  .genre-acts .add-round{ flex:none; }
   .search-row.nowrap #btn-more-filters{ padding:8px 14px; white-space:nowrap; }
   .lib-h2{ display:none; }
   .add-round{ width:42px; height:42px; min-height:0; padding:0; border-radius:50%; font-size:1.5rem; line-height:1; flex:none; }
@@ -495,6 +498,9 @@
   .wk-sent{ margin-top:6px; color:#07785a; font-weight:600; font-size:.8rem; }
   .wk-acts{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:6px 0 10px; } .wk-acts button{ padding:10px 6px; }
   .wk-foot{ margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .wk-shelfn{ font-size:.78rem; opacity:.8; margin-top:4px; }
+  .wk-next{ background:#fff1d6; color:#6b4a00; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:.86rem; }
+  .walk-here{ float:right; min-height:28px; padding:3px 10px; font-size:.72rem; font-family:var(--sans); }
   .wk-done{ text-align:center; padding:20px 0; }
   .un-walk-btn{ margin-top:4px; }
 </style>
@@ -534,14 +540,16 @@
         </div>
         <div class="search-row">
           <div class="seg" id="scope-seg"><button data-scope="all" class="active">Anything</button><button data-scope="title">Title</button><button data-scope="author">Author</button></div>
-          <select id="f-genre" class="genre-main"><option value="">All genres</option></select>
+          <div class="genre-acts">
+            <select id="f-genre" class="genre-main"><option value="">All genres</option></select>
+            <button id="btn-scan" class="add-round scan-round secondary" aria-label="Scan a barcode" title="Scan a barcode to add books"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="3" y="5" width="2" height="14"/><rect x="6.5" y="5" width="1" height="14"/><rect x="9" y="5" width="2" height="14"/><rect x="12.5" y="5" width="1" height="14"/><rect x="15" y="5" width="3" height="14"/><rect x="19.5" y="5" width="1.5" height="14"/></svg></button>
+            <button id="btn-photos" class="add-round scan-round secondary" aria-label="Send photos to Claude" title="Send shelf or book photos to Claude"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg></button>
+            <button id="btn-add" class="add-round" aria-label="Add book" title="Add book">+</button>
+          </div>
         </div>
         <div class="search-row nowrap">
           <div class="seg" id="view-seg"><button data-view="feed">Feed</button><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
           <button class="secondary" id="btn-more-filters">Filters</button>
-          <button id="btn-scan" class="add-round scan-round secondary" aria-label="Scan a barcode" title="Scan a barcode to add books"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="3" y="5" width="2" height="14"/><rect x="6.5" y="5" width="1" height="14"/><rect x="9" y="5" width="2" height="14"/><rect x="12.5" y="5" width="1" height="14"/><rect x="15" y="5" width="3" height="14"/><rect x="19.5" y="5" width="1.5" height="14"/></svg></button>
-          <button id="btn-photos" class="add-round scan-round secondary" aria-label="Send photos to Claude" title="Send shelf or book photos to Claude"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg></button>
-          <button id="btn-add" class="add-round" aria-label="Add book" title="Add book">+</button>
         </div>
         <div id="more-filters" class="hide" style="margin-top:12px;">
         <div class="lb-filters">
@@ -2259,13 +2267,13 @@ function renderUnid(){
   let html='', lastRoom=null, lastCase=null;
   for(const b of L){
     if(b.room!==lastRoom){ if(lastRoom!==null) html+='</div></div>'; html+='<div class="card un-room"><h3>'+esc(b.room||'(no room)')+'</h3><div>'; lastRoom=b.room; lastCase=null; }
-    if(b.bookcase!==lastCase){ html+='<div class="case-h">'+esc(b.bookcase||'')+'</div>'; lastCase=b.bookcase; }
+    if(b.bookcase!==lastCase){ html+='<div class="case-h">'+esc(b.bookcase||'')+' <button type="button" class="secondary walk-here" data-walk="'+b.id+'">Walk this bookcase</button></div>'; lastCase=b.bookcase; }
     html+='<div class="sp un-row" data-id="'+b.id+'"><span class="n">'+esc(shelfLabel(b)+' · '+(b.position?sideText(b):'–'))+'</span><span>'+esc(b.title)+(b.author?' — <i>'+esc(b.author)+'</i>':'')+(b.notes?'<span class="note" style="display:block;margin:2px 0 0;">'+esc(b.notes)+'</span>':'')+'</span></div>';
   }
   if(lastRoom!==null) html+='</div></div>';
   $('un-list').innerHTML = html || '<div class="card empty">Nothing unidentified — nice work.</div>';
 }
-$('un-list').addEventListener('click', e=>{ const r=e.target.closest('.un-row'); if(!r) return; const ids=[...document.querySelectorAll('#un-list .un-row')].map(x=>x.dataset.id); openBook(r.dataset.id, ids); $('modal').classList.remove('viewing'); });
+$('un-list').addEventListener('click', e=>{ const w=e.target.closest('[data-walk]'); if(w){ openWalk(w.dataset.walk); return; } const r=e.target.closest('.un-row'); if(!r) return; const ids=[...document.querySelectorAll('#un-list .un-row')].map(x=>x.dataset.id); openBook(r.dataset.id, ids); $('modal').classList.remove('viewing'); });
 $('un-room').addEventListener('change', renderUnid); $('un-review').addEventListener('change', renderUnid);
 $('un-print').onclick=()=>{
   const L=unidRows(); const w=window.open('','_blank'); if(!w){ toast('Allow pop-ups to print'); return; }
@@ -2630,8 +2638,10 @@ $('btn-form-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
    ============================================================ */
 let walkIds=[], walkI=0, walkSkipped=new Set(), walkPhoto=null;
 function shelfMates(b){ return live().filter(x=>x.room===b.room && x.bookcase===b.bookcase && String(x.shelf)===String(b.shelf)).sort(posCmp); }
-function openWalk(){
+function openWalk(startId){
+  // already in walking order: room → bookcase → shelf → spot, so each shelf is finished before moving on
   walkIds = unidRows().filter(b=>isUnid(b)).map(b=>b.id); walkI=0; walkSkipped=new Set();
+  if(typeof startId==='string'){ const k=walkIds.indexOf(startId); if(k>0) walkIds=walkIds.slice(k).concat(walkIds.slice(0,k)); }
   if(!walkIds.length){ toast('Nothing unidentified here'); return; }
   $('walk-bg').classList.add('open'); lockPage(); drawWalk();
 }
@@ -2651,11 +2661,16 @@ function drawWalk(){
   const b=walkCur(), mates=shelfMates(b), k=mates.findIndex(x=>x.id===b.id);
   const L=mates[k-1], R=mates[k+1];
   const nb=x=>x?'<b>'+esc(x.title)+'</b>'+(x.author&&!String(x.title).startsWith('(')?' <span class="note" style="margin:0">'+esc(x.author)+'</span>':''):'<i>the end of the shelf</i>';
+  const skey=x=>x?[x.room,x.bookcase,x.shelf].join('|'):'';
+  const onShelf=walkIds.map(byId).filter(x=>x && !x.deleted && skey(x)===skey(b));
+  const nOn=onShelf.findIndex(x=>x.id===b.id)+1, prev=walkI>0?byId(walkIds[walkI-1]):null;
+  const moved = walkI>0 && prev && skey(prev)!==skey(b);
   $('wk-count').textContent=(walkI+1)+' of '+walkIds.length;
   walkPhoto=null;
   $('wk-body').innerHTML=
-    '<div class="wk-where"><div class="wk-room">'+esc(b.room||'')+'</div><div class="wk-case">'+esc(b.bookcase||'')+'</div>'
-    +'<div class="wk-spot">'+esc(shelfLabel(b))+(b.position?' · '+esc(sideText(b)):'')+'</div></div>'
+    (moved?'<div class="wk-next">That shelf’s done — on to '+(prev.room!==b.room?'<b>'+esc(b.room||'')+'</b>, ':'')+(prev.bookcase!==b.bookcase||prev.room!==b.room?'<b>'+esc(b.bookcase||'')+'</b>, ':'')+'<b>'+esc(shelfLabel(b))+'</b></div>':'')
+    +'<div class="wk-where"><div class="wk-room">'+esc(b.room||'')+'</div><div class="wk-case">'+esc(b.bookcase||'')+'</div>'
+    +'<div class="wk-spot">'+esc(shelfLabel(b))+(b.position?' · '+esc(sideText(b)):'')+'</div><div class="wk-shelfn">'+nOn+' of '+onShelf.length+' mystery book'+(onShelf.length===1?'':'s')+' on this shelf</div></div>'
     +'<div class="wk-nb"><div><span>Left of it</span>'+nb(L)+'</div><div><span>Right of it</span>'+nb(R)+'</div></div>'
     +'<div class="wk-what"><span>We have it down as</span><b>'+esc(b.title)+'</b>'+(b.author?' — '+esc(b.author):'')+(b.notes?'<div class="note" style="margin:4px 0 0">'+esc(b.notes)+'</div>':'')
     +(b.idPhoto?'<div class="wk-sent">📷 Title-page photo already sent to Claude</div>':'')+'</div>'
@@ -2725,7 +2740,7 @@ function shrinkPhoto(file, max){
       c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(bl=>bl?res(bl):rej(new Error('photo failed')),'image/jpeg',0.82); };
     img.onerror=()=>rej(new Error('couldn’t read the photo')); img.src=url; });
 }
-$('un-walk').onclick=openWalk;
+$('un-walk').onclick=()=>openWalk();
 $('wk-close').onclick=closeWalk;
 // mark books whose title-page photo is waiting for Claude in the unidentified list
 const _renderUnid=renderUnid; renderUnid=function(){ _renderUnid(); const n=live().filter(b=>isUnid(b)&&b.idPhoto).length;
