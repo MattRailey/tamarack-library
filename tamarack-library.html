@@ -354,8 +354,8 @@
 
   .modal{ will-change:transform; backface-visibility:hidden; }
   .modal-bg.open{ -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); transition:background .2s; }
-  .modal-bg.flipping{ background:rgba(28,24,18,.82); }
-  .modal.peek{ pointer-events:none; box-shadow:0 10px 40px rgba(20,12,4,.25); }
+  .modal.peek{ pointer-events:none; will-change:transform; }
+  .modal-bg.open{ overflow:hidden; }
 </style>
 </head>
 <body>
@@ -644,7 +644,7 @@
       <div><label>Room</label><input id="e-room" list="dl-room"></div>
       <div><label>Bookcase</label><input id="e-bookcase" list="dl-case"></div>
       <div><label>Shelf (1 = top)</label><input id="e-shelf" list="dl-shelf"></div>
-      <div><label>Position from left</label><input id="e-position" inputmode="numeric"></div>
+      <div><label>Position (count from left)</label><input id="e-position" inputmode="numeric"></div>
     </div>
     <div class="m-sec">Reading &amp; loans</div>
     <div class="grid">
@@ -1025,8 +1025,24 @@ function locText(b){
   if(b.room) p.push(b.room);
   if(b.bookcase) p.push(/^[\w-]{1,3}$/.test(String(b.bookcase)) ? 'Case '+b.bookcase : String(b.bookcase));
   if(b.shelf) p.push('Shelf '+b.shelf);
-  if(b.position) p.push('#'+b.position);
+  if(b.position) p.push(sideText(b));
   return p.join(' · ') || 'No location yet';
+}
+// Position shown from the nearer end of the shelf: left half counts from the left,
+// right half counts from the right (stacked 5a/5b share one slot). Stored position stays "from left".
+function sideText(b){
+  const m = String(b.position||'').trim().match(/^(\d+)\s*([a-z]*)$/i);
+  if(!m) return '#'+b.position;
+  const n = +m[1], suf = m[2] ? m[2].toLowerCase() : '';
+  const slots = new Set();
+  for(const x of allBooks()){
+    if(x.room!==b.room || x.bookcase!==b.bookcase || String(x.shelf)!==String(b.shelf)) continue;
+    const mm = String(x.position||'').trim().match(/^(\d+)/); if(mm) slots.add(+mm[1]);
+  }
+  slots.add(n);
+  const order = [...slots].sort((a,c)=>a-c), k = order.indexOf(n)+1, N = order.length;
+  if(N<2 || k <= Math.ceil(N/2)) return '#'+k+suf+' from left';
+  return '#'+(N-k+1)+suf+' from right';
 }
 function words(s){ return norm(s).replace(/[^a-z0-9]+/g,' ').trim(); }
 // ---- search index: each book split into weighted fields of whole words ----
@@ -1146,6 +1162,7 @@ function chipsHTML(b){
   else if(st==='reading') c.push('<span class="chip reading">Reading</span>');
   if(b.loanedTo) c.push('<span class="chip loan">Loaned: '+esc(b.loanedTo)+'</span>');
   if(+b.rating) c.push('<span class="chip stars">'+'★'.repeat(+b.rating)+'</span>');
+  if(b.needsReview) c.push('<span class="chip review">'+(String(b.title||'').startsWith('(')?'Unidentified':'Partly identified')+'</span>');
   if(b.genre) c.push('<span class="chip">'+esc(b.genre)+'</span>');
   return c.join('');
 }
@@ -1172,7 +1189,7 @@ function renderLibrary(resetPaging){
         '<div class="loc">📍 '+esc(locText(b))+'</div></div></article>'; }).join('') + '</div>';
   } else if(ui.view==='list'){
     box.innerHTML = '<div class="lb-list">' + slice.map(b=>
-      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">review</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
+      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">'+(String(b.title||'').startsWith('(')?'unidentified':'partly identified')+'</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
     ).join('') + '</div>';
   } else {
     box.innerHTML = '<div class="lb-grid">' + slice.map(b=>
@@ -1322,6 +1339,7 @@ function openBook(id, list){
   updateArrows();
   $('modal-bg').classList.add('open'); lockPage();
   $('modal').scrollTop=0;
+  if(!flipping) preparePeeks();
 }
 function openNew(prefill){
   isNew=true; editId=null; navList=[];
@@ -1354,42 +1372,60 @@ function saveBook(silent){
   if(!silent) toast('Saved');
   return true;
 }
-// ---- flipping between books: the next book slides in alongside, like a photo carousel ----
-const GAP=24;
-let peek=null, flipping=false;
+// ---- flipping between books: a real carousel. The neighbouring books are built ahead of time
+// (covers preloaded), sit one card-width to each side, and move 1:1 with the finger. ----
+const GAP=16;
+let peeks={}, flipping=false, peekTimer=0;
 function neighbor(dir){ const i=navList.indexOf(editId); return (!isNew && i>=0) ? navList[i+dir] : undefined; }
-function makePeek(dir){
+function cardW(){ return $('modal').getBoundingClientRect().width + GAP; }
+function buildPeek(dir){
   const id=neighbor(dir), b=id && byId(id); if(!b) return null;
-  $('modal-bg').classList.add('flipping');
-  const m=$('modal'), r=m.getBoundingClientRect();
-  const c=m.cloneNode(true);
+  const m=$('modal'), c=m.cloneNode(true);
   viewFill({cover:c.querySelector('#m-cover'), title:c.querySelector('#m-title'), sub:c.querySelector('#m-sub'), about:c.querySelector('#m-about'), view:c.querySelector('#m-view')}, b);
   c.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id')); c.removeAttribute('id');
+  c.querySelectorAll('img').forEach(img=>{ img.loading='eager'; img.decoding='async'; });
   c.classList.add('viewing','peek');
-  Object.assign(c.style,{position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', margin:'0', transition:'none', transform:'translateX('+(dir*(r.width+GAP)*0.45)+'px) scale(.96)', opacity:'0'});
-  $('modal-bg').appendChild(c); c.scrollTop=0;
-  return {el:c, dir, id, w:r.width+GAP};
+  c.style.cssText='position:fixed;margin:0;transition:none;visibility:hidden;';
+  $('modal-bg').appendChild(c);
+  return {el:c, dir, id};
 }
-function dropPeek(){ if(peek){ peek.el.remove(); peek=null; } $('modal-bg').classList.remove('flipping'); }
-function place(dx, anim){
-  // Crossfade: the current book drifts aside and fades out while the next one drifts in from the
-  // same side and fades in over it — both cards share the middle so they blend into each other.
-  const m=$('modal'), t=anim||'none';
-  const w=(peek?peek.w:m.offsetWidth+GAP), p=Math.min(1,Math.abs(dx)/w);
-  const ease=v=>v*v*(3-2*v);                                   // smoothstep for a softer blend
-  m.style.transition = t==='none'?'none':'transform '+t+', opacity '+t;
-  m.style.transform = dx ? 'translateX('+(dx*0.45)+'px) scale('+(1-p*.04)+')' : '';
-  m.style.opacity = dx ? String(peek ? 1-ease(p) : 1-p*.15) : '';
-  if(peek){ peek.el.style.transition = t==='none'?'none':'transform '+t+', opacity '+t;
-    peek.el.style.transform='translateX('+(peek.dir*w*0.45 + dx*0.45)+'px) scale('+(0.96+p*.04)+')';
-    peek.el.style.opacity=String(ease(p)); }
+function dropPeek(){ clearTimeout(peekTimer); for(const k in peeks){ peeks[k] && peeks[k].el.remove(); } peeks={}; }
+function preparePeeks(){          // called after a book opens; builds both sides when the browser is idle
+  dropPeek();
+  if(isNew || !$('modal').classList.contains('viewing')) return;
+  peekTimer=setTimeout(()=>{ if(flipping) return; peeks[1]=buildPeek(1); peeks[-1]=buildPeek(-1); }, 60);
 }
-function finishFlip(ms){
-  // both cards glide the rest of the way, then the real panel quietly takes the new book
-  const target=-peek.dir*peek.w, id=peek.id, ease=ms+'ms cubic-bezier(.2,.7,.25,1)';
-  place(target, ease); flipping=true;
-  setTimeout(()=>{ const m=$('modal'); openBook(id, navList); m.scrollTop=0; place(0,'none'); m.style.transform=''; m.style.opacity='';
-    dropPeek(); flipping=false; }, ms+10);
+function ensurePeeks(){ if(!(1 in peeks)){ clearTimeout(peekTimer); peeks[1]=buildPeek(1); peeks[-1]=buildPeek(-1); } }
+function alignPeeks(){            // match the live card's box (cheap; handles rotation/resizes)
+  const r=$('modal').getBoundingClientRect();
+  for(const k in peeks){ const p=peeks[k]; if(!p) continue;
+    Object.assign(p.el.style,{left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', visibility:'visible'}); }
+}
+function place(dx, trans){
+  const m=$('modal'), w=cardW(), t=trans||'none';
+  const tr=t==='none'?'none':'transform '+t;
+  m.style.transition=tr; m.style.transform = dx ? 'translate3d('+dx+'px,0,0)' : '';
+  for(const k in peeks){ const p=peeks[k]; if(!p) continue;
+    p.el.style.transition=tr; p.el.style.transform='translate3d('+(p.dir*w+dx)+'px,0,0)'; }
+}
+function whenDone(el, ms, fn){ let done=false; const f=()=>{ if(done) return; done=true; el.removeEventListener('transitionend', f); fn(); };
+  el.addEventListener('transitionend', f); setTimeout(f, ms+60); }
+function finishFlip(dir, ms){
+  const p=peeks[dir]; if(!p){ place(0,'220ms ease-out'); return; }
+  flipping=true;
+  place(-dir*cardW(), ms+'ms cubic-bezier(.22,.75,.3,1)');
+  whenDone($('modal'), ms, ()=>{
+    // The incoming card now sits exactly over the real panel. Load the real panel behind it,
+    // wait for its cover to be ready, then remove the card — no flash, no jump.
+    const m=$('modal'); p.el.style.zIndex='5';
+    openBook(p.id, navList); m.scrollTop=0; place(0,'none');
+    const img=m.querySelector('#m-cover img');
+    const ready = img && img.decode ? img.decode().catch(()=>{}) : Promise.resolve();
+    Promise.race([ready, new Promise(r=>setTimeout(r,250))]).then(()=>requestAnimationFrame(()=>{
+      p.el.remove(); for(const k in peeks) if(peeks[k]!==p && peeks[k]) peeks[k].el.remove(); peeks={};
+      flipping=false; preparePeeks();
+    }));
+  });
 }
 function step(dir){
   if(flipping) return;
@@ -1399,40 +1435,44 @@ function step(dir){
     if(isDirty()){ if(confirm('Save your changes to this book first?')){ if(!saveBook(true)) return; } }
     openBook(id, navList); return;
   }
-  dropPeek(); peek=makePeek(dir); if(!peek){ openBook(id, navList); return; }
-  requestAnimationFrame(()=>finishFlip(300));
+  ensurePeeks(); alignPeeks(); place(0,'none');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>finishFlip(dir, 320)));
 }
 $('m-prev').onclick=()=>step(-1); $('m-next').onclick=()=>step(1);
 (function(){
-  let x0=null, y0=null, drag=false, lastX=0, lastT=0, vel=0;
+  let x0=null, y0=null, drag=false, lastX=0, lastT=0, vel=0, raf=0, curDx=0;
   const m=$('modal');
+  const resist=dx=>{ const dir=dx<0?1:-1; return peeks[dir] ? dx : dx/(1+Math.abs(dx)/120); };   // rubber-band at the ends
+  const paint=()=>{ raf=0; place(resist(curDx),'none'); };
   m.addEventListener('touchstart', e=>{
     const tg=(e.target.tagName||'').toLowerCase();
     if(flipping || !m.classList.contains('viewing') || tg==='input'||tg==='textarea'||tg==='select'||e.touches.length>1){ x0=null; return; }
-    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=performance.now(); vel=0; drag=false;
+    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=performance.now(); vel=0; drag=false; curDx=0;
   }, {passive:true});
   m.addEventListener('touchmove', e=>{
     if(x0===null) return;
     const x=e.touches[0].clientX, dx=x-x0, dy=e.touches[0].clientY-y0;
-    if(!drag){ if(Math.abs(dx)>8 && Math.abs(dx)>Math.abs(dy)*1.2) drag=true; else if(Math.abs(dy)>10){ x0=null; return; } else return; }
+    if(!drag){
+      if(Math.abs(dx)>6 && Math.abs(dx)>Math.abs(dy)*1.1){ drag=true; ensurePeeks(); alignPeeks(); x0=x-(dx>0?1:-1); }   // start from here: no jump
+      else if(Math.abs(dy)>10){ x0=null; return; } else return;
+    }
     e.preventDefault();
-    const now=performance.now(); vel = 0.8*vel + 0.2*((x-lastX)/Math.max(1,now-lastT)); lastX=x; lastT=now;
-    const dir = dx<0 ? 1 : -1;
-    if(!peek || peek.dir!==dir){ dropPeek(); peek=makePeek(dir); }
-    place(peek ? dx : dx*0.3, 'none');                        // at either end: gentle rubber-band
+    const now=performance.now(), dt=Math.max(1,now-lastT);
+    vel = 0.7*vel + 0.3*((x-lastX)/dt); lastX=x; lastT=now;
+    curDx=x-x0; if(!raf) raf=requestAnimationFrame(paint);
   }, {passive:false});
   const end=()=>{
     if(x0===null) return;
-    const dx=lastX-x0; x0=null;
-    if(!drag){ return; }
-    drag=false;
-    const w=peek?peek.w:m.offsetWidth, fling=Math.abs(vel)>0.45 && Math.sign(vel)===Math.sign(dx);
-    if(peek && (Math.abs(dx)>w*0.33 || fling)){
-      const remaining=Math.max(0, w-Math.abs(dx)), speed=Math.max(Math.abs(vel),1.2);   // px per ms
-      finishFlip(Math.round(Math.min(360, Math.max(170, remaining/speed))));
+    x0=null; if(!drag) return; drag=false;
+    if(raf){ cancelAnimationFrame(raf); raf=0; }
+    const dx=curDx, w=cardW(), dir=dx<0?1:-1;
+    if(performance.now()-lastT>80) vel=0;                         // finger stopped before lifting
+    const fling=Math.abs(vel)>0.35 && Math.sign(vel)===Math.sign(dx);
+    if(peeks[dir] && (Math.abs(dx)>w*0.3 || fling)){
+      const remaining=Math.max(0, w-Math.abs(dx)), speed=Math.max(Math.abs(vel)*1.1, 1.3);   // keep the finger's momentum
+      finishFlip(dir, Math.round(Math.min(380, Math.max(160, remaining/speed))));
     } else {
-      place(0, '260ms cubic-bezier(.2,.7,.25,1)');            // spring back
-      setTimeout(()=>{ if(!drag) dropPeek(); }, 270);
+      place(0, '300ms cubic-bezier(.22,.75,.3,1)');               // settle back
     }
   };
   m.addEventListener('touchend', end); m.addEventListener('touchcancel', end);
@@ -1625,7 +1665,7 @@ function renderShelves(){
           '<button class="secondary" data-act="add" data-r="'+esc(r)+'" data-c="'+esc(c)+'" data-s="'+esc(s)+'">+ Book</button>'+
           '<button class="secondary" data-act="renum" data-ids="'+books.map(b=>b.id).join(',')+'">Renumber</button></span></div><div class="spines">'+
           books.map(b=>{ const h = q && hay(b).includes(q); if(h) hit=true;
-            return '<div class="sp" data-id="'+b.id+'" data-list="'+books.map(x=>x.id).join(',')+'"'+(h?' style="background:#fff1c2"':'')+'><span class="n">'+esc(b.position||'–')+'</span><span>'+esc(b.title)+(b.loanedTo?' <span class="chip loan">'+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' <span class="chip review">review</span>':'')+'</span><span class="a">'+esc(b.author||'')+'</span></div>'; }).join('')+
+            return '<div class="sp" data-id="'+b.id+'" data-list="'+books.map(x=>x.id).join(',')+'"'+(h?' style="background:#fff1c2"':'')+'><span class="n">'+esc(b.position?sideText(b).replace(' from left',' L').replace(' from right',' R').replace('#',''):'–')+'</span><span>'+esc(b.title)+(b.loanedTo?' <span class="chip loan">'+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' <span class="chip review">review</span>':'')+'</span><span class="a">'+esc(b.author||'')+'</span></div>'; }).join('')+
           '</div></div>';
       }).join('') + '</div>';
     }).join('');
@@ -1957,7 +1997,7 @@ function showIE(which){ document.querySelectorAll('#ie-seg button').forEach(y=>y
   ['unid','sell','import'].forEach(k=>$('ie-'+k).classList.toggle('hide', k!==which));
   if(which==='sell') renderSell(); if(which==='unid') renderUnid(); ui.ie=which; lsSet(UI_KEY, JSON.stringify(ui)); }
 document.querySelectorAll('#ie-seg button').forEach(x=>x.onclick=()=>showIE(x.dataset.ie));
-function isUnid(b){ return String(b.title||'').startsWith('('); }
+function isUnid(b){ return String(b.title||'').startsWith('(') || (b.needsReview && /^Partly identified/.test(b.notes||'')); }
 function shelfLabel(b){ return /^\d/.test(String(b.shelf||'')) ? 'Shelf '+b.shelf : (b.shelf||''); }
 function unidRows(){
   const room=$('un-room').value, withRev=$('un-review').checked;
@@ -1972,7 +2012,7 @@ function renderUnid(){
   for(const b of L){
     if(b.room!==lastRoom){ if(lastRoom!==null) html+='</div></div>'; html+='<div class="card un-room"><h3>'+esc(b.room||'(no room)')+'</h3><div>'; lastRoom=b.room; lastCase=null; }
     if(b.bookcase!==lastCase){ html+='<div class="case-h">'+esc(b.bookcase||'')+'</div>'; lastCase=b.bookcase; }
-    html+='<div class="sp un-row" data-id="'+b.id+'"><span class="n">'+esc(shelfLabel(b)+' · #'+(b.position||'–'))+'</span><span>'+esc(b.title)+(b.author?' — <i>'+esc(b.author)+'</i>':'')+(b.notes?'<span class="note" style="display:block;margin:2px 0 0;">'+esc(b.notes)+'</span>':'')+'</span></div>';
+    html+='<div class="sp un-row" data-id="'+b.id+'"><span class="n">'+esc(shelfLabel(b)+' · '+(b.position?sideText(b):'–'))+'</span><span>'+esc(b.title)+(b.author?' — <i>'+esc(b.author)+'</i>':'')+(b.notes?'<span class="note" style="display:block;margin:2px 0 0;">'+esc(b.notes)+'</span>':'')+'</span></div>';
   }
   if(lastRoom!==null) html+='</div></div>';
   $('un-list').innerHTML = html || '<div class="card empty">Nothing unidentified — nice work.</div>';
@@ -1983,7 +2023,7 @@ $('un-print').onclick=()=>{
   const L=unidRows(); const w=window.open('','_blank'); if(!w){ toast('Allow pop-ups to print'); return; }
   let rows='', last='';
   for(const b of L){ const loc=(b.room||'')+' — '+(b.bookcase||''); if(loc!==last){ rows+='<tr><th colspan="3">'+esc(loc)+'</th></tr>'; last=loc; }
-    rows+='<tr><td>'+esc(shelfLabel(b))+'</td><td>#'+esc(b.position||'')+'</td><td>'+esc(b.title)+(b.author?' — '+esc(b.author):'')+'</td></tr>'; }
+    rows+='<tr><td>'+esc(shelfLabel(b))+'</td><td>'+esc(b.position?sideText(b):'')+'</td><td>'+esc(b.title)+(b.author?' — '+esc(b.author):'')+'</td></tr>'; }
   w.document.write('<!doctype html><meta charset="utf-8"><title>Unidentified books</title><style>body{font:13px Georgia,serif;margin:24px}h1{font-size:20px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ccc;padding:5px 6px;text-align:left;vertical-align:top}th{background:#f3ece0;font-size:14px;padding-top:12px}td:nth-child(1){width:90px}td:nth-child(2){width:40px}<\/style><h1>Unidentified books ('+L.length+')</h1><table>'+rows+'</table><script>print()<\/script>');
   w.document.close();
 };
