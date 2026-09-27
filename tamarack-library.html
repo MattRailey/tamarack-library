@@ -178,7 +178,7 @@
 <body>
 <header>
   <h1>Tamarack Library</h1>
-  <div class="meta"><div id="hdr-count">—</div><div><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Local only</span></div></div>
+  <div class="meta"><div id="hdr-count">—</div><div id="lookup-hdr"></div><div><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Local only</span></div></div>
 </header>
 <div class="layout">
   <nav id="nav">
@@ -196,7 +196,8 @@
         <input type="search" id="f-q" placeholder="Search books…" autocomplete="off" style="font-size:17px;">
         <div class="row" style="margin:10px 0 0; justify-content:space-between;">
           <div class="seg" id="scope-seg"><button data-scope="all" class="active">Anything</button><button data-scope="title">Title</button><button data-scope="author">Author</button></div>
-          <button class="secondary" id="btn-more-filters">More filters</button>
+          <div class="row"><div class="seg" id="view-seg"><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
+          <button class="secondary" id="btn-more-filters">More filters</button></div>
         </div>
         <div id="more-filters" class="hide" style="margin-top:12px;">
         <div class="lb-filters">
@@ -236,7 +237,6 @@
           <label class="check"><input type="checkbox" id="f-review"> Needs review only</label>
           <div class="row">
             <button class="secondary" id="btn-reset">Clear filters</button>
-            <div class="seg" id="view-seg"><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
           </div>
         </div>
         </div>
@@ -285,7 +285,7 @@
           <li>Photograph a bookcase in good light, a shelf or two per photo, close enough that spine text is readable. Leaning, angled, and sideways-stacked books are fine as they are; for a tall stack, an extra close-up helps.</li>
           <li>Send the photos to Claude in chat and say which room and bookcase it is. Claude counts the shelves (1 = top) and each book's place from the left, reads the spines, and sends back a <b>tamarack-library-import.json</b> file. Books in a sideways stack share one spot, lettered top to bottom (5a, 5b, 5c…).</li>
           <li>Load that file below, check the preview, and import. Books Claude wasn't sure about come in flagged <b>Needs review</b>.</li>
-          <li>Afterward, run <b>Look up missing details</b> on the Data &amp; Sync tab to fill in covers, ISBNs, and years from Open Library.</li>
+          <li>Covers, ISBNs, and years fill in automatically in the background after import. Open any book to pick a different cover.</li>
         </ol>
       </div>
       <div class="card">
@@ -345,9 +345,9 @@
         <div id="room-stats" style="margin-top:12px;"></div>
       </div>
       <div class="card">
-        <h3>Look up missing details</h3>
-        <p class="note" style="margin-top:0;">Searches Open Library (free) for each book missing a cover or ISBN and fills in cover, ISBN, year, publisher, and page count, only when the title and author clearly match. Nothing you've typed gets overwritten.</p>
-        <div class="row" style="margin-top:8px;"><button id="btn-lookup-all">Look up missing details</button><button class="secondary hide" id="btn-lookup-stop">Stop</button></div>
+        <h3>Covers &amp; details</h3>
+        <p class="note" style="margin-top:0;">Covers are found automatically in the background from Open Library and Google Books whenever new books come in (only when the title and author clearly match). It also fills in blank ISBN, year, publisher, page count, and keywords, and never overwrites what you've typed. For a wrong or missing cover, open the book and tap “Look up cover &amp; details” to pick one.</p>
+        <div class="row" style="margin-top:8px;"><button id="btn-lookup-all">Check again now</button><button class="secondary hide" id="btn-lookup-stop">Stop</button></div>
         <p class="note" id="lookup-progress"></p>
       </div>
       <div class="card">
@@ -632,7 +632,7 @@ function setSync(kind, text){
 }
 function schedulePush(){ if(!dbxTokens()) return; clearTimeout(pushTimer); pushTimer=setTimeout(syncNow, 1500); }
 async function syncNow(){
-  if(!dbxTokens()){ setSync('', 'Local only (Dropbox not connected)'); return; }
+  if(!dbxTokens()){ setSync('', 'Local only (Dropbox not connected)'); setTimeout(()=>autoLookup(false), 800); return; }
   if(syncing){ syncAgain=true; return; }
   syncing=true; setSync('warn','Syncing…');
   try{
@@ -656,6 +656,7 @@ async function syncNow(){
   finally{
     syncing=false;
     if(syncAgain){ syncAgain=false; syncNow(); }
+    else setTimeout(()=>autoLookup(false), 800);   // new books from another device or from Claude get covers too
   }
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && Date.now()-lastSyncAt>15000) syncNow(); });
@@ -711,7 +712,7 @@ function coverHTML(b, size){
 function locText(b){
   const p=[];
   if(b.room) p.push(b.room);
-  if(b.bookcase) p.push('Case '+b.bookcase);
+  if(b.bookcase) p.push(/^[\w-]{1,3}$/.test(String(b.bookcase)) ? 'Case '+b.bookcase : String(b.bookcase));
   if(b.shelf) p.push('Shelf '+b.shelf);
   if(b.position) p.push('#'+b.position);
   return p.join(' · ') || 'No location yet';
@@ -831,7 +832,7 @@ function renderLibrary(resetPaging){
     box.innerHTML = '<div class="card empty">No books match. Try fewer words or clear the filters.</div>';
   } else if(ui.view==='list'){
     box.innerHTML = '<div class="lb-list">' + slice.map(b=>
-      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">review</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
+      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">review</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
     ).join('') + '</div>';
   } else {
     box.innerHTML = '<div class="lb-grid">' + slice.map(b=>
@@ -1018,8 +1019,12 @@ document.addEventListener('keydown', e=>{
 });
 
 /* ============================================================
-   Open Library lookups (free, no key)
+   Cover & detail lookups — Open Library first, Google Books as
+   a fallback (both free, no key, called from the browser).
+   Results are normalized to { title, authors[], year, isbn[],
+   publisher, pages, subjects[], cover }.
    ============================================================ */
+const LOOKUP_V = 2;   // bump to re-check books a weaker earlier lookup gave up on
 async function olSearch(title, author, isbn){
   const p = new URLSearchParams({ limit:'6', fields:'key,title,author_name,first_publish_year,isbn,publisher,cover_i,number_of_pages_median,subject' });
   const cleanIsbn = String(isbn||'').replace(/[^0-9Xx]/g,'');
@@ -1027,68 +1032,90 @@ async function olSearch(title, author, isbn){
   else { if(title) p.set('title', title); if(author) p.set('author', author); }
   const r = await fetch('https://openlibrary.org/search.json?'+p.toString());
   if(!r.ok) throw new Error('Open Library HTTP '+r.status);
-  return (await r.json()).docs || [];
+  return ((await r.json()).docs || []).map(d=>({ src:'Open Library', title:d.title, authors:d.author_name||[], year:d.first_publish_year?String(d.first_publish_year):'',
+    isbn:d.isbn||[], publisher:(d.publisher||[])[0]||'', pages:d.number_of_pages_median?String(d.number_of_pages_median):'', subjects:d.subject||[],
+    cover:d.cover_i?'https://covers.openlibrary.org/b/id/'+d.cover_i+'-M.jpg':'' }));
+}
+async function gbSearch(title, author, isbn){
+  const cleanIsbn = String(isbn||'').replace(/[^0-9Xx]/g,'');
+  const strip = s=>String(s||'').replace(/[:"()]/g,' ').trim();
+  const q = cleanIsbn.length>=10 ? 'isbn:'+cleanIsbn : 'intitle:'+strip(title) + (author ? ' inauthor:'+strip(String(author).split(/[,&;]| and | with /)[0]).split(' ').pop() : '');
+  const r = await fetch('https://www.googleapis.com/books/v1/volumes?'+new URLSearchParams({ q, maxResults:'6', printType:'books' }));
+  if(!r.ok) throw new Error('Google Books HTTP '+r.status);
+  return ((await r.json()).items || []).map(it=>{ const v=it.volumeInfo||{}; const img=(v.imageLinks||{}).thumbnail||(v.imageLinks||{}).smallThumbnail||'';
+    return { src:'Google Books', title:v.title+(v.subtitle?': '+v.subtitle:''), authors:v.authors||[], year:(v.publishedDate||'').slice(0,4),
+      isbn:(v.industryIdentifiers||[]).filter(x=>/ISBN/.test(x.type)).map(x=>x.identifier), publisher:v.publisher||'', pages:v.pageCount?String(v.pageCount):'',
+      subjects:v.categories||[], cover:img?img.replace(/^http:/,'https:').replace('&edge=curl',''):'' }; });
+}
+async function bookSearch(title, author, isbn){
+  const out=[];
+  try{ out.push(...await olSearch(title, author, isbn)); }catch(e){}
+  try{ out.push(...await gbSearch(title, author, isbn)); }catch(e){}
+  return out;
 }
 function cleanSubjects(list){ return uniq((list||[]).filter(x=>x.length<40 && !/accessible book|protected daisy|in library|large type|reading level|nyt:|fiction, general|open_syllabus|^\d/i.test(x)).map(x=>x.toLowerCase())).slice(0,10).join(', '); }
 function pickIsbn(doc){ const l=doc.isbn||[]; return l.find(x=>x.length===13 && x.startsWith('978')) || l.find(x=>x.length===13) || l[0] || ''; }
 function docFill(doc){
-  return { isbn:pickIsbn(doc), year:doc.first_publish_year?String(doc.first_publish_year):'', publisher:(doc.publisher||[])[0]||'',
-    pages:doc.number_of_pages_median?String(doc.number_of_pages_median):'', subjects:cleanSubjects(doc.subject), coverUrl:doc.cover_i?'https://covers.openlibrary.org/b/id/'+doc.cover_i+'-M.jpg':'' };
+  return { isbn:pickIsbn(doc), year:doc.year||'', publisher:doc.publisher||'', pages:doc.pages||'', subjects:cleanSubjects(doc.subjects), coverUrl:doc.cover||'' };
 }
 $('btn-lookup').onclick = async ()=>{
-  const box=$('lookup-res'); box.innerHTML='<div class="note">Searching Open Library…</div>';
-  try{
-    const docs = await olSearch($('e-title').value.trim(), $('e-author').value.trim(), $('e-isbn').value.trim());
-    if(!docs.length){ box.innerHTML='<div class="note">No matches. Try shortening the title or removing the author.</div>'; return; }
-    box.innerHTML = docs.map((d,i)=>'<div class="lk">'+(d.cover_i?'<img src="https://covers.openlibrary.org/b/id/'+d.cover_i+'-S.jpg" alt="">':'<img alt="">')+
-      '<div class="x"><b>'+esc(d.title)+'</b><br>'+esc((d.author_name||[]).join(', '))+(d.first_publish_year?' · '+d.first_publish_year:'')+'</div><button type="button" data-i="'+i+'">Use</button></div>').join('');
-    box.onclick = e=>{
-      const i=e.target.dataset.i; if(i===undefined) return;
-      const d=docs[+i], f=docFill(d);
-      // fill only empty fields — never overwrite what's been typed
-      ['isbn','year','publisher','pages','subjects'].forEach(k=>{ if(!$('e-'+k).value.trim() && f[k]) $('e-'+k).value=f[k]; });
-      if(!$('e-title').value.trim()) $('e-title').value=d.title||'';
-      if(!$('e-author').value.trim()) $('e-author').value=(d.author_name||[]).join(', ');
-      if(f.coverUrl){ pendingCover=f.coverUrl; $('m-cover').innerHTML='<img src="'+esc(f.coverUrl)+'" alt="">'; }
-      box.innerHTML='<div class="note">Filled in the blanks — tap Save to keep it.</div>';
-    };
-  }catch(err){ box.innerHTML='<div class="note">Lookup failed: '+esc(err.message)+'</div>'; }
+  const box=$('lookup-res'); box.innerHTML='<div class="note">Searching Open Library and Google Books…</div>';
+  const docs = await bookSearch($('e-title').value.trim(), $('e-author').value.trim(), $('e-isbn').value.trim());
+  if(!docs.length){ box.innerHTML='<div class="note">No matches (or no connection). Try shortening the title or removing the author.</div>'; return; }
+  box.innerHTML = docs.slice(0,10).map((d,i)=>'<div class="lk">'+(d.cover?'<img src="'+esc(d.cover)+'" alt="">':'<img alt="">')+
+    '<div class="x"><b>'+esc(d.title)+'</b><br>'+esc(d.authors.join(', '))+(d.year?' · '+esc(d.year):'')+'<br><span style="color:var(--steel);font-size:.7rem;">'+d.src+'</span></div><button type="button" data-i="'+i+'">Use</button></div>').join('');
+  box.onclick = e=>{
+    const i=e.target.dataset.i; if(i===undefined) return;
+    const d=docs[+i], f=docFill(d);
+    // fill only empty fields — never overwrite what's been typed (the cover is the exception: you picked it)
+    ['isbn','year','publisher','pages','subjects'].forEach(k=>{ if(!$('e-'+k).value.trim() && f[k]) $('e-'+k).value=f[k]; });
+    if(!$('e-title').value.trim()) $('e-title').value=d.title||'';
+    if(!$('e-author').value.trim()) $('e-author').value=d.authors.join(', ');
+    if(f.coverUrl){ pendingCover=f.coverUrl; $('m-cover').innerHTML='<img src="'+esc(f.coverUrl)+'" alt="">'; }
+    box.innerHTML='<div class="note">Filled in the blanks — tap Save to keep it.</div>';
+  };
 };
 
 function titleMatch(a,b){ const x=normKey(a), y=normKey(b); if(!x||!y) return false; if(x===y) return true; const xs=x.split(':')[0], ys=y.split(':')[0]; return (x.length>6 && y.startsWith(x)) || (y.length>6 && x.startsWith(y)) || normKey(xs)===normKey(ys); }
 function authorMatch(a, list){
   if(!a) return true;
-  const last = normKey(String(a).split(/[,&;]| and /)[0]).split(' ').pop();
+  const last = normKey(String(a).split(/[,&;]| and | with /)[0]).split(' ').pop();
   return (list||[]).some(n=>normKey(n).includes(last));
 }
-let lookupStop=false;
-$('btn-lookup-all').onclick = async ()=>{
-  const todo = live().filter(b=>(!b.coverUrl || !b.isbn) && !b.lookupDone && b.title);
-  if(!todo.length){ $('lookup-progress').textContent='Nothing to look up — every book already has a cover and ISBN (or was already checked).'; return; }
-  lookupStop=false; $('btn-lookup-all').disabled=true; $('btn-lookup-stop').classList.remove('hide');
-  let found=0, n=0;
+/* Runs by itself in the background whenever books without covers show up
+   (after a sync or an import), and from the button on Data & Sync. */
+let lookupRunning=false, lookupStop=false;
+function needsLookup(b){ return b.title && !String(b.title).startsWith('(') && !b.coverUrl && (b.lookupV||0) < LOOKUP_V; }
+async function autoLookup(manual){
+  if(lookupRunning) return;
+  const todo = live().filter(needsLookup);
+  if(!todo.length){ if(manual) $('lookup-progress').textContent='Nothing to look up — every book has a cover or was already checked.'; return; }
+  lookupRunning=true; lookupStop=false;
+  $('btn-lookup-all').disabled=true; $('btn-lookup-stop').classList.remove('hide');
+  let found=0, n=0, pendingSave=0;
   for(const b of todo){
     if(lookupStop) break;
-    n++; $('lookup-progress').textContent='Checking '+n+' of '+todo.length+'… ('+found+' filled in)';
-    try{
-      const docs = await olSearch(b.title, b.author, b.isbn);
-      const d = docs.find(x=>titleMatch(b.title, x.title) && authorMatch(b.author, x.author_name));
-      const cur = byId(b.id); if(!cur || cur.deleted) continue;
-      const ch = { lookupDone:true };
-      if(d){
-        const f=docFill(d);
-        ['isbn','year','publisher','pages','coverUrl','subjects'].forEach(k=>{ if(!cur[k] && f[k]) ch[k]=f[k]; });
-        if(Object.keys(ch).length>1) found++;
-      }
-      Object.assign(cur, ch, {updatedAt:Date.now()});
-      if(n%15===0){ commit(); }
-    }catch(e){ /* network hiccup: skip this one, it stays eligible next run */ }
-    await new Promise(r=>setTimeout(r, 400));
+    n++;
+    const msg='Finding covers '+n+' of '+todo.length+'…';
+    $('lookup-progress').textContent = msg+' ('+found+' found)'; $('lookup-hdr').textContent = msg;
+    let docs=[], ok=false;
+    try{ docs = await olSearch(b.title, b.author, b.isbn); ok=true; }catch(e){}
+    let d = docs.find(x=>x.cover && titleMatch(b.title, x.title) && authorMatch(b.author, x.authors));
+    if(!d){ try{ const g = await gbSearch(b.title, b.author, b.isbn); ok=true; d = g.find(x=>x.cover && titleMatch(b.title, x.title) && authorMatch(b.author, x.authors)); }catch(e){} }
+    if(!ok){ await new Promise(r=>setTimeout(r, 1500)); continue; }   // offline or blocked: leave it for next time
+    const cur = byId(b.id); if(!cur || cur.deleted) continue;
+    const ch = { lookupV:LOOKUP_V };
+    if(d){ const f=docFill(d); ['isbn','year','publisher','pages','coverUrl','subjects'].forEach(k=>{ if(!cur[k] && f[k]) ch[k]=f[k]; }); if(ch.coverUrl) found++; }
+    Object.assign(cur, ch, {updatedAt:Date.now()});
+    if(++pendingSave>=10){ pendingSave=0; commit(); }
+    await new Promise(r=>setTimeout(r, 350));
   }
   commit();
-  $('btn-lookup-all').disabled=false; $('btn-lookup-stop').classList.add('hide');
-  $('lookup-progress').textContent = (lookupStop?'Stopped. ':'Done. ') + 'Filled in details for '+found+' of '+n+' books checked.';
-};
+  lookupRunning=false;
+  $('btn-lookup-all').disabled=false; $('btn-lookup-stop').classList.add('hide'); $('lookup-hdr').textContent='';
+  $('lookup-progress').textContent = (lookupStop?'Stopped. ':'Done. ') + 'Found covers for '+found+' of '+n+' books checked.';
+}
+$('btn-lookup-all').onclick = ()=>autoLookup(true);
 $('btn-lookup-stop').onclick = ()=>{ lookupStop=true; };
 
 /* ============================================================
@@ -1108,7 +1135,7 @@ function renderShelves(){
   $('shelf-tree').innerHTML = rooms.map(r=>{
     const cases = tree[r]; let count=0, hit=false;
     const body = Object.keys(cases).sort(natCmp).map(c=>{
-      return '<div class="case"><div class="case-h">Bookcase '+esc(c)+'</div>' + Object.keys(cases[c]).sort(natCmp).map(s=>{
+      return '<div class="case"><div class="case-h">'+(/^[\w-]{1,3}$/.test(c)?'Bookcase '+esc(c):esc(c))+'</div>' + Object.keys(cases[c]).sort(natCmp).map(s=>{
         const books = cases[c][s].slice().sort((x,y)=>posCmp(x,y) || natCmp(normKey(x.title),normKey(y.title)));
         count += books.length;
         return '<div class="shelf"><div class="shelf-h"><span>Shelf '+esc(s)+' · '+books.length+' book'+(books.length===1?'':'s')+'</span><span class="acts">'+
@@ -1244,6 +1271,7 @@ $('btn-do-import').onclick = ()=>{
   store.imports.push({ id:batch, at:now, added, label:(dr||dc||ds) ? [dr, dc&&'Case '+dc, ds&&'Shelf '+ds].filter(Boolean).join(' · ') : '' });
   pending=null; $('imp-preview').classList.add('hide'); $('imp-text').value='';
   commit();
+  setTimeout(()=>autoLookup(false), 800);
   toast('Imported '+added+(moved?', moved '+moved:'')+(skipped?', skipped '+skipped+' already in library':''));
 };
 function renderUndo(){
