@@ -501,6 +501,11 @@
   .wk-shelfn{ font-size:.78rem; opacity:.8; margin-top:4px; }
   .wk-next{ background:#fff1d6; color:#6b4a00; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:.86rem; }
   .walk-here{ float:right; min-height:28px; padding:3px 10px; font-size:.72rem; font-family:var(--sans); }
+  .wk-pr{ font-family:var(--serif); font-size:1.1rem; color:var(--navy); margin:12px 0 2px; border-bottom:1px solid var(--line); }
+  .wk-pc{ font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--steel); margin:8px 0 4px; }
+  .wk-ps{ display:inline-flex; gap:8px; align-items:center; background:var(--card); color:var(--navy); border:1px solid var(--line); border-radius:999px; padding:5px 12px; min-height:34px; margin:0 6px 6px 0; font-size:.82rem; }
+  .wk-ps:hover, .wk-ps:active{ background:#efe6d3; color:var(--navy); border-color:var(--navy); }
+  .wk-ps .n{ background:#fff1d6; color:#8a5a00; border-radius:999px; padding:0 7px; font-size:.72rem; }
   .wk-done{ text-align:center; padding:20px 0; }
   .un-walk-btn{ margin-top:4px; }
 </style>
@@ -2267,7 +2272,7 @@ function renderUnid(){
   let html='', lastRoom=null, lastCase=null;
   for(const b of L){
     if(b.room!==lastRoom){ if(lastRoom!==null) html+='</div></div>'; html+='<div class="card un-room"><h3>'+esc(b.room||'(no room)')+'</h3><div>'; lastRoom=b.room; lastCase=null; }
-    if(b.bookcase!==lastCase){ html+='<div class="case-h">'+esc(b.bookcase||'')+' <button type="button" class="secondary walk-here" data-walk="'+b.id+'">Walk this bookcase</button></div>'; lastCase=b.bookcase; }
+    if(b.bookcase!==lastCase){ html+='<div class="case-h">'+esc(b.bookcase||'')+' <button type="button" class="secondary walk-here" data-walk="'+b.id+'">Walk it</button></div>'; lastCase=b.bookcase; }
     html+='<div class="sp un-row" data-id="'+b.id+'"><span class="n">'+esc(shelfLabel(b)+' · '+(b.position?sideText(b):'–'))+'</span><span>'+esc(b.title)+(b.author?' — <i>'+esc(b.author)+'</i>':'')+(b.notes?'<span class="note" style="display:block;margin:2px 0 0;">'+esc(b.notes)+'</span>':'')+'</span></div>';
   }
   if(lastRoom!==null) html+='</div></div>';
@@ -2638,12 +2643,38 @@ $('btn-form-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
    ============================================================ */
 let walkIds=[], walkI=0, walkSkipped=new Set(), walkPhoto=null;
 function shelfMates(b){ return live().filter(x=>x.room===b.room && x.bookcase===b.bookcase && String(x.shelf)===String(b.shelf)).sort(posCmp); }
+const skeyOf=x=>x?[x.room||'',x.bookcase||'',x.shelf||''].join('|'):'';
+let walkScope=null;           // null = whole house; otherwise one shelf key
+function walkShelves(){       // every shelf with mystery books, in walking order
+  const out=[], seen=new Map();
+  for(const b of unidRows().filter(isUnid)){ const k=skeyOf(b); if(!seen.has(k)){ seen.set(k,{key:k, b, n:0}); out.push(seen.get(k)); } seen.get(k).n++; }
+  return out;
+}
 function openWalk(startId){
-  // already in walking order: room → bookcase → shelf → spot, so each shelf is finished before moving on
-  walkIds = unidRows().filter(b=>isUnid(b)).map(b=>b.id); walkI=0; walkSkipped=new Set();
-  if(typeof startId==='string'){ const k=walkIds.indexOf(startId); if(k>0) walkIds=walkIds.slice(k).concat(walkIds.slice(0,k)); }
-  if(!walkIds.length){ toast('Nothing unidentified here'); return; }
-  $('walk-bg').classList.add('open'); lockPage(); drawWalk();
+  if(!unidRows().some(isUnid)){ toast('Nothing unidentified here'); return; }
+  $('walk-bg').classList.add('open'); lockPage();
+  if(typeof startId==='string'){ const b=byId(startId); startWalk(b?skeyOf(b):null); return; }
+  drawPicker();
+}
+function startWalk(scope){
+  walkScope=scope;
+  // walking order: room → bookcase → shelf → spot, so a shelf is finished before moving on
+  walkIds=unidRows().filter(b=>isUnid(b) && (!scope || skeyOf(b)===scope)).map(b=>b.id); walkI=0; walkSkipped=new Set();
+  drawWalk();
+}
+function drawPicker(){
+  const S=walkShelves(); $('wk-count').textContent='';
+  let html='<p class="note" style="margin-top:6px;">Pick the shelf you’re standing at — or go through the whole house, one shelf at a time.</p>'
+    +'<button id="wk-all" style="width:100%;margin-bottom:10px;">Whole house, in order ('+S.reduce((s,x)=>s+x.n,0)+' books)</button>';
+  let lastRoom=null, lastCase=null;
+  for(const s of S){
+    if(s.b.room!==lastRoom){ html+='<div class="wk-pr">'+esc(s.b.room||'(no room)')+'</div>'; lastRoom=s.b.room; lastCase=null; }
+    if(s.b.bookcase!==lastCase){ html+='<div class="wk-pc">'+esc(s.b.bookcase||'')+'</div>'; lastCase=s.b.bookcase; }
+    html+='<button type="button" class="wk-ps" data-scope="'+esc(s.key)+'"><span>'+esc(shelfLabel(s.b)||'(no shelf)')+'</span><span class="n">'+s.n+'</span></button>';
+  }
+  $('wk-body').innerHTML=html;
+  $('wk-all').onclick=()=>startWalk(null);
+  $('wk-body').querySelectorAll('[data-scope]').forEach(x=>x.onclick=()=>startWalk(x.dataset.scope));
 }
 function closeWalk(){ $('walk-bg').classList.remove('open'); unlockPage(); if($('import').classList.contains('active')) renderUnid(); }
 function walkCur(){ return byId(walkIds[walkI]); }
@@ -2651,6 +2682,18 @@ function drawWalk(){
   // step past anything that's been identified meanwhile (e.g. on another device)
   while(walkI<walkIds.length){ const b=byId(walkIds[walkI]); if(b && !b.deleted && isUnid(b) && !walkSkipped.has(b.id)) break; walkI++; }
   const left = walkIds.filter(id=>{ const b=byId(id); return b && !b.deleted && isUnid(b); }).length;
+  if(walkI>=walkIds.length && walkScope){
+    const S=walkShelves(), i=S.findIndex(s=>s.key===walkScope), nxt=S[i+1] || S.find(s=>s.key!==walkScope);
+    $('wk-count').textContent='';
+    $('wk-body').innerHTML='<div class="wk-done"><h3>Shelf done</h3><p class="note">'+(left?left+' left on this shelf (skipped or waiting on a photo).':'Every mystery book on this shelf is taken care of.')+'</p>'
+      +(nxt?'<button id="wk-nxt" style="margin:4px;">Next shelf: '+esc([nxt.b.bookcase, shelfLabel(nxt.b)].filter(Boolean).join(' · '))+'</button>':'')
+      +'<button class="secondary" id="wk-pick" style="margin:4px;">Pick another shelf</button>'
+      +(left?'<button class="secondary" id="wk-again" style="margin:4px;">Redo the skipped ones here</button>':'')+'</div>';
+    if($('wk-nxt')) $('wk-nxt').onclick=()=>startWalk(nxt.key);
+    $('wk-pick').onclick=drawPicker;
+    if($('wk-again')) $('wk-again').onclick=()=>startWalk(walkScope);
+    return;
+  }
   if(walkI>=walkIds.length){
     $('wk-body').innerHTML='<div class="wk-done"><h3>That’s the end of the list</h3><p class="note">'+(left?left+' still unidentified (skipped or waiting on a photo).':'Everything here is identified — nice work.')+'</p>'
       +(left?'<button class="secondary" id="wk-restart">Go through the skipped ones</button>':'')+'</div>';
@@ -2681,13 +2724,14 @@ function drawWalk(){
     +'</div>'
     +'<div id="wk-form" class="hide"><div class="grid"><div style="grid-column:1/-1"><label>Title</label><input id="wk-title"></div><div style="grid-column:1/-1"><label>Author</label><input id="wk-author" list="dl-author"></div></div>'
     +'<div class="row" style="margin-top:10px;"><button id="wk-save">Save &amp; next</button><button class="secondary" id="wk-look">Look up cover &amp; details</button></div><div class="lookup-res" id="wk-look-res"></div></div>'
-    +'<div class="row wk-foot"><button class="secondary" id="wk-back"'+(walkI?'':' disabled')+'>&larr; Back</button><button class="secondary" id="wk-skip">Skip</button><span style="flex:1"></span><button class="danger" id="wk-gone">Not here / not a book</button></div>';
+    +'<div class="row wk-foot"><button class="secondary" id="wk-back"'+(walkI?'':' disabled')+'>&larr; Back</button><button class="secondary" id="wk-skip">Skip</button><button class="secondary" id="wk-change">Change shelf</button><span style="flex:1"></span><button class="danger" id="wk-gone">Not here / not a book</button></div>';
   $('wk-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
     if(!info.title){ showWalkForm(); $('wk-title').focus(); walkPending={isbn:info.isbn}; toast('Not found online — type the title'); return; }
     identify(b, info); }});
   $('wk-type').onclick=()=>{ showWalkForm(); $('wk-title').focus(); };
   $('wk-photo').onclick=()=>$('wk-file').click();
   $('wk-skip').onclick=()=>{ walkSkipped.add(b.id); walkI++; drawWalk(); };
+  $('wk-change').onclick=drawPicker;
   $('wk-back').onclick=()=>{ if(walkI>0){ walkI--; walkSkipped.delete(walkIds[walkI]); drawWalk(); } };
   $('wk-gone').onclick=()=>{
     if(!confirm('Remove this entry from the library? (Use this if there’s no book there, or it isn’t a book.)')) return;
