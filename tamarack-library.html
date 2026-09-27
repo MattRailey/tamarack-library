@@ -351,6 +351,9 @@
     nav button{ flex:1; padding:12px 10px; }
     .hdr-count{ display:none; }
   }
+
+  .modal{ will-change:transform; backface-visibility:hidden; }
+  .modal.peek{ pointer-events:none; box-shadow:0 10px 40px rgba(20,12,4,.25); }
 </style>
 </head>
 <body>
@@ -659,7 +662,7 @@
     </div>
     <label class="check" style="margin-top:10px;"><input type="checkbox" id="e-review"> Needs review (check the title/author against the actual book)</label>
     <div class="m-sec">Open Library</div>
-    <button class="secondary" id="btn-lookup">Look up cover &amp; details</button>
+    <div class="row"><button class="secondary" id="btn-lookup">Look up cover &amp; details</button><button class="secondary" id="btn-cover-photo">Take a photo of the cover</button><input type="file" id="cover-file" accept="image/*" capture="environment" class="hide"></div>
     <div class="lookup-res" id="lookup-res"></div>
     <div class="row" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;">
       <button id="btn-save">Save</button>
@@ -966,7 +969,7 @@ function hue(s){ let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))>>>0
 const CLOTH=['#7d3328','#2e4a3b','#3a4a63','#6a4c2f','#5b3f5e','#8a5a2b','#35544f','#6d2f3a','#4a5a33','#7a6a3a'];
 function initials(t){ return normKey(t).split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?'; }
 function coverUrl(b, size){
-  if(b.coverUrl) return size==='L' ? b.coverUrl.replace(/-[SM]\.jpg$/,'-L.jpg') : b.coverUrl;
+  if(b.coverUrl) return (size==='L' && !b.coverUrl.startsWith('data:')) ? b.coverUrl.replace(/-[SM]\.jpg$/,'-L.jpg') : b.coverUrl;
   const isbn = String(b.isbn||'').replace(/[^0-9Xx]/g,'');
   if(isbn.length===10 || isbn.length===13) return 'https://covers.openlibrary.org/b/isbn/'+isbn+'-'+(size||'M')+'.jpg?default=false';
   return '';
@@ -975,7 +978,7 @@ function coverHTML(b, size){
   const ph = '<div class="ph" style="background-color:'+CLOTH[hue(b.title)%CLOTH.length]+'">'+esc(initials(b.title))+'</div>';
   const u = coverUrl(b, size);
   if(!u) return ph;
-  return '<img loading="lazy" alt="" src="'+esc(u)+'" onerror="this.parentNode.innerHTML=this.dataset.ph" data-ph="'+esc(ph)+'">';
+  return '<img loading="lazy" alt="" src="'+esc(u)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph" data-ph="'+esc(ph)+'">';
 }
 
 /* ============================================================
@@ -1235,12 +1238,19 @@ function fillForm(b){
   editRating = +b.rating||0; starButtons();
   $('e-review').checked = !!b.needsReview;
   pendingCover = b.coverUrl || null;
-  $('m-title').textContent = b.title || (isNew?'New book':'(untitled)');
+  viewFill({cover:$('m-cover'), title:$('m-title'), sub:$('m-sub'), about:$('m-about'), view:$('m-view')}, b);
+  $('modal').classList.toggle('viewing', !isNew);
+  $('lookup-res').innerHTML = '';
+  $('btn-returned').classList.toggle('hide', !b.loanedTo);
+  $('btn-delete').classList.toggle('hide', isNew);
+}
+function viewFill(el, b){
+  el.title.textContent = b.title || (isNew?'New book':'(untitled)');
   const bits=[]; if(b.author) bits.push(esc(b.author)); bits.push(esc(locText(b)));
   if(b.loanedTo) bits.push('<span style="color:#a33b17;font-weight:600;">Loaned to '+esc(b.loanedTo)+(b.loanedDate?' on '+esc(fmtLocalDate(b.loanedDate)):'')+'</span>');
   if(b.addedAt) bits.push('Added '+new Date(b.addedAt).toLocaleDateString());
-  $('m-sub').innerHTML = bits.join('<br>');
-  $('m-about').textContent = b.about || '';
+  el.sub.innerHTML = bits.join('<br>');
+  el.about.textContent = b.about || '';
   const facts=[];
   const f=(k,v,w)=>{ if(v) facts.push('<div'+(w?' style="grid-column:1/-1"':'')+'><dt>'+k+'</dt><dd>'+v+'</dd></div>'); };
   f('Genre', esc(b.genre||'')); f('Series', b.series?esc(b.series)+(b.seriesNo?' #'+esc(b.seriesNo):''):'');
@@ -1249,12 +1259,8 @@ function fillForm(b){
   f('Loaned to', b.loanedTo?esc(b.loanedTo)+(b.loanedDate?' ('+esc(fmtLocalDate(b.loanedDate))+')':''):'');
   f('Publisher', esc(b.publisher||'')); f('Pages', esc(b.pages||''));
   f('Keywords', esc(b.subjects||''), 1); f('Notes', esc(b.notes||''), 1);
-  $('m-view').innerHTML = facts.length ? '<dl>'+facts.join('')+'</dl>' : '';
-  $('modal').classList.toggle('viewing', !isNew);
-  $('m-cover').innerHTML = coverHTML(b, 'M');
-  $('lookup-res').innerHTML = '';
-  $('btn-returned').classList.toggle('hide', !b.loanedTo);
-  $('btn-delete').classList.toggle('hide', isNew);
+  el.view.innerHTML = facts.length ? '<dl>'+facts.join('')+'</dl>' : '';
+  el.cover.innerHTML = coverHTML(b, 'M');
 }
 function formData(){
   const o={};
@@ -1297,7 +1303,7 @@ function updateArrows(){
 let lockY=0;
 function lockPage(){ if(document.body.classList.contains('locked')) return; lockY=window.scrollY; document.body.style.top=(-lockY)+'px'; document.body.classList.add('locked'); }
 function unlockPage(){ if(!document.body.classList.contains('locked')) return; document.body.classList.remove('locked'); document.body.style.top=''; window.scrollTo(0,lockY); }
-function closeModal(){ $('modal-bg').classList.remove('open'); editId=null; isNew=false; unlockPage(); }
+function closeModal(){ dropPeek && dropPeek(); $('modal').style.transform=''; $('modal').style.opacity=''; $('modal-bg').classList.remove('open'); editId=null; isNew=false; unlockPage(); }
 function saveBook(silent){
   const d = formData();
   if(!d.title){ toast('A title is needed'); $('e-title').focus(); return false; }
@@ -1312,43 +1318,83 @@ function saveBook(silent){
   if(!silent) toast('Saved');
   return true;
 }
+// ---- flipping between books: the next book slides in alongside, like a photo carousel ----
+const GAP=24;
+let peek=null, flipping=false;
+function neighbor(dir){ const i=navList.indexOf(editId); return (!isNew && i>=0) ? navList[i+dir] : undefined; }
+function makePeek(dir){
+  const id=neighbor(dir), b=id && byId(id); if(!b) return null;
+  const m=$('modal'), r=m.getBoundingClientRect();
+  const c=m.cloneNode(true);
+  viewFill({cover:c.querySelector('#m-cover'), title:c.querySelector('#m-title'), sub:c.querySelector('#m-sub'), about:c.querySelector('#m-about'), view:c.querySelector('#m-view')}, b);
+  c.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id')); c.removeAttribute('id');
+  c.classList.add('viewing','peek');
+  Object.assign(c.style,{position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', margin:'0', transition:'none', transform:'translateX('+(dir*(r.width+GAP))+'px)'});
+  $('modal-bg').appendChild(c); c.scrollTop=0;
+  return {el:c, dir, id, w:r.width+GAP};
+}
+function dropPeek(){ if(peek){ peek.el.remove(); peek=null; } }
+function place(dx, anim){
+  const m=$('modal'), t=anim||'none';
+  m.style.transition = t==='none'?'none':'transform '+t;
+  const w=(peek?peek.w:m.offsetWidth+GAP), p=Math.min(1,Math.abs(dx)/w);
+  m.style.transform = dx ? 'translateX('+dx+'px) scale('+(1-p*.05)+')' : '';
+  m.style.opacity = dx ? String(1-p*.12) : '';
+  if(peek){ peek.el.style.transition = t==='none'?'none':'transform '+t+', opacity '+t;
+    const pp=1-p; peek.el.style.transform='translateX('+(dx+peek.dir*peek.w)+'px) scale('+(1-pp*.05)+')'; peek.el.style.opacity=String(1-pp*.12); }
+}
+function finishFlip(ms){
+  // both cards glide the rest of the way, then the real panel quietly takes the new book
+  const target=-peek.dir*peek.w, id=peek.id, ease=ms+'ms cubic-bezier(.2,.7,.25,1)';
+  place(target, ease); flipping=true;
+  setTimeout(()=>{ const m=$('modal'); openBook(id, navList); m.scrollTop=0; place(0,'none'); m.style.transform=''; m.style.opacity='';
+    dropPeek(); flipping=false; }, ms+10);
+}
 function step(dir){
-  const i = navList.indexOf(editId); const j=i+dir;
-  if(i<0 || j<0 || j>=navList.length) return;
-  if(isDirty()){ if(confirm('Save your changes to this book first?')){ if(!saveBook(true)) return; } }
-  openBook(navList[j], navList);
+  if(flipping) return;
+  const id=neighbor(dir); if(id===undefined) return;
+  const m=$('modal');
+  if(!m.classList.contains('viewing')){   // editing: ask to save, then switch without animation
+    if(isDirty()){ if(confirm('Save your changes to this book first?')){ if(!saveBook(true)) return; } }
+    openBook(id, navList); return;
+  }
+  dropPeek(); peek=makePeek(dir); if(!peek){ openBook(id, navList); return; }
+  requestAnimationFrame(()=>finishFlip(300));
 }
 $('m-prev').onclick=()=>step(-1); $('m-next').onclick=()=>step(1);
-$('btn-edit').onclick=()=>{ $('modal').classList.remove('viewing'); setTimeout(()=>$('e-title').focus(),50); };
-$('btn-view-close').onclick=()=>closeModal();
-// swipe left/right between books (like flipping through photos)
 (function(){
-  let x0=null, y0=null, t0=0, drag=false;
+  let x0=null, y0=null, drag=false, lastX=0, lastT=0, vel=0;
   const m=$('modal');
   m.addEventListener('touchstart', e=>{
     const tg=(e.target.tagName||'').toLowerCase();
-    if(tg==='input'||tg==='textarea'||tg==='select'||e.touches.length>1){ x0=null; return; }
-    x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now(); drag=false;
+    if(flipping || !m.classList.contains('viewing') || tg==='input'||tg==='textarea'||tg==='select'||e.touches.length>1){ x0=null; return; }
+    x0=lastX=e.touches[0].clientX; y0=e.touches[0].clientY; lastT=performance.now(); vel=0; drag=false;
   }, {passive:true});
   m.addEventListener('touchmove', e=>{
     if(x0===null) return;
-    const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
-    if(!drag && Math.abs(dx)>10 && Math.abs(dx)>Math.abs(dy)*1.2) drag=true;
-    if(drag){ e.preventDefault(); m.style.transition='none'; m.style.transform='translateX('+dx+'px)'; m.style.opacity=String(Math.max(.4,1-Math.abs(dx)/600)); }
+    const x=e.touches[0].clientX, dx=x-x0, dy=e.touches[0].clientY-y0;
+    if(!drag){ if(Math.abs(dx)>8 && Math.abs(dx)>Math.abs(dy)*1.2) drag=true; else if(Math.abs(dy)>10){ x0=null; return; } else return; }
+    e.preventDefault();
+    const now=performance.now(); vel = 0.8*vel + 0.2*((x-lastX)/Math.max(1,now-lastT)); lastX=x; lastT=now;
+    const dir = dx<0 ? 1 : -1;
+    if(!peek || peek.dir!==dir){ dropPeek(); peek=makePeek(dir); }
+    place(peek ? dx : dx*0.3, 'none');                        // at either end: gentle rubber-band
   }, {passive:false});
-  m.addEventListener('touchend', e=>{
+  const end=()=>{
     if(x0===null) return;
-    const dx=e.changedTouches[0].clientX-x0, fast=Date.now()-t0<300;
-    const i=navList.indexOf(editId), dir = dx<0 ? 1 : -1, ok = !isNew && i>=0 && navList[i+dir]!==undefined;
-    x0=null;
-    m.style.transition='transform .18s ease, opacity .18s ease';
-    if(drag && ok && (Math.abs(dx)>80 || (fast && Math.abs(dx)>40))){
-      m.style.transform='translateX('+(dir>0?-1:1)*window.innerWidth+'px)'; m.style.opacity='0';
-      setTimeout(()=>{ step(dir); m.style.transition='none'; m.style.transform='translateX('+(dir>0?1:-1)*window.innerWidth*0.4+'px)';
-        requestAnimationFrame(()=>{ m.style.transition='transform .2s ease, opacity .2s ease'; m.style.transform=''; m.style.opacity=''; }); }, 170);
-    } else { m.style.transform=''; m.style.opacity=''; }
+    const dx=lastX-x0; x0=null;
+    if(!drag){ return; }
     drag=false;
-  });
+    const w=peek?peek.w:m.offsetWidth, fling=Math.abs(vel)>0.45 && Math.sign(vel)===Math.sign(dx);
+    if(peek && (Math.abs(dx)>w*0.33 || fling)){
+      const remaining=Math.max(0, w-Math.abs(dx)), speed=Math.max(Math.abs(vel),1.2);   // px per ms
+      finishFlip(Math.round(Math.min(360, Math.max(170, remaining/speed))));
+    } else {
+      place(0, '260ms cubic-bezier(.2,.7,.25,1)');            // spring back
+      setTimeout(()=>{ if(!drag) dropPeek(); }, 270);
+    }
+  };
+  m.addEventListener('touchend', end); m.addEventListener('touchcancel', end);
 })();
 $('m-close').onclick=()=>{ if(isDirty() && !confirm('Discard unsaved changes?')) return; closeModal(); };
 $('btn-cancel').onclick=$('m-close').onclick;
@@ -1378,7 +1424,7 @@ document.addEventListener('keydown', e=>{
    Results are normalized to { title, authors[], year, isbn[],
    publisher, pages, subjects[], cover }.
    ============================================================ */
-const LOOKUP_V = 2;   // bump to re-check books a weaker earlier lookup gave up on
+const LOOKUP_V = 3;   // bump to re-check books a weaker earlier lookup gave up on
 async function olSearch(title, author, isbn){
   const p = new URLSearchParams({ limit:'6', fields:'key,title,author_name,first_publish_year,isbn,publisher,cover_i,number_of_pages_median,subject' });
   const cleanIsbn = String(isbn||'').replace(/[^0-9Xx]/g,'');
@@ -1425,9 +1471,20 @@ function pickIsbn(doc){ const l=doc.isbn||[]; return l.find(x=>x.length===13 && 
 function docFill(doc){
   return { isbn:pickIsbn(doc), year:doc.year||'', publisher:doc.publisher||'', pages:doc.pages||'', subjects:cleanSubjects(doc.subjects), coverUrl:doc.cover||'' };
 }
+$('btn-cover-photo').onclick=()=>$('cover-file').click();
+$('cover-file').onchange=e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const img=new Image(), url=URL.createObjectURL(f);
+  img.onload=()=>{ const W=240,H=360, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+    const s=Math.max(W/img.width,H/img.height), w=img.width*s, h=img.height*s; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+    pendingCover=c.toDataURL('image/jpeg',0.72); URL.revokeObjectURL(url);
+    $('m-cover').innerHTML='<img src="'+pendingCover+'" alt="">'; toast('Cover photo added — tap Save to keep it'); };
+  img.src=url;
+};
 $('btn-lookup').onclick = async ()=>{
   const box=$('lookup-res'); box.innerHTML='<div class="note">Searching Open Library and Google Books…</div>';
-  const docs = await bookSearch($('e-title').value.trim(), $('e-author').value.trim(), $('e-isbn').value.trim());
+  let docs = await bookSearch(cleanTitle($('e-title').value.trim()), searchAuthor($('e-author').value.trim()), $('e-isbn').value.trim());
+  if(!docs.length) docs = await bookSearch(cleanTitle($('e-title').value.trim()), '', '');
   if(!docs.length){ box.innerHTML='<div class="note">No matches (or no connection). Try shortening the title or removing the author.</div>'; return; }
   box.innerHTML = docs.slice(0,10).map((d,i)=>'<div class="lk">'+(d.cover?'<img src="'+esc(d.cover)+'" alt="">':'<img alt="">')+
     '<div class="x"><b>'+esc(d.title)+'</b><br>'+esc(d.authors.join(', '))+(d.year?' · '+esc(d.year):'')+'<br><span style="color:var(--steel);font-size:.7rem;">'+d.src+'</span></div><button type="button" data-i="'+i+'">Use</button></div>').join('');
@@ -1443,14 +1500,29 @@ $('btn-lookup').onclick = async ()=>{
   };
 };
 
-function titleMatch(a,b){ const x=normKey(a), y=normKey(b); if(!x||!y) return false; if(x===y) return true; const xs=x.split(':')[0], ys=y.split(':')[0]; return (x.length>6 && y.startsWith(x)) || (y.length>6 && x.startsWith(y)) || normKey(xs)===normKey(ys); }
-function authorMatch(a, list){
-  if(!a) return true;
-  const last = normKey(String(a).split(/[,&;]| and | with /)[0]).split(' ').pop();
-  return (list||[]).some(n=>normKey(n).includes(last));
+// Titles as they sit on our shelves carry extras the catalogs don't: "(Hardy Boys #17)", ", Vol. 3", "(second copy)"…
+function cleanTitle(t){
+  return String(t||'').replace(/\s*\((?:[^()]*#\s*\d+[^()]*|second copy|third copy|volume[^)]*|vol\.[^)]*|collected works[^)]*|eyewitness|dk [^)]*|a child's first library[^)]*|take-along guide|the gatefold collection|kingfisher knowledge|\d{4} yearbook[^)]*|golden guide)\)\s*/ig,' ')
+    .replace(/,?\s+(?:vol\.?|volume|book)\s+[\divxlc]+\b.*$/i,'').replace(/\s+/g,' ').trim();
 }
-/* Runs by itself in the background whenever books without covers show up
-   (after a sync or an import), and from the button on Data & Sync. */
+function searchAuthor(a){ return String(a||'').split(/\s+(?:and|with)\s+|[,;&(]/)[0].replace(/\b(ed|eds|trans|illus)\.?$/i,'').trim(); }
+function sigWords(t){ return normKey(t).split(' ').filter(w=>w.length>2 && !STOP.has(w)); }
+function titleMatch(a,b){
+  const x=normKey(cleanTitle(a)), y=normKey(cleanTitle(b)); if(!x||!y) return false;
+  if(x===y) return true;
+  const xs=normKey(x.split(':')[0]), ys=normKey(y.split(':')[0]);
+  if(xs===ys) return true;
+  if((x.length>7 && y.startsWith(x)) || (y.length>7 && x.startsWith(y))) return true;
+  const wa=sigWords(xs), wb=sigWords(ys);
+  if(wa.length>=2 && wb.length>=2){ const n=Math.min(3,wa.length,wb.length); if(wa.slice(0,n).join(' ')===wb.slice(0,n).join(' ') && Math.abs(wa.length-wb.length)<=2) return true; }
+  return false;
+}
+function authorMatch(a, list){
+  const want=normKey(searchAuthor(a)).split(' ').filter(w=>w.length>=3);
+  if(!want.length) return true;
+  const last=want[want.length-1];
+  return (list||[]).some(n=>normKey(n).split(' ').some(w=>w===last || (w.length>=5 && last.length>=5 && edit1(w,last)) || want.includes(w) && w.length>=4));
+}
 let lookupRunning=false, lookupStop=false;
 function needsLookup(b){ return b.title && !String(b.title).startsWith('(') && !b.coverUrl && (b.lookupV||0) < LOOKUP_V; }
 async function autoLookup(manual){
@@ -1465,10 +1537,13 @@ async function autoLookup(manual){
     n++;
     const msg='Finding covers '+n+' of '+todo.length+'…';
     $('lookup-progress').textContent = msg+' ('+found+' found)'; $('lookup-hdr').textContent = msg;
-    let docs=[], ok=false;
-    try{ docs = await olSearch(b.title, b.author, b.isbn); ok=true; }catch(e){}
-    let d = docs.find(x=>x.cover && titleMatch(b.title, x.title) && authorMatch(b.author, x.authors));
-    if(!d){ try{ const g = await gbSearch(b.title, b.author, b.isbn); ok=true; d = g.find(x=>x.cover && titleMatch(b.title, x.title) && authorMatch(b.author, x.authors)); }catch(e){} }
+    let ok=false, d=null;
+    const t=cleanTitle(b.title), a=searchAuthor(b.author);
+    const good=list=>list.find(x=>x.cover && titleMatch(b.title, x.title) && authorMatch(b.author, x.authors));
+    const tries=[()=>olSearch(t,a,b.isbn), ()=>gbSearch(t,a,b.isbn)];
+    if(a) tries.push(()=>olSearch(t,'',''), ()=>gbSearch(t,'',''));            // author spelled differently in the catalog
+    if(t.includes(':')) tries.push(()=>olSearch(t.split(':')[0],a,''));        // drop long subtitles
+    for(const go of tries){ try{ d=good(await go()); ok=true; }catch(e){} if(d) break; await new Promise(r=>setTimeout(r,150)); }
     if(!ok){ await new Promise(r=>setTimeout(r, 1500)); continue; }   // offline or blocked: leave it for next time
     const cur = byId(b.id); if(!cur || cur.deleted) continue;
     const ch = { lookupV:LOOKUP_V };
