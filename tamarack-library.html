@@ -447,6 +447,49 @@
     .hdr-right{ left:auto !important; right:14px !important; top:70px !important; }
     header{ padding-top:78px !important; }
   }
+
+  /* ---- collections, scanner, unidentified walk-through ---- */
+  .coll-bar{ display:flex; gap:6px; overflow-x:auto; padding:2px 2px 10px; margin:-4px 0 6px; align-items:center; scrollbar-width:none; }
+  .coll-bar::-webkit-scrollbar{ display:none; }
+  .coll-lbl{ font-family:var(--serif); font-style:italic; color:var(--steel); font-size:.95rem; flex:none; margin-right:2px; }
+  .coll-pill{ flex:none; background:var(--card); color:var(--navy); border:1px solid var(--line); border-radius:999px; padding:5px 12px; min-height:32px; font-size:.8rem; font-weight:600; white-space:nowrap; }
+  .coll-pill span{ color:var(--steel); font-weight:400; margin-left:2px; }
+  .coll-pill.on{ background:var(--navy); color:#fff8e8; border-color:var(--navy); }
+  .coll-pill.on span{ color:#e9dcc0; }
+  .coll-pill.ghost{ background:none; border-style:dashed; color:var(--steel); font-weight:400; }
+  .coll-now{ display:inline-block; background:var(--navy); color:#fff8e8; border-radius:999px; padding:1px 10px; font-size:.78rem; font-weight:600; margin-right:4px; }
+  .coll-edit{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .coll-chip{ display:inline-flex; align-items:center; gap:2px; background:#efe6d3; color:var(--navy); border-radius:999px; padding:3px 4px 3px 11px; font-size:.8rem; font-weight:600; }
+  .coll-chip.view{ padding:2px 10px; font-size:.76rem; }
+  .coll-chip button{ background:none; color:var(--steel); min-height:0; padding:0 6px; font-size:1.05rem; line-height:1; }
+  .coll-in-row{ display:flex; gap:6px; margin-top:6px; } .coll-in-row input{ flex:1; } .coll-in-row button{ min-height:36px; padding:6px 12px; }
+  .scan-round svg{ display:block; margin:auto; }
+  #scan-bg{ z-index:260; } #walk-bg{ z-index:230; }
+  .scan-modal{ max-width:520px; }
+  .sc-view{ position:relative; background:#111; border-radius:8px; overflow:hidden; aspect-ratio:4/3; margin:8px 0 6px; }
+  .sc-view video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .sc-frame{ position:absolute; left:10%; right:10%; top:25%; bottom:25%; border:2px solid rgba(255,248,232,.9); border-radius:8px; box-shadow:0 0 0 999px rgba(0,0,0,.28); pointer-events:none; }
+  .sc-frame::after{ content:''; position:absolute; left:6%; right:6%; top:50%; height:2px; background:#e0553b; opacity:.8; }
+  .sc-type{ display:flex; gap:6px; } .sc-type input{ flex:1; }
+  .sc-loc{ margin-top:10px; } .sc-loc .grid{ grid-template-columns:repeat(4,1fr); gap:6px; } .sc-loc label{ font-size:.7rem; }
+  @media (max-width:520px){ .sc-loc .grid{ grid-template-columns:1fr 1fr; } }
+  .sc-card{ display:flex; gap:12px; align-items:flex-start; margin-top:10px; background:var(--paper); border-radius:8px; padding:10px; font-size:.86rem; }
+  .sc-card img, .sc-nocov{ width:58px; height:86px; object-fit:cover; border-radius:3px; flex:none; background:#ddd; }
+  .sc-nocov{ display:flex; align-items:center; justify-content:center; font-size:.65rem; color:var(--steel); text-align:center; }
+  .sc-have{ background:#fff1d6; color:#6b4a00; border-radius:8px; padding:8px 10px; margin-top:10px; font-size:.84rem; }
+  .sc-ok{ background:#e3f6ef; color:#07785a; border-radius:8px; padding:10px; margin-top:10px; }
+  .wk-modal{ max-width:560px; }
+  .wk-head{ display:flex; align-items:baseline; gap:10px; } .wk-head h3{ margin:0; font-family:var(--serif); font-size:1.4rem; } #wk-count{ color:var(--steel); font-size:.85rem; }
+  .wk-where{ text-align:center; background:var(--navy); color:#fff8e8; border-radius:10px; padding:14px 12px; margin:12px 0 10px; }
+  .wk-room{ font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; opacity:.8; } .wk-case{ font-family:var(--serif); font-size:1.35rem; margin:2px 0; } .wk-spot{ font-size:1.05rem; font-weight:700; color:var(--gold); }
+  .wk-nb{ display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:.84rem; }
+  .wk-nb > div{ background:var(--paper); border-radius:8px; padding:8px 10px; } .wk-nb span, .wk-what > span{ display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--steel); margin-bottom:2px; }
+  .wk-what{ margin:10px 0; padding:8px 10px; border:1px dashed var(--line); border-radius:8px; font-size:.86rem; }
+  .wk-sent{ margin-top:6px; color:#07785a; font-weight:600; font-size:.8rem; }
+  .wk-acts{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:6px 0 10px; } .wk-acts button{ padding:10px 6px; }
+  .wk-foot{ margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .wk-done{ text-align:center; padding:20px 0; }
+  .un-walk-btn{ margin-top:4px; }
 </style>
 </head>
 <body>
@@ -489,6 +532,7 @@
         <div class="search-row nowrap">
           <div class="seg" id="view-seg"><button data-view="feed">Feed</button><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
           <button class="secondary" id="btn-more-filters">Filters</button>
+          <button id="btn-scan" class="add-round scan-round secondary" aria-label="Scan a barcode" title="Scan a barcode to add books"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="3" y="5" width="2" height="14"/><rect x="6.5" y="5" width="1" height="14"/><rect x="9" y="5" width="2" height="14"/><rect x="12.5" y="5" width="1" height="14"/><rect x="15" y="5" width="3" height="14"/><rect x="19.5" y="5" width="1.5" height="14"/></svg></button>
           <button id="btn-add" class="add-round" aria-label="Add book" title="Add book">+</button>
         </div>
         <div id="more-filters" class="hide" style="margin-top:12px;">
@@ -535,6 +579,7 @@
         </div>
       </div>
 
+      <div class="coll-bar hide" id="coll-bar"></div>
       <div class="card batchbar hide" id="batchbar">
         <div class="row">
           <strong id="batch-count">0 selected</strong>
@@ -576,6 +621,8 @@
             <div><h3 style="margin-bottom:2px;">Unidentified books</h3><div class="note" id="un-summary" style="margin-top:0;"></div></div>
             <button class="secondary" id="un-print">Print list</button>
           </div>
+          <button id="un-walk" class="un-walk-btn">Start the walk-through</button>
+          <p class="note">The walk-through takes you to each one in turn — where it sits and what's on either side. Scan its barcode, type the title, or snap the title page and the photo goes to Dropbox for Claude to read.</p>
           <p class="note">Books whose spine couldn't be read, listed by where they sit. Pull each one, check the title page, then tap it here to fill in the title and author (and clear “Needs review”).</p>
           <div class="search-row">
             <select id="un-room" class="genre-main"><option value="">All rooms</option></select>
@@ -754,11 +801,12 @@
       <div><label>Year</label><input id="e-year" inputmode="numeric"></div>
       <div><label>Publisher</label><input id="e-publisher"></div>
       <div><label>Pages</label><input id="e-pages" inputmode="numeric"></div>
+      <div style="grid-column:1/-1;"><label>Collections</label><div class="coll-edit" id="e-colls"></div><div class="coll-in-row"><input id="e-coll-in" list="dl-coll" placeholder="Add to a collection — e.g. Read-alouds"><button type="button" class="secondary" id="e-coll-add">Add</button></div></div>
       <div style="grid-column:1/-1;"><label>Notes</label><textarea id="e-notes"></textarea></div>
     </div>
     <label class="check" style="margin-top:10px;"><input type="checkbox" id="e-review"> Needs review (check the title/author against the actual book)</label>
     <div class="m-sec">Open Library</div>
-    <div class="row"><button class="secondary" id="btn-lookup">Look up cover &amp; details</button><button class="secondary" id="btn-cover-photo">Take a photo of the cover</button><input type="file" id="cover-file" accept="image/*" capture="environment" class="hide"></div>
+    <div class="row"><button class="secondary" id="btn-form-scan">Scan barcode</button><button class="secondary" id="btn-lookup">Look up cover &amp; details</button><button class="secondary" id="btn-cover-photo">Take a photo of the cover</button><input type="file" id="cover-file" accept="image/*" capture="environment" class="hide"></div>
     <div class="lookup-res" id="lookup-res"></div>
     <div class="row" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px;">
       <button id="btn-save">Save</button>
@@ -803,13 +851,46 @@
       <div><label>Shelf</label><input id="b-shelf" list="dl-shelf"></div>
       <div><label>Status</label><select id="b-status"><option value="">(keep)</option><option value="unread">Unread</option><option value="reading">Reading</option><option value="read">Read</option></select></div>
       <div><label>Genre</label><input id="b-genre" list="dl-genre"></div>
+      <div><label>Add to collection</label><input id="b-coll-add" list="dl-coll" placeholder="e.g. Read-alouds"></div>
+      <div><label>Remove from collection</label><select id="b-coll-rm"><option value="">(none)</option></select></div>
       <div><label>Needs review</label><select id="b-review"><option value="">(keep)</option><option value="no">Clear flag</option><option value="yes">Flag</option></select></div>
     </div>
     <div class="row" style="margin-top:16px;"><button id="b-apply">Apply</button><button class="secondary" id="b-cancel">Cancel</button></div>
   </div>
 </div>
 
-<datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
+
+<!-- barcode scanner -->
+<div class="modal-bg" id="scan-bg">
+  <div class="modal scan-modal">
+    <button class="modal-close" id="sc-close" aria-label="Close">&times;</button>
+    <h3 id="sc-title">Scan books to add</h3>
+    <div class="note" id="sc-hint" style="margin-top:0;"></div>
+    <div class="sc-view"><video id="sc-video" muted playsinline></video><div class="sc-frame"></div></div>
+    <div class="sc-type"><input id="sc-isbn" inputmode="numeric" placeholder="…or type the ISBN"><button class="secondary" id="sc-go">Look up</button></div>
+    <div class="sc-loc" id="sc-loc">
+      <div class="note" style="margin:0 0 4px;">New books go here (the spot counts up as you scan along a shelf):</div>
+      <div class="grid">
+        <div><label>Room</label><input id="sc-room" list="dl-room"></div>
+        <div><label>Bookcase</label><input id="sc-case" list="dl-case"></div>
+        <div><label>Shelf</label><input id="sc-shelf" list="dl-shelf"></div>
+        <div><label>Spot from left</label><input id="sc-pos" inputmode="numeric"></div>
+      </div>
+    </div>
+    <div id="sc-result"></div>
+  </div>
+</div>
+
+<!-- unidentified walk-through -->
+<div class="modal-bg" id="walk-bg">
+  <div class="modal wk-modal">
+    <button class="modal-close" id="wk-close" aria-label="Close">&times;</button>
+    <div class="wk-head"><h3>Mystery books</h3><span id="wk-count"></span></div>
+    <div id="wk-body"></div>
+    <input type="file" id="wk-file" accept="image/*" capture="environment" class="hide">
+  </div>
+</div>
+<datalist id="dl-coll"></datalist><datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
 <datalist id="dl-author"></datalist><datalist id="dl-series"></datalist><datalist id="dl-genre"></datalist><datalist id="dl-loan"></datalist>
 <div class="toast" id="toast"></div>
 
@@ -1614,6 +1695,8 @@ $('m-close').onclick=()=>{ if(isDirty() && !confirm('Discard unsaved changes?'))
 $('btn-cancel').onclick=$('m-close').onclick;
 $('modal-bg').addEventListener('click', e=>{ if(e.target===$('modal-bg')) $('m-close').onclick(); });
 $('btn-save').onclick=()=>{ if(saveBook()) closeModal(); };
+$('btn-edit').onclick=()=>{ dropPeek(); $('modal').classList.remove('viewing'); $('modal').scrollTop=0; };
+$('btn-view-close').onclick=()=>closeModal();
 $('btn-delete').onclick=()=>{
   const b=byId(editId); if(!b) return;
   if(!confirm('Delete "'+(b.title||'this book')+'"?')) return;
@@ -1659,7 +1742,7 @@ async function gbSearch(title, author, isbn){
   return ((await r.json()).items || []).map(it=>{ const v=it.volumeInfo||{}; const img=(v.imageLinks||{}).thumbnail||(v.imageLinks||{}).smallThumbnail||'';
     return { src:'Google Books', title:v.title+(v.subtitle?': '+v.subtitle:''), authors:v.authors||[], year:(v.publishedDate||'').slice(0,4),
       isbn:(v.industryIdentifiers||[]).filter(x=>/ISBN/.test(x.type)).map(x=>x.identifier), publisher:v.publisher||'', pages:v.pageCount?String(v.pageCount):'',
-      subjects:v.categories||[], cover:img?img.replace(/^http:/,'https:').replace('&edge=curl',''):'' }; });
+      subjects:v.categories||[], about:(String(v.description||'').replace(/<[^>]+>/g,'').match(/^.{0,400}?[.!?](?=\s|$)/)||[''])[0], cover:img?img.replace(/^http:/,'https:').replace('&edge=curl',''):'' }; });
 }
 async function bookSearch(title, author, isbn){
   const out=[];
@@ -2257,6 +2340,315 @@ function refreshAll(){
   if($('data').classList.contains('active')) renderData();
   if($('import').classList.contains('active')){ renderUndo(); if(!$('ie-sell').classList.contains('hide')) renderSell(); if(!$('ie-unid').classList.contains('hide')) renderUnid(); }
 }
+
+/* ============================================================
+   Collections — hand-picked groups ("Read-alouds", "Christmas"…).
+   Stored per book as b.collections = ['Read-alouds', …] so they
+   merge across devices like every other field.
+   ============================================================ */
+function collsOf(b){ return Array.isArray(b.collections) ? b.collections.filter(Boolean) : []; }
+function allColls(){ const m=new Map(); for(const b of live()) for(const c of collsOf(b)) m.set(c,(m.get(c)||0)+1); return [...m.entries()].sort((a,b)=>natCmp(a[0],b[0])); }
+function renderCollBar(){
+  const cs=allColls(), bar=$('coll-bar');
+  if(ui.coll && !cs.some(c=>c[0]===ui.coll)) ui.coll='';
+  if(!cs.length){ bar.classList.add('hide'); bar.innerHTML=''; return; }
+  bar.classList.remove('hide');
+  bar.innerHTML='<span class="coll-lbl">Collections</span>'+cs.map(([c,n])=>'<button type="button" class="coll-pill'+(ui.coll===c?' on':'')+'" data-coll="'+esc(c)+'">'+esc(c)+' <span>'+n+'</span></button>').join('')
+    +(ui.coll?'<button type="button" class="coll-pill ghost" data-act="rename">Rename</button><button type="button" class="coll-pill ghost" data-act="remove">Remove collection</button>':'');
+}
+$('coll-bar').addEventListener('click', e=>{
+  const p=e.target.closest('button'); if(!p) return;
+  if(p.dataset.coll!==undefined){ ui.coll = ui.coll===p.dataset.coll ? '' : p.dataset.coll; lsSet(UI_KEY, JSON.stringify(ui)); renderLibrary(true); return; }
+  const cur=ui.coll; if(!cur) return;
+  const now=Date.now();
+  if(p.dataset.act==='rename'){
+    const nn=(prompt('Rename “'+cur+'” to:', cur)||'').trim(); if(!nn || nn===cur) return;
+    store.books.forEach(b=>{ if(!b.deleted && collsOf(b).includes(cur)){ b.collections=[...new Set(collsOf(b).map(c=>c===cur?nn:c))]; b.updatedAt=now; } });
+    ui.coll=nn; commit(); toast('Renamed');
+  }
+  if(p.dataset.act==='remove'){
+    if(!confirm('Remove the “'+cur+'” collection? The books stay in the library — they just leave this collection.')) return;
+    store.books.forEach(b=>{ if(!b.deleted && collsOf(b).includes(cur)){ b.collections=collsOf(b).filter(c=>c!==cur); b.updatedAt=now; } });
+    ui.coll=''; commit(); toast('Collection removed');
+  }
+  lsSet(UI_KEY, JSON.stringify(ui));
+});
+// chip editor in the book form
+let editColls=[];
+function drawCollEditor(){
+  $('e-colls').innerHTML = editColls.map((c,i)=>'<span class="coll-chip">'+esc(c)+'<button type="button" data-i="'+i+'" aria-label="Remove">&times;</button></span>').join('');
+}
+function addEditColl(v){ v=String(v||'').replace(/,$/,'').trim(); if(v && !editColls.includes(v)){ editColls.push(v); drawCollEditor(); } $('e-coll-in').value=''; }
+$('e-colls').addEventListener('click', e=>{ const i=e.target.dataset.i; if(i===undefined) return; editColls.splice(+i,1); drawCollEditor(); });
+$('e-coll-in').addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===','){ e.preventDefault(); addEditColl($('e-coll-in').value); } });
+$('e-coll-in').addEventListener('change', ()=>addEditColl($('e-coll-in').value));
+$('e-coll-add').onclick = ()=>addEditColl($('e-coll-in').value);
+// hook the existing form functions
+const _fillForm=fillForm; fillForm=function(b){ _fillForm(b); editColls=collsOf(b).slice(); drawCollEditor(); $('e-coll-in').value=''; };
+const _formData=formData; formData=function(){ const o=_formData(); if($('e-coll-in').value.trim()) addEditColl($('e-coll-in').value); o.collections=editColls.slice(); return o; };
+const _isDirty=isDirty; isDirty=function(){ if(_isDirty()) return true; if(isNew) return editColls.length>0; const b=byId(editId); return !!b && collsOf(b).join('|')!==editColls.join('|'); };
+const _viewFill=viewFill; viewFill=function(el,b){ _viewFill(el,b); const cs=collsOf(b); if(cs.length){ const dl=el.view.querySelector('dl') || (el.view.innerHTML='<dl></dl>', el.view.querySelector('dl')); dl.insertAdjacentHTML('afterbegin','<div style="grid-column:1/-1"><dt>Collections</dt><dd>'+cs.map(c=>'<span class="coll-chip view">'+esc(c)+'</span>').join(' ')+'</dd></div>'); } };
+const _refreshLists=refreshLists; refreshLists=function(){ _refreshLists(); fillDatalist('dl-coll', allColls().map(c=>c[0])); const rm=$('b-coll-rm'); if(rm) rm.innerHTML='<option value="">(none)</option>'+allColls().map(([c])=>'<option>'+esc(c)+'</option>').join(''); };
+const _renderLibrary=renderLibrary; renderLibrary=function(r){ renderCollBar(); _renderLibrary(r); if(ui.coll) $('summary').insertAdjacentHTML('afterbegin','<span class="coll-now">'+esc(ui.coll)+'</span> '); };
+const _filtered=filtered; filtered=function(){ const out=_filtered(); return ui.coll ? out.filter(b=>collsOf(b).includes(ui.coll)) : out; };
+// batch: add to / remove from a collection
+const _batchEdit=$('btn-batch-edit').onclick; $('btn-batch-edit').onclick=()=>{ _batchEdit(); $('b-coll-add').value=''; $('b-coll-rm').value=''; };
+const _bApply=$('b-apply').onclick;
+$('b-apply').onclick=()=>{
+  const add=$('b-coll-add').value.trim(), rm=$('b-coll-rm').value;
+  if(add || rm){
+    const now=Date.now();
+    store.books.forEach(b=>{ if(!selected.has(b.id) || b.deleted) return;
+      let cs=collsOf(b); const before=cs.join('|');
+      if(add && !cs.includes(add)) cs=cs.concat(add);
+      if(rm) cs=cs.filter(c=>c!==rm);
+      if(cs.join('|')!==before){ b.collections=cs; b.updatedAt=now; } });
+    $('b-coll-add').value=''; $('b-coll-rm').value='';
+    const others=['b-room','b-bookcase','b-shelf','b-genre','b-status','b-review'].some(id=>$(id).value.trim());
+    if(!others){ closeBatch(); commit(); toast((add?'Added to “'+add+'”':'Removed from “'+rm+'”')); return; }
+  }
+  _bApply();
+};
+const _reset=$('btn-reset').onclick; $('btn-reset').onclick=()=>{ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); _reset(); };
+
+/* ============================================================
+   Barcode scanning — ISBN from the camera (or typed in).
+   Uses the phone's built-in barcode reader where there is one
+   (Chrome/Android), otherwise loads the ZXing reader on demand.
+   ============================================================ */
+function isbn13(raw){
+  let d=String(raw||'').replace(/[^0-9Xx]/g,'').toUpperCase();
+  if(d.length===10){ const core='978'+d.slice(0,9); let s=0; for(let i=0;i<12;i++) s+=(+core[i])*(i%2?3:1); return core+((10-s%10)%10); }
+  if(d.length===13 && /^\d+$/.test(d)) return d;
+  return '';
+}
+function validEan13(d){ if(!/^\d{13}$/.test(d)) return false; let s=0; for(let i=0;i<12;i++) s+=(+d[i])*(i%2?3:1); return (10-s%10)%10===+d[12]; }
+function findByIsbn(code){ const k=isbn13(code); if(!k) return []; return live().filter(b=>isbn13(b.isbn)===k); }
+let scanStream=null, scanTimer=0, zxReader=null, scanMode=null, scanBusy=false, lastCode='', lastCodeAt=0;
+function loadZX(){
+  if(window.ZXing) return Promise.resolve(window.ZXing);
+  return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+    s.onload=()=>window.ZXing?res(window.ZXing):rej(new Error('reader failed to load')); s.onerror=()=>rej(new Error('reader failed to load')); document.head.appendChild(s); });
+}
+async function openScanner(mode){
+  // mode: {kind:'add'} adds new books; {kind:'fill', onFound(fields)} hands the result back
+  scanMode=mode||{kind:'add'};
+  $('sc-title').textContent = scanMode.kind==='fill' ? 'Scan this book’s barcode' : 'Scan books to add';
+  $('sc-hint').textContent = 'Point the camera at the barcode on the back cover (the one starting 978 or 979).';
+  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-loc').classList.toggle('hide', scanMode.kind==='fill');
+  if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||$('f-room').value||''; $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
+  $('scan-bg').classList.add('open'); lockPage();
+  startCamera();
+}
+async function startCamera(){
+  stopCamera(); scanBusy=false;
+  const v=$('sc-video');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ $('sc-hint').textContent='This browser can’t use the camera here — type the ISBN below instead.'; return; }
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false });
+  }catch(e){ $('sc-hint').textContent='No camera access (' + (e.name==='NotAllowedError'?'permission was denied':'no camera found') + ') — type the ISBN below instead.'; return; }
+  v.srcObject=scanStream; v.setAttribute('playsinline',''); try{ await v.play(); }catch(e){}
+  let native=null;
+  if('BarcodeDetector' in window){ try{ const f=await BarcodeDetector.getSupportedFormats(); if(f.includes('ean_13')) native=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(x=>f.includes(x))}); }catch(e){} }
+  if(native){
+    const tick=async()=>{ if(!scanStream) return; if(!scanBusy && v.readyState>=2){ try{ const r=await native.detect(v); if(r&&r.length) gotCode(r[0].rawValue); }catch(e){} } scanTimer=setTimeout(tick, 180); };
+    tick(); return;
+  }
+  try{
+    const ZX=await loadZX(); if(!scanStream) return;
+    const hints=new Map(); hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS,[ZX.BarcodeFormat.EAN_13,ZX.BarcodeFormat.EAN_8,ZX.BarcodeFormat.UPC_A,ZX.BarcodeFormat.UPC_E]); hints.set(ZX.DecodeHintType.TRY_HARDER,true);
+    zxReader=new ZX.MultiFormatReader(); zxReader.setHints(hints);
+    const c=document.createElement('canvas'), g=c.getContext('2d',{willReadFrequently:true});
+    const tick=()=>{ if(!scanStream) return;
+      if(!scanBusy && v.videoWidth){
+        const W=v.videoWidth, H=v.videoHeight, cw=Math.round(W*0.8), ch=Math.round(H*0.5); c.width=cw; c.height=ch;
+        g.drawImage(v,(W-cw)/2,(H-ch)/2,cw,ch,0,0,cw,ch);
+        try{ const lum=new ZX.HTMLCanvasElementLuminanceSource(c), bmp=new ZX.BinaryBitmap(new ZX.HybridBinarizer(lum)); const r=zxReader.decode(bmp); if(r) gotCode(r.getText()); }catch(e){}
+      }
+      scanTimer=setTimeout(tick, 150); };
+    tick();
+  }catch(e){ $('sc-hint').textContent='The barcode reader couldn’t load (no internet?) — type the ISBN below instead.'; }
+}
+function stopCamera(){ clearTimeout(scanTimer); if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } const v=$('sc-video'); if(v) v.srcObject=null; }
+function closeScanner(){ stopCamera(); $('scan-bg').classList.remove('open'); if(!$('modal-bg').classList.contains('open') && !$('walk-bg').classList.contains('open')) unlockPage(); }
+function gotCode(raw){
+  let d=String(raw||'').replace(/\D/g,'');
+  if(d.length===12) d='0'+d;                       // UPC-A → EAN-13
+  if(!validEan13(d)) return;
+  if(!/^97[89]/.test(d)){ $('sc-hint').textContent='That’s a price or store barcode — look for the one starting 978 or 979.'; return; }
+  if(d===lastCode && Date.now()-lastCodeAt<4000 && $('sc-result').innerHTML) return;
+  lastCode=d; lastCodeAt=Date.now();
+  try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+  handleIsbn(d);
+}
+$('sc-go').onclick=()=>{ const d=isbn13($('sc-isbn').value); if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
+$('sc-isbn').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('sc-go').onclick(); } });
+async function isbnLookup(code){
+  const docs = await bookSearch('', '', code);
+  const d = docs.find(x=>x.title) || null;
+  if(!d) return null;
+  const f=docFill(d);
+  const about = (docs.find(x=>x.about)||{}).about || '';
+  return { title:d.title||'', author:(d.authors||[]).join(', '), isbn:code, year:f.year, publisher:f.publisher, pages:f.pages, subjects:f.subjects,
+    about, coverUrl: f.coverUrl || (docs.find(x=>x.cover)||{}).cover || '' };
+}
+async function handleIsbn(code){
+  scanBusy=true;
+  const box=$('sc-result');
+  box.innerHTML='<div class="note">Looking up '+code+'…</div>';
+  const have = scanMode.kind==='add' ? findByIsbn(code) : [];
+  let info=null; try{ info=await isbnLookup(code); }catch(e){}
+  if(!info) info={ title:'', author:'', isbn:code };
+  if(scanMode.kind==='fill'){
+    box.innerHTML = info.title
+      ? scanCard(info)+'<div class="row" style="margin-top:10px;"><button id="sc-use">Use this</button><button class="secondary" id="sc-again">Scan again</button></div>'
+      : '<div class="note">Couldn’t find ISBN '+code+' online. You can still keep the ISBN and type the title.</div><div class="row" style="margin-top:10px;"><button id="sc-use">Keep the ISBN</button><button class="secondary" id="sc-again">Scan again</button></div>';
+    $('sc-use').onclick=()=>{ const cb=scanMode.onFound; closeScanner(); cb && cb(info); };
+    $('sc-again').onclick=()=>{ box.innerHTML=''; scanBusy=false; };
+    return;
+  }
+  let html='';
+  if(have.length) html+='<div class="sc-have">Already in the library: '+have.map(b=>'<a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a> — '+esc(locText(b))).join('<br>')+'</div>';
+  html += info.title ? scanCard(info) : '<div class="note">Couldn’t find ISBN '+code+' online — you can add it by hand.</div>';
+  html += '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(have.length?'Add another copy':'Add to library')+'</button>':'')
+    +'<button class="secondary" id="sc-edit">'+(info.title?'Edit first':'Add by hand')+'</button><button class="secondary" id="sc-again">Next book</button></div>';
+  box.innerHTML=html;
+  box.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); closeScanner(); openBook(a.dataset.open,[a.dataset.open]); });
+  const loc=()=>({ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() });
+  const remember=l=>{ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; };
+  if($('sc-add')) $('sc-add').onclick=()=>{
+    const l=loc(), now=Date.now();
+    const b=Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'scan', status:'unread', lookupV:0 }, info, l);
+    if(!b.coverUrl) delete b.coverUrl;
+    store.books.push(b); commit(); remember(l);
+    box.innerHTML='<div class="sc-ok">✓ Added <b>'+esc(b.title)+'</b>'+(l.room?' — '+esc(locText(b)):'')+'</div>';
+    scanBusy=false;
+  };
+  $('sc-edit').onclick=()=>{ const l=loc(); remember(l); closeScanner(); openNew(Object.assign({status:'unread'}, info, l)); };
+  $('sc-again').onclick=()=>{ box.innerHTML=''; scanBusy=false; };
+}
+function scanCard(i){
+  return '<div class="sc-card">'+(i.coverUrl?'<img src="'+esc(i.coverUrl)+'" alt="">':'<div class="sc-nocov">No cover</div>')+'<div><b>'+esc(i.title)+'</b><br>'+esc(i.author||'Unknown author')+(i.year?' · '+esc(i.year):'')+(i.publisher?'<br><span class="note" style="margin:0">'+esc(i.publisher)+'</span>':'')+'<br><span class="note" style="margin:0">ISBN '+esc(i.isbn)+'</span></div></div>';
+}
+$('sc-close').onclick=closeScanner;
+$('btn-scan').onclick=()=>openScanner({kind:'add'});
+// in the book form: scan to fill the blanks of this book
+$('btn-form-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
+  ['title','author','isbn','year','publisher','pages','subjects','about'].forEach(k=>{ const el=$('e-'+k); if(el && info[k] && (!el.value.trim() || (k==='title' && el.value.trim().startsWith('(')))) el.value=info[k]; });
+  if(info.author && $('e-author').value.trim()!==info.author && String($('e-title').value).startsWith('(')) $('e-author').value=info.author;
+  if(info.coverUrl){ pendingCover=info.coverUrl; $('m-cover').innerHTML='<img src="'+esc(info.coverUrl)+'" alt="">'; }
+  if(info.title) $('e-review').checked=false;
+  toast(info.title?'Filled in from the barcode — tap Save to keep it':'ISBN filled in');
+}});
+
+/* ============================================================
+   Walk-through for unidentified books: one book at a time, with
+   where to find it and what's on either side. Scan it, type it,
+   or snap the title page — the photo goes to Dropbox for Claude.
+   ============================================================ */
+let walkIds=[], walkI=0, walkSkipped=new Set(), walkPhoto=null;
+function shelfMates(b){ return live().filter(x=>x.room===b.room && x.bookcase===b.bookcase && String(x.shelf)===String(b.shelf)).sort(posCmp); }
+function openWalk(){
+  walkIds = unidRows().filter(b=>isUnid(b)).map(b=>b.id); walkI=0; walkSkipped=new Set();
+  if(!walkIds.length){ toast('Nothing unidentified here'); return; }
+  $('walk-bg').classList.add('open'); lockPage(); drawWalk();
+}
+function closeWalk(){ $('walk-bg').classList.remove('open'); unlockPage(); if($('import').classList.contains('active')) renderUnid(); }
+function walkCur(){ return byId(walkIds[walkI]); }
+function drawWalk(){
+  // step past anything that's been identified meanwhile (e.g. on another device)
+  while(walkI<walkIds.length){ const b=byId(walkIds[walkI]); if(b && !b.deleted && isUnid(b) && !walkSkipped.has(b.id)) break; walkI++; }
+  const left = walkIds.filter(id=>{ const b=byId(id); return b && !b.deleted && isUnid(b); }).length;
+  if(walkI>=walkIds.length){
+    $('wk-body').innerHTML='<div class="wk-done"><h3>That’s the end of the list</h3><p class="note">'+(left?left+' still unidentified (skipped or waiting on a photo).':'Everything here is identified — nice work.')+'</p>'
+      +(left?'<button class="secondary" id="wk-restart">Go through the skipped ones</button>':'')+'</div>';
+    $('wk-count').textContent='';
+    if($('wk-restart')) $('wk-restart').onclick=()=>{ walkIds=unidRows().filter(isUnid).map(b=>b.id); walkI=0; walkSkipped=new Set(); drawWalk(); };
+    return;
+  }
+  const b=walkCur(), mates=shelfMates(b), k=mates.findIndex(x=>x.id===b.id);
+  const L=mates[k-1], R=mates[k+1];
+  const nb=x=>x?'<b>'+esc(x.title)+'</b>'+(x.author&&!String(x.title).startsWith('(')?' <span class="note" style="margin:0">'+esc(x.author)+'</span>':''):'<i>the end of the shelf</i>';
+  $('wk-count').textContent=(walkI+1)+' of '+walkIds.length;
+  walkPhoto=null;
+  $('wk-body').innerHTML=
+    '<div class="wk-where"><div class="wk-room">'+esc(b.room||'')+'</div><div class="wk-case">'+esc(b.bookcase||'')+'</div>'
+    +'<div class="wk-spot">'+esc(shelfLabel(b))+(b.position?' · '+esc(sideText(b)):'')+'</div></div>'
+    +'<div class="wk-nb"><div><span>Left of it</span>'+nb(L)+'</div><div><span>Right of it</span>'+nb(R)+'</div></div>'
+    +'<div class="wk-what"><span>We have it down as</span><b>'+esc(b.title)+'</b>'+(b.author?' — '+esc(b.author):'')+(b.notes?'<div class="note" style="margin:4px 0 0">'+esc(b.notes)+'</div>':'')
+    +(b.idPhoto?'<div class="wk-sent">📷 Title-page photo already sent to Claude</div>':'')+'</div>'
+    +'<div class="wk-acts">'
+    +'<button id="wk-scan">Scan barcode</button>'
+    +'<button id="wk-photo">Photo of title page</button>'
+    +'<button class="secondary" id="wk-type">Type title</button>'
+    +'</div>'
+    +'<div id="wk-form" class="hide"><div class="grid"><div style="grid-column:1/-1"><label>Title</label><input id="wk-title"></div><div style="grid-column:1/-1"><label>Author</label><input id="wk-author" list="dl-author"></div></div>'
+    +'<div class="row" style="margin-top:10px;"><button id="wk-save">Save &amp; next</button><button class="secondary" id="wk-look">Look up cover &amp; details</button></div><div class="lookup-res" id="wk-look-res"></div></div>'
+    +'<div class="row wk-foot"><button class="secondary" id="wk-back"'+(walkI?'':' disabled')+'>&larr; Back</button><button class="secondary" id="wk-skip">Skip</button><span style="flex:1"></span><button class="danger" id="wk-gone">Not here / not a book</button></div>';
+  $('wk-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
+    if(!info.title){ showWalkForm(); $('wk-title').focus(); walkPending={isbn:info.isbn}; toast('Not found online — type the title'); return; }
+    identify(b, info); }});
+  $('wk-type').onclick=()=>{ showWalkForm(); $('wk-title').focus(); };
+  $('wk-photo').onclick=()=>$('wk-file').click();
+  $('wk-skip').onclick=()=>{ walkSkipped.add(b.id); walkI++; drawWalk(); };
+  $('wk-back').onclick=()=>{ if(walkI>0){ walkI--; walkSkipped.delete(walkIds[walkI]); drawWalk(); } };
+  $('wk-gone').onclick=()=>{
+    if(!confirm('Remove this entry from the library? (Use this if there’s no book there, or it isn’t a book.)')) return;
+    const now=Date.now(); store.books=store.books.map(x=>x.id===b.id?{id:x.id, deleted:true, updatedAt:now}:x); commit(); walkI++; drawWalk(); };
+  $('wk-save').onclick=()=>{ const t=$('wk-title').value.trim(); if(!t){ toast('Type the title first'); return; } identify(b, Object.assign({ title:t, author:$('wk-author').value.trim() }, walkPending||{})); };
+  $('wk-look').onclick=async()=>{
+    const box=$('wk-look-res'); const t=$('wk-title').value.trim(); if(!t){ toast('Type the title first'); return; }
+    box.innerHTML='<div class="note">Searching…</div>';
+    const docs=await bookSearch(cleanTitle(t), searchAuthor($('wk-author').value.trim()), '');
+    if(!docs.length){ box.innerHTML='<div class="note">No matches — just tap Save &amp; next.</div>'; return; }
+    box.innerHTML=docs.slice(0,6).map((d,i)=>'<div class="lk">'+(d.cover?'<img src="'+esc(d.cover)+'" alt="">':'<img alt="">')+'<div class="x"><b>'+esc(d.title)+'</b><br>'+esc(d.authors.join(', '))+(d.year?' · '+esc(d.year):'')+'</div><button type="button" data-i="'+i+'">Use</button></div>').join('');
+    box.onclick=e=>{ const i=e.target.dataset.i; if(i===undefined) return; const d=docs[+i], f=docFill(d);
+      identify(b, Object.assign({ title:$('wk-title').value.trim()||d.title, author:$('wk-author').value.trim()||d.authors.join(', ') }, f, d.about?{about:d.about}:{})); };
+  };
+  walkPending=null;
+}
+let walkPending=null;
+function showWalkForm(){ $('wk-form').classList.remove('hide'); }
+function identify(b, info){
+  const now=Date.now();
+  const ch={ title:info.title, needsReview:false, updatedAt:now, lookupV:0 };
+  if(info.author) ch.author=info.author;
+  ['isbn','year','publisher','pages','subjects','about'].forEach(k=>{ if(info[k] && !b[k]) ch[k]=info[k]; });
+  if(info.coverUrl) ch.coverUrl=info.coverUrl;
+  const was=b.title;
+  store.books=store.books.map(x=>x.id===b.id?Object.assign({}, x, ch):x);
+  commit(); toast('Saved — '+info.title); walkI++; drawWalk();
+}
+// title-page photo → Dropbox /Railey Library/photos/identify/ for Claude to read later
+$('wk-file').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const b=walkCur(); if(!b) return;
+  const t=await dbxToken(); if(!t){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
+  toast('Sending photo…');
+  try{
+    const blob=await shrinkPhoto(f, 1600);
+    const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+    const path='/Railey Library/photos/identify/'+[slug(b.room),slug(b.bookcase),'shelf-'+slug(b.shelf),'pos-'+slug(b.position),b.id].join(' ')+'.jpg';
+    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({ path, mode:'add', autorename:true, mute:true }).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)) }, body:blob });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const now=Date.now();
+    store.books=store.books.map(x=>x.id===b.id?Object.assign({}, x, { idPhoto:path, idPhotoAt:now, updatedAt:now }):x);
+    commit(); toast('Photo sent — Claude will read it next time you ask'); walkSkipped.add(b.id); walkI++; drawWalk();
+  }catch(err){ toast('Couldn’t send the photo ('+err.message+') — try again'); }
+};
+function shrinkPhoto(file, max){
+  return new Promise((res,rej)=>{ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ const s=Math.min(1, max/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(bl=>bl?res(bl):rej(new Error('photo failed')),'image/jpeg',0.82); };
+    img.onerror=()=>rej(new Error('couldn’t read the photo')); img.src=url; });
+}
+$('un-walk').onclick=openWalk;
+$('wk-close').onclick=closeWalk;
+// mark books whose title-page photo is waiting for Claude in the unidentified list
+const _renderUnid=renderUnid; renderUnid=function(){ _renderUnid(); const n=live().filter(b=>isUnid(b)&&b.idPhoto).length;
+  document.querySelectorAll('#un-list .un-row').forEach(r=>{ const b=byId(r.dataset.id); if(b && b.idPhoto) r.querySelector('.n').insertAdjacentHTML('afterbegin','📷 '); });
+  if(n) $('un-summary').textContent += ' · '+n+' photo'+(n===1?'':'s')+' waiting for Claude'; };
 
 if(ui.sort) $('f-sort').value = ui.sort;
 syncViewSeg();
