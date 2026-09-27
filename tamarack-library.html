@@ -478,6 +478,12 @@
   .sc-card img, .sc-nocov{ width:58px; height:86px; object-fit:cover; border-radius:3px; flex:none; background:#ddd; }
   .sc-nocov{ display:flex; align-items:center; justify-content:center; font-size:.65rem; color:var(--steel); text-align:center; }
   .sc-have{ background:#fff1d6; color:#6b4a00; border-radius:8px; padding:8px 10px; margin-top:10px; font-size:.84rem; }
+  .sc-st{ margin-top:10px; border-radius:8px; padding:8px 12px; font-weight:700; font-size:.9rem; }
+  .sc-st.have{ background:#e3f6ef; color:#07785a; } .sc-st.partial{ background:#fff1d6; color:#8a5a00; } .sc-st.new{ background:#e8eef7; color:#2c4a73; }
+  .sc-m a{ color:var(--navy); text-decoration:none; } .sc-have a{ color:inherit; }
+  .sc-grp{ margin-top:10px; } .sc-gh{ font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--steel); margin-bottom:4px; }
+  .sc-m{ display:flex; gap:8px; align-items:center; justify-content:space-between; padding:7px 0; border-top:1px solid var(--line); font-size:.84rem; }
+  .sc-mb{ display:flex; gap:6px; flex:none; } .sc-mb button{ min-height:32px; padding:5px 10px; font-size:.76rem; }
   .sc-ok{ background:#e3f6ef; color:#07785a; border-radius:8px; padding:10px; margin-top:10px; }
   .wk-modal{ max-width:560px; }
   .wk-head{ display:flex; align-items:baseline; gap:10px; } .wk-head h3{ margin:0; font-family:var(--serif); font-size:1.4rem; } #wk-count{ color:var(--steel); font-size:.85rem; }
@@ -869,6 +875,9 @@
     <h3 id="sc-title">Scan books to add</h3>
     <div class="note" id="sc-hint" style="margin-top:0;"></div>
     <div class="sc-view"><video id="sc-video" muted playsinline></video><div class="sc-frame"></div></div>
+    <div class="row" style="margin:0 0 8px;"><button class="secondary" id="sc-shelfphoto" style="flex:1;">📷 Photograph this shelf for Claude</button></div>
+    <input type="file" id="sc-file" accept="image/*" capture="environment" class="hide">
+    <div id="sc-phstatus" class="note" style="margin:-4px 0 8px;"></div>
     <div class="sc-type"><input id="sc-isbn" inputmode="numeric" placeholder="…or type the ISBN"><button class="secondary" id="sc-go">Look up</button></div>
     <div class="sc-loc" id="sc-loc">
       <div class="note" style="margin:0 0 4px;">New books go here (the spot counts up as you scan along a shelf):</div>
@@ -2458,7 +2467,7 @@ async function openScanner(mode){
   scanMode=mode||{kind:'add'};
   $('sc-title').textContent = scanMode.kind==='fill' ? 'Scan this book’s barcode' : 'Scan books to add';
   $('sc-hint').textContent = 'Point the camera at the barcode on the back cover (the one starting 978 or 979).';
-  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-loc').classList.toggle('hide', scanMode.kind==='fill');
+  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent=''; $('sc-loc').classList.toggle('hide', scanMode.kind==='fill');
   if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||$('f-room').value||''; $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
   $('scan-bg').classList.add('open'); lockPage();
   startCamera();
@@ -2534,22 +2543,68 @@ async function handleIsbn(code){
     $('sc-again').onclick=()=>{ box.innerHTML=''; scanBusy=false; };
     return;
   }
-  let html='';
-  if(have.length) html+='<div class="sc-have">Already in the library: '+have.map(b=>'<a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a> — '+esc(locText(b))).join('<br>')+'</div>';
+  // ---- where does this book stand in the library? ----
+  const loc=()=>({ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() });
+  const remember=l=>{ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; };
+  const partial=b=>isUnid(b) || !!b.needsReview;
+  const L0=live(), here=loc();
+  const inLib=new Map(), maybe=new Map();
+  for(const b of have) (partial(b)?maybe:inLib).set(b.id,b);
+  if(info.title){
+    const last=normKey(searchAuthor(info.author||'')).split(' ').filter(w=>w.length>=3).pop()||'';
+    for(const b of L0){
+      if(inLib.has(b.id)||maybe.has(b.id)) continue;
+      const tOk = !String(b.title||'').startsWith('(') && titleMatch(info.title, b.title) && (!b.author || !info.author || authorMatch(b.author,[info.author]));
+      if(tOk){ (partial(b)?maybe:inLib).set(b.id,b); continue; }
+      if(partial(b) && last && normKey((b.title||'')+' '+(b.author||'')).split(' ').includes(last)) maybe.set(b.id,b);   // e.g. "(Hermann Hesse — title not visible)"
+    }
+  }
+  // unreadable books on the very shelf being scanned could be this one too
+  if(here.room && here.bookcase && here.shelf){
+    const same=L0.filter(b=>isUnid(b) && !maybe.has(b.id) && b.room===here.room && b.bookcase===here.bookcase && String(b.shelf)===here.shelf).sort(posCmp);
+    same.slice(0,8).forEach(b=>maybe.set(b.id,b));
+  }
+  const inL=[...inLib.values()], mb=[...maybe.values()].slice(0,10);
+  const status = inL.length ? 'have' : mb.length ? 'partial' : 'new';
+  const badge={ have:['sc-st have','✓ Already in the library'], partial:['sc-st partial','◐ Possibly a partly identified book'], new:['sc-st new','＋ Not in the library yet'] }[status];
+  const row=(b,kind)=>'<div class="sc-m"><div><a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a>'+(b.author?' <span class="note" style="margin:0">'+esc(b.author)+'</span>':'')
+      +'<div class="note" style="margin:0">'+esc(b.room?locText(b):'No shelf yet')+'</div></div>'
+      +'<div class="sc-mb"><button class="secondary" data-this="'+b.id+'" data-kind="'+kind+'">That’s it</button>'
+      +(kind==='have' && here.room && b.room && (b.room!==here.room||b.bookcase!==here.bookcase||String(b.shelf)!==here.shelf)?'<button class="secondary" data-move="'+b.id+'">Move here</button>':'')+'</div></div>';
+  let html='<div class="'+badge[0]+'">'+badge[1]+'</div>';
   html += info.title ? scanCard(info) : '<div class="sc-have">The barcode read fine (ISBN '+code+'), but the free book databases don’t have this one — common for self-published, print-on-demand'+(/^9798/.test(code)?' (ISBNs starting 979-8 are usually Amazon self-published)':'')+' and very new books. Tap <b>Add by hand</b>: the ISBN and shelf spot are filled in, and you can snap the cover there.</div>';
-  html += '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(have.length?'Add another copy':'Add to library')+'</button>':'')
+  if(inL.length) html+='<div class="sc-grp"><div class="sc-gh">You have it'+(inL.length>1?' ('+inL.length+' copies)':'')+'</div>'+inL.map(b=>row(b,'have')).join('')+'</div>';
+  if(mb.length) html+='<div class="sc-grp"><div class="sc-gh">'+(inL.length?'Also possibly one of these partly identified books':'Is it one of these partly identified books?')+'</div>'+mb.map(b=>row(b,'partial')).join('')+'</div>';
+  html += '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(inL.length?'Add another copy':mb.length?'Add as a new book':'Add to library')+'</button>':'')
     +'<button class="secondary" id="sc-edit">'+(info.title?'Edit first':'Add by hand')+'</button><button class="secondary" id="sc-again">Next book</button></div>';
   box.innerHTML=html;
   box.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); closeScanner(); openBook(a.dataset.open,[a.dataset.open]); });
-  const loc=()=>({ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() });
-  const remember=l=>{ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; };
+  const done=msg=>{ box.innerHTML='<div class="sc-ok">'+msg+'</div>'; scanBusy=false; };
+  box.querySelectorAll('[data-this]').forEach(btn=>btn.onclick=()=>{
+    const id=btn.dataset.this, kind=btn.dataset.kind, now=Date.now(), l=loc();
+    let msg='';
+    store.books=store.books.map(x=>{ if(x.id!==id) return x;
+      const ch={ updatedAt:now };
+      ['isbn','year','publisher','pages','subjects','about'].forEach(k=>{ if(info[k] && !x[k]) ch[k]=info[k]; });
+      if(info.coverUrl && !x.coverUrl) ch.coverUrl=info.coverUrl;
+      if(kind==='partial' && info.title){ ch.title=info.title; if(info.author) ch.author=info.author; ch.needsReview=false; ch.lookupV=0; if(info.coverUrl) ch.coverUrl=info.coverUrl; }
+      if(!x.room && l.room){ ch.room=l.room; ch.bookcase=l.bookcase; ch.shelf=l.shelf; if(l.position) ch.position=l.position; }
+      const y=Object.assign({}, x, ch);
+      msg = (kind==='partial'?'✓ Identified <b>'+esc(y.title)+'</b> (was “'+esc(x.title)+'”)':'✓ Updated <b>'+esc(y.title)+'</b> with the barcode details')+(!x.room&&ch.room?' and gave it a spot: '+esc(locText(y)):'')+'.';
+      return y; });
+    commit(); done(msg);
+  });
+  box.querySelectorAll('[data-move]').forEach(btn=>btn.onclick=()=>{
+    const id=btn.dataset.move, l=loc(), now=Date.now(), was=locText(byId(id));
+    store.books=store.books.map(x=>x.id===id?Object.assign({}, x, { room:l.room, bookcase:l.bookcase, shelf:l.shelf, position:l.position||x.position, updatedAt:now }):x);
+    commit(); remember(l); done('✓ Moved <b>'+esc(byId(id).title)+'</b> from '+esc(was)+' to '+esc(locText(byId(id)))+'.');
+  });
   if($('sc-add')) $('sc-add').onclick=()=>{
     const l=loc(), now=Date.now();
     const b=Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'scan', status:'unread', lookupV:0 }, info, l);
     if(!b.coverUrl) delete b.coverUrl;
     store.books.push(b); commit(); remember(l);
-    box.innerHTML='<div class="sc-ok">✓ Added <b>'+esc(b.title)+'</b>'+(l.room?' — '+esc(locText(b)):'')+'</div>';
-    scanBusy=false;
+    done('✓ Added <b>'+esc(b.title)+'</b>'+(inL.length?' as another copy':'')+(l.room?' — '+esc(locText(b)):' (no shelf yet)'));
   };
   $('sc-edit').onclick=()=>{ const l=loc(); remember(l); closeScanner(); openNew(Object.assign({status:'unread'}, info, l)); };
   $('sc-again').onclick=()=>{ box.innerHTML=''; scanBusy=false; };
@@ -2692,16 +2747,19 @@ $('ph-close').onclick=()=>{ $('ph-bg').classList.remove('open'); unlockPage(); }
 $('ph-take').onclick=async()=>{ if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; } $('ph-file').click(); };
 $('ph-file').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
-  const t=await dbxToken(); if(!t){ toast('Dropbox isn’t connected'); return; }
   const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
   ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
-  const note=$('ph-note').value.trim();
+  await sendToInbox(files, loc, $('ph-note').value.trim(), $('ph-status'), $('ph-sent'));
+  $('ph-note').value='';
+};
+async function sendToInbox(files, loc, note, statusEl, listEl){
+  const t=await dbxToken(); if(!t){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return 0; }
   const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
   const d=new Date(), stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+String(d.getSeconds()).padStart(2,'0');
   const base=[stamp, slug(loc.room)||'no-room', slug(loc.bookcase)||'no-bookcase', loc.shelf?'shelf-'+slug(loc.shelf):'', loc.kind, note?slug(note):''].filter(Boolean).join(' ');
   let ok=0, fail=0;
   for(let i=0;i<files.length;i++){
-    $('ph-status').textContent='Sending '+(i+1)+' of '+files.length+'…';
+    statusEl.textContent='Sending '+(i+1)+' of '+files.length+'…';
     try{
       const blob=await shrinkPhoto(files[i], loc.kind==='book'?1800:2600);
       const path='/Railey Library/photos/inbox/'+base+(files.length>1?' '+(i+1):'')+'.jpg';
@@ -2710,7 +2768,7 @@ $('ph-file').onchange=async e=>{
       if(!r.ok) throw new Error('HTTP '+r.status);
       ok++;
       const url=URL.createObjectURL(blob);
-      $('ph-sent').insertAdjacentHTML('afterbegin','<div class="ph-item"><img src="'+url+'" alt=""><span>✓ '+esc([loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')||'Sent')+(note?' — '+esc(note):'')+'</span></div>');
+      listEl && listEl.insertAdjacentHTML('afterbegin','<div class="ph-item"><img src="'+url+'" alt=""><span>✓ '+esc([loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')||'Sent')+(note?' — '+esc(note):'')+'</span></div>');
     }catch(err){ fail++; }
   }
   if(note){
@@ -2718,8 +2776,23 @@ $('ph-file').onchange=async e=>{
     try{ await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
       'Dropbox-API-Arg':JSON.stringify({ path:'/Railey Library/photos/inbox/'+base+' NOTE.txt', mode:'add', autorename:true, mute:true }) }, body:new Blob([note+'\n\n'+JSON.stringify(loc)]) }); }catch(e){}
   }
-  $('ph-status').textContent = fail ? ok+' sent, '+fail+' failed — try those again.' : ok+' photo'+(ok===1?'':'s')+' sent to the inbox. Add more, or close when you’re done.';
-  $('ph-note').value='';
+  statusEl.textContent = fail ? ok+' sent, '+fail+' failed — try those again.' : ok+' photo'+(ok===1?'':'s')+' sent to the inbox. Add more, or close when you’re done.';
+  return ok;
+}
+
+// from the scanner: a full-resolution photo of the shelf, labeled with the room/bookcase/shelf typed above
+$('sc-shelfphoto').onclick=async()=>{
+  if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; }
+  stopCamera(); $('sc-file').click();
+};
+$('sc-file').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value='';
+  if(files.length){
+    const loc={ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), kind:'shelf' };
+    const ok=await sendToInbox(files, loc, '', $('sc-phstatus'), null);
+    if(ok) $('sc-phstatus').textContent='✓ Shelf photo sent to photos/inbox'+(loc.room?' ('+[loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')+')':'')+'. Take another, or keep scanning.';
+  }
+  if($('scan-bg').classList.contains('open')) startCamera();
 };
 
 if(ui.sort) $('f-sort').value = ui.sort;
