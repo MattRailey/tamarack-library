@@ -353,6 +353,8 @@
   }
 
   .modal{ will-change:transform; backface-visibility:hidden; }
+  .modal-bg.open{ -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); transition:background .2s; }
+  .modal-bg.flipping{ background:rgba(28,24,18,.82); }
   .modal.peek{ pointer-events:none; box-shadow:0 10px 40px rgba(20,12,4,.25); }
 </style>
 </head>
@@ -1324,24 +1326,29 @@ let peek=null, flipping=false;
 function neighbor(dir){ const i=navList.indexOf(editId); return (!isNew && i>=0) ? navList[i+dir] : undefined; }
 function makePeek(dir){
   const id=neighbor(dir), b=id && byId(id); if(!b) return null;
+  $('modal-bg').classList.add('flipping');
   const m=$('modal'), r=m.getBoundingClientRect();
   const c=m.cloneNode(true);
   viewFill({cover:c.querySelector('#m-cover'), title:c.querySelector('#m-title'), sub:c.querySelector('#m-sub'), about:c.querySelector('#m-about'), view:c.querySelector('#m-view')}, b);
   c.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id')); c.removeAttribute('id');
   c.classList.add('viewing','peek');
-  Object.assign(c.style,{position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', margin:'0', transition:'none', transform:'translateX('+(dir*(r.width+GAP))+'px)'});
+  Object.assign(c.style,{position:'fixed', left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px', margin:'0', transition:'none', transform:'translateX('+(dir*(r.width+GAP)*0.45)+'px) scale(.96)', opacity:'0'});
   $('modal-bg').appendChild(c); c.scrollTop=0;
   return {el:c, dir, id, w:r.width+GAP};
 }
-function dropPeek(){ if(peek){ peek.el.remove(); peek=null; } }
+function dropPeek(){ if(peek){ peek.el.remove(); peek=null; } $('modal-bg').classList.remove('flipping'); }
 function place(dx, anim){
+  // Crossfade: the current book drifts aside and fades out while the next one drifts in from the
+  // same side and fades in over it — both cards share the middle so they blend into each other.
   const m=$('modal'), t=anim||'none';
-  m.style.transition = t==='none'?'none':'transform '+t;
   const w=(peek?peek.w:m.offsetWidth+GAP), p=Math.min(1,Math.abs(dx)/w);
-  m.style.transform = dx ? 'translateX('+dx+'px) scale('+(1-p*.05)+')' : '';
-  m.style.opacity = dx ? String(1-p*.12) : '';
+  const ease=v=>v*v*(3-2*v);                                   // smoothstep for a softer blend
+  m.style.transition = t==='none'?'none':'transform '+t+', opacity '+t;
+  m.style.transform = dx ? 'translateX('+(dx*0.45)+'px) scale('+(1-p*.04)+')' : '';
+  m.style.opacity = dx ? String(peek ? 1-ease(p) : 1-p*.15) : '';
   if(peek){ peek.el.style.transition = t==='none'?'none':'transform '+t+', opacity '+t;
-    const pp=1-p; peek.el.style.transform='translateX('+(dx+peek.dir*peek.w)+'px) scale('+(1-pp*.05)+')'; peek.el.style.opacity=String(1-pp*.12); }
+    peek.el.style.transform='translateX('+(peek.dir*w*0.45 + dx*0.45)+'px) scale('+(0.96+p*.04)+')';
+    peek.el.style.opacity=String(ease(p)); }
 }
 function finishFlip(ms){
   // both cards glide the rest of the way, then the real panel quietly takes the new book
