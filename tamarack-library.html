@@ -256,6 +256,30 @@
     nav button.active{ border-bottom-color:var(--gold); }
     h2{ font-size:1.7rem; }
   }
+
+  /* feed view (Instagram-style) */
+  .feed{ max-width:560px; margin:0 auto; display:flex; flex-direction:column; gap:18px; }
+  .post{ background:var(--card); border:1px solid var(--line); border-radius:18px; overflow:hidden; cursor:pointer; box-shadow:0 2px 10px rgba(60,40,20,.06); }
+  .post.selected{ outline:3px solid var(--blueprint); }
+  .post-art{ position:relative; display:flex; align-items:center; justify-content:center; padding:28px 0; background:linear-gradient(160deg, rgba(247,241,230,.80), rgba(233,221,200,.70)), var(--bg); }
+  .cover.big{ width:180px; height:270px; border-radius:4px 8px 8px 4px; box-shadow:0 14px 30px rgba(40,25,10,.35); }
+  .cover.big .ph{ font-size:2.6rem; }
+  .post-body{ padding:14px 18px 18px; }
+  .post-body h4{ font-family:var(--serif); font-size:1.5rem; font-weight:600; line-height:1.1; margin:0 0 4px; color:var(--ink); }
+  .post-body .au{ font-style:italic; color:var(--steel); font-size:.92rem; }
+  .post-body .ser{ font-size:.78rem; color:var(--blueprint); font-weight:600; margin-top:4px; }
+  .post-body .ab{ font-size:.95rem; line-height:1.5; margin:10px 0; color:var(--ink); }
+  .post-body .chips{ margin:8px 0; }
+  .post-body .loc{ font-size:.78rem; color:var(--steel); }
+  .modal.viewing .m-form{ display:none; }
+  .modal:not(.viewing) .m-view, .modal:not(.viewing) .m-viewbar{ display:none; }
+  .m-view dl{ margin:4px 0 0; display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }
+  .m-view dt{ font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--steel); font-weight:700; }
+  .m-view dd{ margin:2px 0 0; font-size:.92rem; }
+  .m-viewbar{ margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
+  .m-about{ font-size:.92rem; line-height:1.5; margin:8px 0 0; color:var(--ink); font-style:italic; }
+  .more-wrap.auto button{ opacity:.7; }
+  @media (max-width:700px){ .feed{ gap:14px; } .cover.big{ width:160px; height:240px; } }
 </style>
 </head>
 <body>
@@ -279,7 +303,7 @@
         <input type="search" id="f-q" placeholder="Search books…" autocomplete="off" style="font-size:17px;">
         <div class="row" style="margin:10px 0 0; justify-content:space-between;">
           <div class="seg" id="scope-seg"><button data-scope="all" class="active">Anything</button><button data-scope="title">Title</button><button data-scope="author">Author</button></div>
-          <div class="row"><div class="seg" id="view-seg"><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
+          <div class="row"><div class="seg" id="view-seg"><button data-view="feed">Feed</button><button data-view="grid" class="active">Cards</button><button data-view="list">List</button></div>
           <button class="secondary" id="btn-more-filters">More filters</button></div>
         </div>
         <div id="more-filters" class="hide" style="margin-top:12px;">
@@ -459,11 +483,16 @@
       <div style="min-width:0;flex:1;">
         <h3 id="m-title">Book</h3>
         <div class="note" id="m-sub" style="margin-top:0;"></div>
+        <p class="m-about" id="m-about"></p>
       </div>
     </div>
+    <div class="m-view" id="m-view"></div>
+    <div class="row m-viewbar"><button id="btn-edit">Edit details</button><button class="secondary" id="btn-view-close">Close</button></div>
+    <div class="m-form">
     <div class="grid">
       <div style="grid-column:1/-1;"><label>Title</label><input id="e-title"></div>
       <div style="grid-column:1/-1;"><label>Author</label><input id="e-author" list="dl-author"></div>
+      <div style="grid-column:1/-1;"><label>About this book</label><textarea id="e-about" rows="2" style="min-height:60px;"></textarea></div>
       <div><label>Series</label><input id="e-series" list="dl-series"></div>
       <div><label>Series #</label><input id="e-seriesNo" inputmode="decimal"></div>
       <div><label>Genre</label><input id="e-genre" list="dl-genre"></div>
@@ -503,6 +532,7 @@
       <button class="secondary" id="btn-cancel">Cancel</button>
       <span style="flex:1;"></span>
       <button class="danger" id="btn-delete">Delete</button>
+    </div>
     </div>
   </div>
 </div>
@@ -817,7 +847,7 @@ function words(s){ return norm(s).replace(/[^a-z0-9]+/g,' ').trim(); }
 function hay(b){
   // punctuation-free so "jrr tolkien", "J.R.R.", "tolkien's" all line up
   const a = words(b.author);
-  return ' ' + [words(b.title), a, a.replace(/\b(\w) (?=\w\b)/g,'$1'), words(b.series), words(b.genre), words(b.subjects), words(b.notes), words(b.loanedTo),
+  return ' ' + [words(b.title), a, words(b.about), a.replace(/\b(\w) (?=\w\b)/g,'$1'), words(b.series), words(b.genre), words(b.subjects), words(b.notes), words(b.loanedTo),
     words(b.publisher), words(b.isbn), words(b.year), words(b.room), words(b.bookcase), words(b.format)].join(' | ') + ' ';
 }
 function scopeText(b, scope){
@@ -901,7 +931,7 @@ function filtered(){
 /* ============================================================
    Library render
    ============================================================ */
-const ui = Object.assign({ view:'grid' }, (()=>{ try{ return JSON.parse(lsGet(UI_KEY)||'{}'); }catch(e){ return {}; } })());
+const ui = Object.assign({ view: (window.matchMedia && matchMedia('(max-width:700px)').matches) ? 'feed' : 'grid' }, (()=>{ try{ return JSON.parse(lsGet(UI_KEY)||'{}'); }catch(e){ return {}; } })());
 let shown = PAGE, current = [], selectMode = false;
 const selected = new Set();
 
@@ -927,6 +957,17 @@ function renderLibrary(resetPaging){
     box.innerHTML = '<div class="card empty">No books yet. Head to <b>Import</b> to load the file from your shelf photos, or tap <b>+ Add book</b>.</div>';
   } else if(!current.length){
     box.innerHTML = '<div class="card empty">No books match. Try fewer words or clear the filters.</div>';
+  } else if(ui.view==='feed'){
+    box.innerHTML = '<div class="feed">' + slice.map(b=>{
+      const ser = b.series ? esc(b.series)+(b.seriesNo?' #'+esc(b.seriesNo):'') : '';
+      return '<article class="post'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'">'+
+        '<div class="post-art" style="--bg:'+CLOTH[hue(b.title)%CLOTH.length]+'"><div class="cover big">'+coverHTML(b,'L')+'</div></div>'+
+        '<div class="post-body"><h4>'+esc(b.title||'(untitled)')+'</h4>'+
+        '<div class="au">'+esc(b.author||'Unknown author')+(b.year?' · '+esc(b.year):'')+'</div>'+
+        (ser?'<div class="ser">'+ser+'</div>':'')+
+        (b.about?'<p class="ab">'+esc(b.about)+'</p>':'')+
+        '<div class="chips">'+chipsHTML(b)+'</div>'+
+        '<div class="loc">📍 '+esc(locText(b))+'</div></div></article>'; }).join('') + '</div>';
   } else if(ui.view==='list'){
     box.innerHTML = '<div class="lb-list">' + slice.map(b=>
       '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">review</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
@@ -938,6 +979,7 @@ function renderLibrary(resetPaging){
     ).join('') + '</div>';
   }
   $('more-wrap').classList.toggle('hide', current.length <= shown);
+  $('more-wrap').classList.toggle('auto', true);
   $('btn-more').textContent = 'Show more ('+(current.length-shown).toLocaleString()+' left)';
   const loaned = current.filter(b=>b.loanedTo).length, read = current.filter(b=>b.status==='read').length;
   const val = current.reduce((s,b)=>s+(+b.value||0),0), rev = current.filter(b=>b.needsReview).length;
@@ -955,6 +997,10 @@ $('results').addEventListener('click', e=>{
   openBook(id, current.map(b=>b.id));
 });
 $('btn-more').onclick = ()=>{ shown += PAGE*2; renderLibrary(false); };
+// endless scrolling: load the next batch automatically as you near the bottom
+if('IntersectionObserver' in window){
+  new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting) && current.length>shown && $('library').classList.contains('active')){ const y=window.scrollY; shown += PAGE; renderLibrary(false); window.scrollTo(0,y); } }, {rootMargin:'1200px 0px'}).observe($('more-wrap'));
+}
 ['f-q'].forEach(id=>$(id).addEventListener('input', ()=>{ clearTimeout(renderLibrary._t); renderLibrary._t=setTimeout(()=>renderLibrary(true),120); }));
 ['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-sort','f-review'].forEach(id=>$(id).addEventListener('change', ()=>{
   if(id==='f-room'){ $('f-case').value=''; $('f-shelf').value=''; }
@@ -1009,7 +1055,7 @@ $('b-apply').onclick = ()=>{
 /* ============================================================
    Book modal
    ============================================================ */
-const FIELDS = ['title','author','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','loanedTo','loanedDate','value','isbn','year','publisher','pages','notes'];
+const FIELDS = ['title','author','about','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','loanedTo','loanedDate','value','isbn','year','publisher','pages','notes'];
 let editId=null, navList=[], editRating=0, pendingCover=null, isNew=false;
 
 function starButtons(){
@@ -1028,6 +1074,17 @@ function fillForm(b){
   if(b.loanedTo) bits.push('<span style="color:#a33b17;font-weight:600;">Loaned to '+esc(b.loanedTo)+(b.loanedDate?' on '+esc(fmtLocalDate(b.loanedDate)):'')+'</span>');
   if(b.addedAt) bits.push('Added '+new Date(b.addedAt).toLocaleDateString());
   $('m-sub').innerHTML = bits.join('<br>');
+  $('m-about').textContent = b.about || '';
+  const facts=[];
+  const f=(k,v,w)=>{ if(v) facts.push('<div'+(w?' style="grid-column:1/-1"':'')+'><dt>'+k+'</dt><dd>'+v+'</dd></div>'); };
+  f('Genre', esc(b.genre||'')); f('Series', b.series?esc(b.series)+(b.seriesNo?' #'+esc(b.seriesNo):''):'');
+  f('First published', esc(b.year||'')); f('Status', b.status==='read'?'Read':b.status==='reading'?'Reading':'');
+  f('Rating', +b.rating?'<span style="color:var(--gold)">'+'★'.repeat(+b.rating)+'</span>':'');
+  f('Loaned to', b.loanedTo?esc(b.loanedTo)+(b.loanedDate?' ('+esc(fmtLocalDate(b.loanedDate))+')':''):'');
+  f('Publisher', esc(b.publisher||'')); f('Pages', esc(b.pages||'')); f('Value', +b.value?money(b.value):'');
+  f('Keywords', esc(b.subjects||''), 1); f('Notes', esc(b.notes||''), 1);
+  $('m-view').innerHTML = facts.length ? '<dl>'+facts.join('')+'</dl>' : '';
+  $('modal').classList.toggle('viewing', !isNew);
   $('m-cover').innerHTML = coverHTML(b, 'M');
   $('lookup-res').innerHTML = '';
   $('btn-returned').classList.toggle('hide', !b.loanedTo);
@@ -1093,6 +1150,37 @@ function step(dir){
   openBook(navList[j], navList);
 }
 $('m-prev').onclick=()=>step(-1); $('m-next').onclick=()=>step(1);
+$('btn-edit').onclick=()=>{ $('modal').classList.remove('viewing'); setTimeout(()=>$('e-title').focus(),50); };
+$('btn-view-close').onclick=()=>closeModal();
+// swipe left/right between books (like flipping through photos)
+(function(){
+  let x0=null, y0=null, t0=0, drag=false;
+  const m=$('modal');
+  m.addEventListener('touchstart', e=>{
+    const tg=(e.target.tagName||'').toLowerCase();
+    if(tg==='input'||tg==='textarea'||tg==='select'||e.touches.length>1){ x0=null; return; }
+    x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now(); drag=false;
+  }, {passive:true});
+  m.addEventListener('touchmove', e=>{
+    if(x0===null) return;
+    const dx=e.touches[0].clientX-x0, dy=e.touches[0].clientY-y0;
+    if(!drag && Math.abs(dx)>12 && Math.abs(dx)>Math.abs(dy)*1.3) drag=true;
+    if(drag){ m.style.transition='none'; m.style.transform='translateX('+dx+'px)'; m.style.opacity=String(Math.max(.4,1-Math.abs(dx)/600)); }
+  }, {passive:true});
+  m.addEventListener('touchend', e=>{
+    if(x0===null) return;
+    const dx=e.changedTouches[0].clientX-x0, fast=Date.now()-t0<300;
+    const i=navList.indexOf(editId), dir = dx<0 ? 1 : -1, ok = !isNew && i>=0 && navList[i+dir]!==undefined;
+    x0=null;
+    m.style.transition='transform .18s ease, opacity .18s ease';
+    if(drag && ok && (Math.abs(dx)>80 || (fast && Math.abs(dx)>40))){
+      m.style.transform='translateX('+(dir>0?-1:1)*window.innerWidth+'px)'; m.style.opacity='0';
+      setTimeout(()=>{ step(dir); m.style.transition='none'; m.style.transform='translateX('+(dir>0?1:-1)*window.innerWidth*0.4+'px)';
+        requestAnimationFrame(()=>{ m.style.transition='transform .2s ease, opacity .2s ease'; m.style.transform=''; m.style.opacity=''; }); }, 170);
+    } else { m.style.transform=''; m.style.opacity=''; }
+    drag=false;
+  });
+})();
 $('m-close').onclick=()=>{ if(isDirty() && !confirm('Discard unsaved changes?')) return; closeModal(); };
 $('btn-cancel').onclick=$('m-close').onclick;
 $('modal-bg').addEventListener('click', e=>{ if(e.target===$('modal-bg')) $('m-close').onclick(); });
@@ -1150,7 +1238,20 @@ async function bookSearch(title, author, isbn){
   try{ out.push(...await gbSearch(title, author, isbn)); }catch(e){}
   return out;
 }
-function cleanSubjects(list){ return uniq((list||[]).filter(x=>x.length<40 && !/accessible book|protected daisy|in library|large type|reading level|nyt:|fiction, general|open_syllabus|^\d/i.test(x)).map(x=>x.toLowerCase())).slice(0,10).join(', '); }
+function cleanSubjects(list){
+  const out=[], seen=new Set();
+  for(let x of (list||[])){
+    for(let part of String(x).split(/\s*--\s*|\s*,\s*/)){
+      part=part.toLowerCase().replace(/\s*\(.*?\)\s*/g,' ').replace(/\s+/g,' ').trim();
+      if(!part || part.length>30 || /[^\x00-\x7f]/.test(part) || /^\d/.test(part)) continue;
+      if(/^(fiction|juvenile|juvenile fiction|juvenile literature|general|accessible book|protected daisy|in library|large type books|open library staff picks|literature|english|nyt:|reading level)/.test(part)) continue;
+      part=part.replace(/ and adventurers$/,'').replace(/, fiction$/,'');
+      if(seen.has(part)) continue; seen.add(part); out.push(part);
+      if(out.length>=6) return out.join(', ');
+    }
+  }
+  return out.join(', ');
+}
 function pickIsbn(doc){ const l=doc.isbn||[]; return l.find(x=>x.length===13 && x.startsWith('978')) || l.find(x=>x.length===13) || l[0] || ''; }
 function docFill(doc){
   return { isbn:pickIsbn(doc), year:doc.year||'', publisher:doc.publisher||'', pages:doc.pages||'', subjects:cleanSubjects(doc.subjects), coverUrl:doc.cover||'' };
