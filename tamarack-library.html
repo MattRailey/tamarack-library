@@ -774,12 +774,46 @@ function loadStore(){
 }
 let store = loadStore();
 
-function writeLocal(){
-  const prev = lsGet(STORE_KEY);
-  if(prev) lsSet(PREV_KEY, prev);
-  if(!lsSet(STORE_KEY, JSON.stringify(store))){
-    toast('Could not save on this device (storage full?) — download a backup from Data & Sync.');
-  }
+/* The on-device copy lives in IndexedDB (plenty of room). localStorage caps each site at ~5 MB,
+   and the catalog plus its backup copy outgrew that, which caused the "storage full" alerts. */
+const IDB_NAME='tamarack_library', IDB_OS='kv';
+let _idbP=null;
+function idb(){
+  if(!_idbP) _idbP=new Promise((res,rej)=>{
+    try{ if(!window.indexedDB) return rej(new Error('no indexedDB'));
+      const r=indexedDB.open(IDB_NAME,1);
+      r.onupgradeneeded=()=>r.result.createObjectStore(IDB_OS);
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('blocked'));
+    }catch(e){ rej(e); }
+  });
+  return _idbP;
+}
+async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const q=db.transaction(IDB_OS).objectStore(IDB_OS).get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+async function idbPut(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(IDB_OS,'readwrite'); t.objectStore(IDB_OS).put(v,k); t.oncomplete=()=>res(true); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('aborted')); }); }
+async function loadFromIdb(){
+  try{
+    const raw=await idbGet(STORE_KEY); if(!raw) return;
+    const s=JSON.parse(raw); if(!validStore(s)) return;
+    if(!Array.isArray(s.imports)) s.imports=[];
+    const merged=mergeStores(store, s);
+    if(sig(merged)!==sig(store)){ store=merged; refreshAll(); }
+  }catch(e){}
+}
+let _saveT=null, _lastSaved=null, _warned=false;
+function writeLocal(){ clearTimeout(_saveT); _saveT=setTimeout(saveLocalNow, 400); }
+async function saveLocalNow(){
+  const json=JSON.stringify(store);
+  try{
+    if(_lastSaved) await idbPut(PREV_KEY, _lastSaved);
+    await idbPut(STORE_KEY, json);
+    _lastSaved=json;
+    try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(PREV_KEY); }catch(e){}   // free the old, cramped spot
+    return;
+  }catch(e){}
+  if(lsSet(STORE_KEY, json)) return;       // fallback for browsers without IndexedDB
+  if(_warned) return; _warned=true;        // say it once, not on every save
+  toast(dbxTokens() ? 'This device could not keep an offline copy, but your changes are still saving to Dropbox.'
+                    : 'Could not save on this device — download a backup from Data & Sync.');
 }
 function commit(){               // call after any user change
   store.updatedAt = Date.now();
@@ -2054,7 +2088,7 @@ refreshLists();
 renderLibrary(true);
 showPanel(ui.panel || 'library');
 renderDbxCard();
-dbxHandleRedirect().then(()=>{ renderDbxCard(); setSync('', dbxTokens() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); });
+loadFromIdb().then(()=>dbxHandleRedirect()).then(()=>{ if(lsGet(STORE_KEY)) writeLocal(); renderDbxCard(); setSync('', dbxTokens() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); });
 window.addEventListener('beforeunload', e=>{ if(pushTimer && dbxTokens() && sig(store)!==lastSyncedSig){ e.preventDefault(); e.returnValue=''; } });
 })();
 </script>
