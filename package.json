@@ -1,0 +1,15 @@
+{
+  "name": "railey-library",
+  "version": "2.0.0",
+  "private": true,
+  "description": "A home book catalog that runs in the browser and keeps each household's books in its own Dropbox.",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "visual": "node tests/visual.compare.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0"
+  }
+}
