@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -481,6 +481,7 @@
   .sc-card img, .sc-nocov{ width:58px; height:86px; object-fit:cover; border-radius:3px; flex:none; background:#ddd; }
   .sc-nocov{ display:flex; align-items:center; justify-content:center; font-size:.65rem; color:var(--steel); text-align:center; }
   .sc-have{ background:#fff1d6; color:#6b4a00; border-radius:8px; padding:8px 10px; margin-top:10px; font-size:.84rem; }
+  .sc-modes{ display:flex; margin:0 0 8px; } .sc-modes button{ flex:1; }
   .sc-st{ margin-top:10px; border-radius:8px; padding:8px 12px; font-weight:700; font-size:.9rem; }
   .sc-st.have{ background:#e3f6ef; color:#07785a; } .sc-st.partial{ background:#fff1d6; color:#8a5a00; } .sc-st.new{ background:#e8eef7; color:#2c4a73; }
   .sc-m a{ color:var(--navy); text-decoration:none; } .sc-have a{ color:inherit; }
@@ -896,9 +897,10 @@
   <div class="modal scan-modal">
     <button class="modal-close" id="sc-close" aria-label="Close">&times;</button>
     <h3 id="sc-title">Scan books to add</h3>
+    <div class="seg sc-modes" id="sc-modes"><button data-k="add" class="active">Add books</button><button data-k="check">Do I own this?</button></div>
     <div class="note" id="sc-hint" style="margin-top:0;"></div>
     <div class="sc-view"><video id="sc-video" muted playsinline></video><div class="sc-frame"></div></div>
-    <div class="row" style="margin:0 0 8px;"><button class="secondary" id="sc-shelfphoto" style="flex:1;">📷 Photograph this shelf for Claude</button></div>
+    <div class="row" id="sc-phrow" style="margin:0 0 8px;"><button class="secondary" id="sc-shelfphoto" style="flex:1;">📷 Photograph this shelf for Claude</button></div>
     <input type="file" id="sc-file" accept="image/*" capture="environment" class="hide">
     <div id="sc-phstatus" class="note" style="margin:-4px 0 8px;"></div>
     <div class="sc-type"><input id="sc-isbn" inputmode="numeric" placeholder="…or type the ISBN"><button class="secondary" id="sc-go">Look up</button></div>
@@ -1004,6 +1006,7 @@ function loadStore(){
   return emptyStore();
 }
 let store = loadStore();
+setTimeout(()=>snapAll(), 0);
 
 /* The on-device copy lives in IndexedDB (plenty of room). localStorage caps each site at ~5 MB,
    and the catalog plus its backup copy outgrew that, which caused the "storage full" alerts. */
@@ -1023,11 +1026,13 @@ async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ 
 async function idbPut(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(IDB_OS,'readwrite'); t.objectStore(IDB_OS).put(v,k); t.oncomplete=()=>res(true); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('aborted')); }); }
 async function loadFromIdb(){
   try{
-    const raw=await idbGet(STORE_KEY); if(!raw) return;
-    const s=JSON.parse(raw); if(!validStore(s)) return;
+    let s=null;
+    try{ const raw=await idbGet(STORE_KEY); if(raw){ s=JSON.parse(raw); if(!validStore(s)) s=null; } }catch(e){ s=null; }
+    if(!s){ try{ const p=await idbGet(PREV_KEY); if(p){ s=JSON.parse(p); if(!validStore(s)) s=null; } }catch(e){ s=null; } }   // main copy unreadable → one save back
+    if(!s) return;
     if(!Array.isArray(s.imports)) s.imports=[];
     const merged=mergeStores(store, s);
-    if(sig(merged)!==sig(store)){ store=merged; refreshAll(); }
+    if(sig(merged)!==sig(store)){ store=merged; snapAll(); refreshAll(); }
   }catch(e){}
 }
 let _saveT=null, _lastSaved=null, _warned=false;
@@ -1046,7 +1051,24 @@ async function saveLocalNow(){
   toast(dbxTokens() ? 'This device could not keep an offline copy, but your changes are still saving to Dropbox.'
                     : 'Could not save on this device — download a backup from Data & Sync.');
 }
+// Snapshot of each book as last saved, used to stamp which fields an edit changed (b.ft = {field: time}).
+const _snap=new Map();
+const FT_SKIP=new Set(['id','updatedAt','ft']);
+function snapAll(){ _snap.clear(); for(const b of store.books) _snap.set(b.id,{u:b.updatedAt, v:Object.assign({},b)}); }
+function stampFields(){
+  for(const b of store.books){
+    if(b.deleted) continue;
+    const s=_snap.get(b.id);
+    if(s && s.u!==b.updatedAt){
+      const keys=new Set(Object.keys(b).concat(Object.keys(s.v)));
+      for(const k of keys){ if(FT_SKIP.has(k)) continue;
+        if(JSON.stringify(b[k])!==JSON.stringify(s.v[k])){ b.ft=Object.assign({}, b.ft); b.ft[k]=b.updatedAt||Date.now(); } }
+    }
+    if(!s || s.u!==b.updatedAt) _snap.set(b.id,{u:b.updatedAt, v:Object.assign({},b)});
+  }
+}
 function commit(){               // call after any user change
+  stampFields();
   store.updatedAt = Date.now();
   writeLocal();
   markDirty();
@@ -1057,12 +1079,29 @@ function allBooks(){ return store.books.filter(b=>!b.deleted); }
 function live(){ return store.books.filter(b=>!b.deleted && b.saleStatus!=='sold'); }
 function byId(id){ return store.books.find(b=>b.id===id); }
 
+// Newer copy wins, except fields the older copy changed more recently (tracked in ft) — so a loan marked on
+// the phone and an author fixed on the desktop both survive.
+function mergeBook(nw, old){
+  if(nw.deleted || old.deleted || !old.ft) return nw;
+  let out=null;
+  for(const k in old.ft){
+    if(old.ft[k] > ((nw.ft||{})[k]||0) && JSON.stringify(old[k])!==JSON.stringify(nw[k])){
+      if(!out) out=Object.assign({}, nw, {ft:Object.assign({}, nw.ft)});
+      if(old[k]===undefined) delete out[k]; else out[k]=old[k];
+      out.ft[k]=old.ft[k];
+    }
+  }
+  return out || nw;
+}
 function mergeStores(a, b){
   const map = new Map();
   for(const bk of a.books) map.set(bk.id, bk);
   for(const bk of b.books){
     const cur = map.get(bk.id);
-    if(!cur || (bk.updatedAt||0) > (cur.updatedAt||0)) map.set(bk.id, bk);
+    if(!cur){ map.set(bk.id, bk); continue; }
+    if((bk.updatedAt||0)===(cur.updatedAt||0)) continue;
+    const [nw, old] = (bk.updatedAt||0) > (cur.updatedAt||0) ? [bk, cur] : [cur, bk];
+    map.set(bk.id, mergeBook(nw, old));
   }
   const imp = new Map();
   for(const i of (a.imports||[]).concat(b.imports||[])) if(i && i.id) imp.set(i.id, Object.assign({}, imp.get(i.id)||{}, i));
@@ -1182,7 +1221,7 @@ async function syncNow(){
       const remote = await dbxDownload();
       if(!remote.connected){ setSync('err', remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
       const merged = remote.data ? mergeStores(store, remote.data) : store;
-      if(sig(merged)!==sig(store)){ store = merged; writeLocal(); refreshAll(); }
+      if(sig(merged)!==sig(store)){ stampFields(); store = merged; snapAll(); writeLocal(); refreshAll(); }
       if(remote.data && sig(merged)===sig(remote.data)){ done=true; break; }
       const up = await dbxUpload(merged, remote.rev);
       if(up.ok){ done=true; break; }
@@ -1192,8 +1231,9 @@ async function syncNow(){
     if(done){
       lastSyncAt=Date.now(); lastSyncedSig=sig(store); lsSet('tamarack_library_synced_sig', lastSyncedSig);
       setSync('ok','Synced ' + new Date(lastSyncAt).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
+      setTimeout(migrateCovers, 3000); setTimeout(fillPendingIsbns, 1500);
     } else setSync('err','Sync kept conflicting — try again');
-  }catch(e){ setSync('err','Sync failed: '+e.message); }
+  }catch(e){ if(navigator.onLine===false) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); else setSync('err','Sync failed: '+e.message); }
   finally{
     syncing=false;
     if(syncAgain){ syncAgain=false; syncNow(); }
@@ -1235,15 +1275,55 @@ function refreshLists(){
 function hue(s){ let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))>>>0; return h; }
 const CLOTH=['#7d3328','#2e4a3b','#3a4a63','#6a4c2f','#5b3f5e','#8a5a2b','#35544f','#6d2f3a','#4a5a33','#7a6a3a'];
 function initials(t){ return normKey(t).split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?'; }
+/* Cover photos live as files in Dropbox (/Railey Library/covers/) and the book stores 'dbx:<path>'.
+   Each device downloads a photo once and keeps it in IndexedDB. */
+const coverBlobs=new Map(), coverLoading=new Set();
+async function saveCoverFile(blob, id){
+  try{
+    const t=await dbxToken(); if(!t) return null;
+    const path='/Railey Library/covers/'+String(id).replace(/[^\w-]/g,'')+'-'+Date.now().toString(36)+'.jpg';
+    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({ path, mode:'add', autorename:true, mute:true }) }, body:blob });
+    if(!r.ok) return null;
+    const j=await r.json(); const saved=j.path_display||path;
+    coverBlobs.set(saved, URL.createObjectURL(blob)); try{ await idbPut('cover:'+saved, blob); }catch(e){}
+    return saved;
+  }catch(e){ return null; }
+}
+async function loadCover(path){
+  if(coverBlobs.has(path) || coverLoading.has(path)) return;
+  coverLoading.add(path);
+  try{
+    let blob=null; try{ blob=await idbGet('cover:'+path); }catch(e){}
+    if(!blob){ const t=await dbxToken(); if(t){ const r=await fetch('https://content.dropboxapi.com/2/files/download',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Dropbox-API-Arg':JSON.stringify({path}) } }); if(r.ok){ blob=await r.blob(); try{ await idbPut('cover:'+path, blob); }catch(e){} } } }
+    if(blob){ const u=URL.createObjectURL(blob); coverBlobs.set(path,u); document.querySelectorAll('img[data-dbx]').forEach(im=>{ if(im.dataset.dbx===path) im.src=u; }); }
+  }finally{ coverLoading.delete(path); }
+}
+// photos taken before this change were stored inside the catalog — move them out when Dropbox is connected
+let _coverMigrating=false;
+async function migrateCovers(){
+  if(_coverMigrating || !dbxTokens()) return; _coverMigrating=true;
+  try{
+    let n=0;
+    for(const b of store.books.filter(x=>!x.deleted && String(x.coverUrl||'').startsWith('data:')).slice(0,40)){
+      const blob=await (await fetch(b.coverUrl)).blob(); const path=await saveCoverFile(blob, b.id); if(!path) break;
+      const cur=byId(b.id); if(cur && cur.coverUrl===b.coverUrl){ cur.coverUrl='dbx:'+path; cur.updatedAt=Date.now(); n++; }
+    }
+    if(n) commit();
+  }catch(e){} finally{ _coverMigrating=false; }
+}
 function coverUrl(b, size){
+  if(String(b.coverUrl||'').startsWith('dbx:')){ const p=b.coverUrl.slice(4); if(coverBlobs.has(p)) return coverBlobs.get(p); loadCover(p); return ''; }
   if(b.coverUrl) return (size==='L' && !b.coverUrl.startsWith('data:')) ? b.coverUrl.replace(/-[SM]\.jpg$/,'-L.jpg') : b.coverUrl;
   const isbn = String(b.isbn||'').replace(/[^0-9Xx]/g,'');
   if(isbn.length===10 || isbn.length===13) return 'https://covers.openlibrary.org/b/isbn/'+isbn+'-'+(size||'M')+'.jpg?default=false';
   return '';
 }
+function webCover(b){ const u=coverUrl(b,'L'); return /^https?:/.test(u) ? u.replace(/\?default=false$/,'') : ''; }
 function coverHTML(b, size){
   const ph = '<div class="ph" style="background-color:'+CLOTH[hue(b.title)%CLOTH.length]+'">'+esc(initials(b.title))+'</div>';
   const u = coverUrl(b, size);
+  if(!u && String(b.coverUrl||'').startsWith('dbx:')) return '<img alt="" data-dbx="'+esc(b.coverUrl.slice(4))+'" data-ph="'+esc(ph)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph" style="background:'+CLOTH[hue(b.title)%CLOTH.length]+'">';
   if(!u) return ph;
   return '<img loading="lazy" alt="" src="'+esc(u)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph" data-ph="'+esc(ph)+'">';
 }
@@ -1261,17 +1341,26 @@ function locText(b){
 }
 // Position shown from the nearer end of the shelf: left half counts from the left,
 // right half counts from the right (stacked 5a/5b share one slot). Stored position stays "from left".
+// Filled slot numbers per shelf, built once per change of the catalog (not once per book shown).
+// Only books still in the house count — sold ones no longer take up a spot.
+let _slots=null, _slotsFor=null, _slotsKey='';
+function shelfSlots(b){
+  const key=store.updatedAt+'|'+store.books.length;
+  if(!_slots || _slotsFor!==store || _slotsKey!==key){
+    _slots=new Map(); _slotsFor=store; _slotsKey=key;
+    for(const x of live()){ const mm=String(x.position||'').trim().match(/^(\d+)/); if(!mm) continue;
+      const k=x.room+'|'+x.bookcase+'|'+x.shelf; if(!_slots.has(k)) _slots.set(k,new Set()); _slots.get(k).add(+mm[1]); }
+    for(const [k,s] of _slots) _slots.set(k,[...s].sort((a,c)=>a-c));
+  }
+  return _slots.get(b.room+'|'+b.bookcase+'|'+b.shelf) || [];
+}
 function sideText(b){
   const m = String(b.position||'').trim().match(/^(\d+)\s*([a-z]*)$/i);
   if(!m) return '#'+b.position;
   const n = +m[1], suf = m[2] ? m[2].toLowerCase() : '';
-  const slots = new Set();
-  for(const x of allBooks()){
-    if(x.room!==b.room || x.bookcase!==b.bookcase || String(x.shelf)!==String(b.shelf)) continue;
-    const mm = String(x.position||'').trim().match(/^(\d+)/); if(mm) slots.add(+mm[1]);
-  }
-  slots.add(n);
-  const order = [...slots].sort((a,c)=>a-c), k = order.indexOf(n)+1, N = order.length;
+  let order = shelfSlots(b);
+  if(!order.includes(n)) order = order.concat(n).sort((a,c)=>a-c);
+  const k = order.indexOf(n)+1, N = order.length;
   if(N<2 || k <= Math.ceil(N/2)) return '#'+k+suf+' from left';
   return '#'+(N-k+1)+suf+' from right';
 }
@@ -1372,7 +1461,6 @@ function filtered(){
     location: (x,y)=>natCmp(x.b.room,y.b.room)||natCmp(x.b.bookcase,y.b.bookcase)||natCmp(x.b.shelf,y.b.shelf)||posCmp(x.b,y.b)||byTitle(x,y),
     added: (x,y)=>(y.b.addedAt||0)-(x.b.addedAt||0),
     rating: (x,y)=>(+y.b.rating||0)-(+x.b.rating||0)||byTitle(x,y),
-    value: (x,y)=>(+y.b.value||0)-(+x.b.value||0)||byTitle(x,y)
   }[sort] || byTitle;
   out.sort((x,y)=> q.length && sort==='title' ? (unk(x.b)-unk(y.b))||(y.score-x.score)||cmp(x,y) : cmp(x,y));
   filtered.q = q;
@@ -1432,7 +1520,7 @@ function renderLibrary(resetPaging){
   $('more-wrap').classList.toggle('auto', true);
   $('btn-more').textContent = 'Show more ('+(current.length-shown).toLocaleString()+' left)';
   const loaned = current.filter(b=>b.loanedTo).length, read = current.filter(b=>b.status==='read').length;
-  const val = current.reduce((s,b)=>s+(+b.value||0),0), rev = current.filter(b=>b.needsReview).length;
+  const rev = current.filter(b=>b.needsReview).length;
   $('summary').innerHTML = (lastFuzzy?'<span style="color:#8a5a00">No exact matches for “'+esc($('f-q').value.trim())+'” — these are close spellings.</span> ':'') + 'Showing <b>'+current.length.toLocaleString()+'</b> of '+all.length.toLocaleString()+' books'
     + (read?' · '+read.toLocaleString()+' read':'') + (loaned?' · <span style="color:#a33b17">'+loaned+' loaned out</span>':'')
 ;
@@ -1830,8 +1918,15 @@ $('cover-file').onchange=e=>{
   const img=new Image(), url=URL.createObjectURL(f);
   img.onload=()=>{ const W=240,H=360, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
     const s=Math.max(W/img.width,H/img.height), w=img.width*s, h=img.height*s; g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
-    pendingCover=c.toDataURL('image/jpeg',0.72); URL.revokeObjectURL(url);
-    $('m-cover').innerHTML='<img src="'+pendingCover+'" alt="">'; toast('Cover photo added — tap Save to keep it'); };
+    URL.revokeObjectURL(url);
+    const dataUrl=c.toDataURL('image/jpeg',0.72);
+    $('m-cover').innerHTML='<img src="'+dataUrl+'" alt="">';
+    c.toBlob(async blob=>{
+      pendingCover=dataUrl;                                   // fallback if Dropbox isn't reachable
+      const path=await saveCoverFile(blob, editId||'new');
+      if(path) pendingCover='dbx:'+path;
+      toast('Cover photo added — tap Save to keep it');
+    }, 'image/jpeg', 0.72); };
   img.src=url;
 };
 $('btn-lookup').onclick = async ()=>{
@@ -2309,7 +2404,7 @@ $('sl-export-ebay').onclick=()=>{
   const noPrice=L.filter(b=>!(+b.salePrice)); if(noPrice.length && !confirm(noPrice.length+' book(s) have no price and eBay will reject them. Export anyway?')) return;
   const s=settings();
   const head=['*Action(SiteID=US|Country=US|Currency=USD|Version=1193)','Custom label (SKU)','Category ID','Title','Product:ISBN','Price','Quantity','Item photo URL','Condition ID','Description','Format','Duration','Best Offer Enabled','Shipping profile name','Return profile name','Payment profile name','C:Book Title','C:Author','C:Language','C:Format','C:Publication Year','C:Publisher','C:Genre'];
-  const rows=L.map(b=>['Add','RL-'+b.id.slice(-8),'261186',listingTitle(b),isbnOf(b),b.salePrice||'','1',coverUrl(b,'L').replace(/\?default=false$/,''),COND_ID[b.saleCondition||s.cond||'Very Good']||4000,
+  const rows=L.map(b=>['Add','RL-'+b.id.slice(-8),'261186',listingTitle(b),isbnOf(b),b.salePrice||'','1',webCover(b),COND_ID[b.saleCondition||s.cond||'Very Good']||4000,
     listingDesc(b).replace(/\n\n/g,'<br><br>'),'FixedPrice','GTC','1',s.ship||'',s.ret||'',s.pay||'',String(b.title||'').replace(/\s*\(.*?\)\s*$/,''),String(b.author||'').split(' (')[0],'English',b.format||'',b.year||'',b.publisher||'',b.genre||'']);
   download('ebay-listings-'+todayLocal()+'.csv', [head].concat(rows).map(r=>r.map(csvQ).join(',')).join('\r\n'), 'text/csv');
   toast('eBay file downloaded — add your own photos in Seller Hub before publishing');
@@ -2319,7 +2414,7 @@ $('sl-export-etsy').onclick=()=>{
   const L=allBooks().filter(b=>b.saleStatus==='etsy');
   if(!L.length){ toast('Set some books to “Sell on Etsy” first'); return; }
   const head=['Title','Description','Price','Quantity','SKU','Tags','When made','Who made','What is it','Category','Condition','ISBN','Photo 1'];
-  const rows=L.map(b=>[listingTitle(b).slice(0,140),listingDesc(b),b.salePrice||'','1','RL-'+b.id.slice(-8),etsyTags(b).join(','),whenMade(b),'someone_else','a_finished_product','Books, Movies & Music > Books > Books',b.saleCondition||settings().cond||'Very Good',isbnOf(b),coverUrl(b,'L').replace(/\?default=false$/,'')]);
+  const rows=L.map(b=>[listingTitle(b).slice(0,140),listingDesc(b),b.salePrice||'','1','RL-'+b.id.slice(-8),etsyTags(b).join(','),whenMade(b),'someone_else','a_finished_product','Books, Movies & Music > Books > Books',b.saleCondition||settings().cond||'Very Good',isbnOf(b),webCover(b)]);
   download('etsy-listings-'+todayLocal()+'.csv', '﻿'+[head].concat(rows).map(r=>r.map(csvQ).join(',')).join('\r\n'), 'text/csv');
   toast('Etsy file downloaded');
   setTimeout(()=>markListed(L), 600);
@@ -2330,7 +2425,6 @@ $('sl-export-etsy').onclick=()=>{
    ============================================================ */
 function renderData(){
   const L=live();
-  const val=L.reduce((s,b)=>s+(+b.value||0),0);
   const stat=(n,l)=>'<div class="stat"><b>'+n+'</b><span>'+l+'</span></div>';
   $('stats').innerHTML = stat(L.length.toLocaleString(),'books') + stat(L.filter(b=>b.status==='read').length.toLocaleString(),'read')
     + stat(L.filter(b=>b.loanedTo).length,'loaned out') + stat(L.filter(b=>b.needsReview).length,'need review')
@@ -2346,7 +2440,7 @@ function download(name, text, type){
 }
 $('btn-export-json').onclick = ()=>download('tamarack-library-backup-'+todayLocal()+'.json', JSON.stringify(store, null, 1), 'application/json');
 $('btn-export-csv').onclick = ()=>{
-  const cols=['title','author','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','value','isbn','year','publisher','pages','notes','needsReview'];
+  const cols=['title','author','series','seriesNo','genre','subjects','format','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','isbn','year','publisher','pages','notes','needsReview'];
   const q=v=>{ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const lines=[cols.join(',')].concat(live().sort((a,b)=>natCmp(a.room,b.room)||natCmp(a.bookcase,b.bookcase)||natCmp(a.shelf,b.shelf)||posCmp(a,b)).map(b=>cols.map(c=>q(b[c])).join(',')));
   download('tamarack-library-'+todayLocal()+'.csv', '﻿'+lines.join('\r\n'), 'text/csv');
@@ -2486,12 +2580,25 @@ function loadZX(){
   return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
     s.onload=()=>window.ZXing?res(window.ZXing):rej(new Error('reader failed to load')); s.onerror=()=>rej(new Error('reader failed to load')); document.head.appendChild(s); });
 }
+function syncScanMode(){
+  const k=scanMode.kind;
+  $('sc-modes').classList.toggle('hide', k==='fill');
+  document.querySelectorAll('#sc-modes button').forEach(b=>b.classList.toggle('active', b.dataset.k===k));
+  $('sc-title').textContent = k==='fill' ? 'Scan this book’s barcode' : k==='check' ? 'Do we own this?' : 'Scan books to add';
+  $('sc-hint').textContent = k==='check'
+    ? 'Scan a book at the store or a sale — it only checks, nothing gets added. No barcode? Type the title below.'+(navigator.onLine===false?' (Offline: barcodes and titles are checked against the copy of the library on this phone.)':'')
+    : 'Point the camera at the barcode on the back cover (the one starting 978 or 979).';
+  $('sc-isbn').placeholder = k==='check' ? '…or type an ISBN or a title' : '…or type the ISBN';
+  $('sc-isbn').setAttribute('inputmode', k==='check' ? 'text' : 'numeric');
+  $('sc-loc').classList.toggle('hide', k!=='add');
+  $('sc-phrow').classList.toggle('hide', k!=='add'); $('sc-phstatus').classList.toggle('hide', k!=='add');
+}
+document.querySelectorAll('#sc-modes button').forEach(b=>b.onclick=()=>{ scanMode={kind:b.dataset.k}; ui.scanKind=b.dataset.k; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-result').innerHTML=''; scanBusy=false; syncScanMode(); });
 async function openScanner(mode){
   // mode: {kind:'add'} adds new books; {kind:'fill', onFound(fields)} hands the result back
-  scanMode=mode||{kind:'add'};
-  $('sc-title').textContent = scanMode.kind==='fill' ? 'Scan this book’s barcode' : 'Scan books to add';
-  $('sc-hint').textContent = 'Point the camera at the barcode on the back cover (the one starting 978 or 979).';
-  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent=''; $('sc-loc').classList.toggle('hide', scanMode.kind==='fill');
+  scanMode=mode||{kind: ui.scanKind==='check' ? 'check' : 'add'};
+  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent='';
+  syncScanMode();
   if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||$('f-room').value||''; $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
   $('scan-bg').classList.add('open'); lockPage();
   startCamera();
@@ -2537,7 +2644,7 @@ function gotCode(raw){
   try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
   handleIsbn(d);
 }
-$('sc-go').onclick=()=>{ const d=isbn13($('sc-isbn').value) || (!$('sc-isbn').value.trim() && lastCode) || ''; if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
+$('sc-go').onclick=()=>{ const raw=$('sc-isbn').value.trim(); if(scanMode.kind==='check' && raw && !isbn13(raw) && /[a-z]/i.test(raw)){ checkTitle(raw); return; } const d=isbn13($('sc-isbn').value) || (!$('sc-isbn').value.trim() && lastCode) || ''; if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
 $('sc-isbn').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('sc-go').onclick(); } });
 async function isbnLookup(code){
   const docs = await bookSearch('', '', code);
@@ -2555,9 +2662,14 @@ async function isbnLookup(code){
 async function handleIsbn(code){
   scanBusy=true; lastCode=code; lastCodeAt=Date.now();
   const box=$('sc-result');
-  box.innerHTML='<div class="note">Looking up '+code+'…</div>';
-  const have = scanMode.kind==='add' ? findByIsbn(code) : [];
-  let info=null; try{ info=await isbnLookup(code); }catch(e){}
+  const have = scanMode.kind!=='fill' ? findByIsbn(code) : [];
+  const offline = navigator.onLine===false;
+  box.innerHTML = (have.length ? '<div class="sc-st have">✓ Already in the library</div>'+have.map(b=>'<div class="sc-m"><div><b>'+esc(b.title)+'</b>'+(b.author?' <span class="note" style="margin:0">'+esc(b.author)+'</span>':'')+'<div class="note" style="margin:0">'+esc(b.room?locText(b):'No shelf yet')+'</div></div></div>').join('') : '')
+    + '<div class="note">'+(offline?'Offline — checking this phone’s copy of the library…':have.length?'Checking online for details…':'Looking up '+code+'…')+'</div>';
+  let info=null;
+  try{ const c=await idbGet('isbn:'+code); if(c && c.title) info=c; }catch(e){}
+  if(!info && !offline){ try{ info=await Promise.race([isbnLookup(code), new Promise(r=>setTimeout(()=>r(null), 9000))]); }catch(e){}
+    if(info && info.title){ try{ await idbPut('isbn:'+code, info); }catch(e){} } }
   if(!info) info={ title:'', author:'', isbn:code };
   if(scanMode.kind==='fill'){
     box.innerHTML = info.title
@@ -2571,9 +2683,10 @@ async function handleIsbn(code){
   const loc=()=>({ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() });
   const remember=l=>{ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; };
   const partial=b=>isUnid(b) || !!b.needsReview;
-  const L0=live(), here=loc();
+  const chk = scanMode.kind==='check';
+  const L0=live(), here = chk ? {} : loc();
   const inLib=new Map(), maybe=new Map();
-  for(const b of have) (partial(b)?maybe:inLib).set(b.id,b);
+  for(const b of have) ((partial(b) && !chk)?maybe:inLib).set(b.id,b);   // same barcode = same book
   if(info.title){
     const last=normKey(searchAuthor(info.author||'')).split(' ').filter(w=>w.length>=3).pop()||'';
     for(const b of L0){
@@ -2590,16 +2703,22 @@ async function handleIsbn(code){
   }
   const inL=[...inLib.values()], mb=[...maybe.values()].slice(0,10);
   const status = inL.length ? 'have' : mb.length ? 'partial' : 'new';
-  const badge={ have:['sc-st have','✓ Already in the library'], partial:['sc-st partial','◐ Possibly a partly identified book'], new:['sc-st new','＋ Not in the library yet'] }[status];
+  const badge = chk
+    ? { have:['sc-st have','✓ Yes — you own this'+(inL.length>1?' ('+inL.length+' copies)':'')], partial:['sc-st partial','◐ Maybe — could be one of your partly identified books'], new:['sc-st new','✗ Not in the library'] }[status]
+    : { have:['sc-st have','✓ Already in the library'], partial:['sc-st partial','◐ Possibly a partly identified book'], new:['sc-st new','＋ Not in the library yet'] }[status];
   const row=(b,kind)=>'<div class="sc-m"><div><a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a>'+(b.author?' <span class="note" style="margin:0">'+esc(b.author)+'</span>':'')
       +'<div class="note" style="margin:0">'+esc(b.room?locText(b):'No shelf yet')+'</div></div>'
-      +'<div class="sc-mb"><button class="secondary" data-this="'+b.id+'" data-kind="'+kind+'">That’s it</button>'
+      +(chk?'<div class="sc-mb">':'<div class="sc-mb"><button class="secondary" data-this="'+b.id+'" data-kind="'+kind+'">That’s it</button>')
       +(kind==='have' && here.room && b.room && (b.room!==here.room||b.bookcase!==here.bookcase||String(b.shelf)!==here.shelf)?'<button class="secondary" data-move="'+b.id+'">Move here</button>':'')+'</div></div>';
   let html='<div class="'+badge[0]+'">'+badge[1]+'</div>';
-  html += info.title ? scanCard(info) : '<div class="sc-have">The barcode read fine (ISBN '+code+'), but the free book databases don’t have this one — common for self-published, print-on-demand'+(/^9798/.test(code)?' (ISBNs starting 979-8 are usually Amazon self-published)':'')+' and very new books. Tap <b>Add by hand</b>: the ISBN and shelf spot are filled in, and you can snap the cover there.</div>';
+  html += info.title ? scanCard(info) : chk ? '<div class="note">'+(offline?'Offline, so no title lookup — ':'')+'No book with barcode '+code+' is in the library. Books added from shelf photos usually have no barcode on file, so <b>type the title above</b> to double-check.</div>'
+    : offline ? '<div class="sc-have">You’re offline, so the title can’t be looked up yet. Tap <b>Save for later</b> — it goes in with this ISBN and shelf spot, and the title, author and cover fill in by themselves next time the app is online.</div>'
+    : '<div class="sc-have">The barcode read fine (ISBN '+code+'), but the free book databases don’t have this one — common for self-published, print-on-demand'+(/^9798/.test(code)?' (ISBNs starting 979-8 are usually Amazon self-published)':'')+' and very new books. Tap <b>Add by hand</b>: the ISBN and shelf spot are filled in, and you can snap the cover there.</div>';
   if(inL.length) html+='<div class="sc-grp"><div class="sc-gh">You have it'+(inL.length>1?' ('+inL.length+' copies)':'')+'</div>'+inL.map(b=>row(b,'have')).join('')+'</div>';
   if(mb.length) html+='<div class="sc-grp"><div class="sc-gh">'+(inL.length?'Also possibly one of these partly identified books':'Is it one of these partly identified books?')+'</div>'+mb.map(b=>row(b,'partial')).join('')+'</div>';
-  html += '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(inL.length?'Add another copy':mb.length?'Add as a new book':'Add to library')+'</button>':'')
+  html += chk
+    ? '<div class="row" style="margin-top:10px;"><button id="sc-again">Check another</button></div>'
+    : '<div class="row" style="margin-top:10px;">'+(info.title?'<button id="sc-add">'+(inL.length?'Add another copy':mb.length?'Add as a new book':'Add to library')+'</button>':offline?'<button id="sc-later">Save for later</button>':'')
     +'<button class="secondary" id="sc-edit">'+(info.title?'Edit first':'Add by hand')+'</button><button class="secondary" id="sc-again">Next book</button></div>';
   box.innerHTML=html;
   box.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); closeScanner(); openBook(a.dataset.open,[a.dataset.open]); });
@@ -2630,8 +2749,49 @@ async function handleIsbn(code){
     store.books.push(b); commit(); remember(l);
     done('✓ Added <b>'+esc(b.title)+'</b>'+(inL.length?' as another copy':'')+(l.room?' — '+esc(locText(b)):' (no shelf yet)'));
   };
-  $('sc-edit').onclick=()=>{ const l=loc(); remember(l); closeScanner(); openNew(Object.assign({status:'unread'}, info, l)); };
+  if($('sc-later')) $('sc-later').onclick=()=>{
+    const l=loc(), now=Date.now();
+    const b=Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'scan', status:'unread', title:'(ISBN '+code+' — details to fill in)', author:'', isbn:code, pendingIsbn:true, needsReview:true }, l);
+    store.books.push(b); commit(); remember(l);
+    done('✓ Saved ISBN '+code+(l.room?' at '+esc(locText(b)):'')+' — the details fill in when you’re back online.');
+  };
+  if($('sc-edit')) $('sc-edit').onclick=()=>{ const l=loc(); remember(l); closeScanner(); openNew(Object.assign({status:'unread'}, info, l)); };
   $('sc-again').onclick=()=>{ box.innerHTML=''; scanBusy=false; };
+}
+function checkTitle(text){
+  const box=$('sc-result'); lastCode='';
+  const toks=words(text).split(' ').filter(t=>t && !STOP.has(t));
+  if(!toks.length){ box.innerHTML=''; return; }
+  const hits=[];
+  for(const b of live()){ const ix=bookIndex(b); let sc=0, ok=true; for(const t of toks){ const s=tokScore(ix.all,t,false); if(!s){ ok=false; break; } sc+=s; } if(ok) hits.push([sc,b]); }
+  hits.sort((a,b)=>b[0]-a[0]);
+  const top=hits.slice(0,8).map(x=>x[1]);
+  box.innerHTML = (top.length ? '<div class="sc-st have">✓ '+(top.length===1?'Found one':'Found '+hits.length)+' in the library</div>' : '<div class="sc-st new">✗ Nothing in the library matches “'+esc(text)+'”</div>')
+    + top.map(b=>'<div class="sc-m"><div><a href="#" data-open="'+b.id+'"><b>'+esc(b.title)+'</b></a>'+(b.author?' <span class="note" style="margin:0">'+esc(b.author)+'</span>':'')+'<div class="note" style="margin:0">'+esc(b.room?locText(b):'No shelf yet')+'</div></div></div>').join('')
+    + (hits.length>8?'<div class="note">…and '+(hits.length-8)+' more — add a word to narrow it.</div>':'')
+    + '<div class="row" style="margin-top:10px;"><button id="sc-again">Check another</button></div>';
+  box.querySelectorAll('[data-open]').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); closeScanner(); openBook(a.dataset.open,[a.dataset.open]); });
+  $('sc-again').onclick=()=>{ box.innerHTML=''; $('sc-isbn').value=''; scanBusy=false; };
+}
+// books saved offline by barcode: fill in title, author and cover once we're online
+let _filling=false;
+async function fillPendingIsbns(){
+  if(_filling || navigator.onLine===false) return; _filling=true;
+  try{
+    for(const b of live().filter(x=>x.pendingIsbn).slice(0,15)){
+      let info=null; try{ info=await Promise.race([isbnLookup(b.isbn), new Promise(r=>setTimeout(()=>r(null), 9000))]); }catch(e){}
+      const cur=byId(b.id); if(!cur || !cur.pendingIsbn) continue;
+      const now=Date.now();
+      if(info && info.title){
+        const ch={ title:info.title, author:info.author||'', needsReview:false, updatedAt:now };
+        ['year','publisher','pages','subjects','about','coverUrl'].forEach(k=>{ if(info[k] && !cur[k]) ch[k]=info[k]; });
+        store.books=store.books.map(x=>x.id===b.id?Object.assign({}, x, ch, {pendingIsbn:false}):x);
+      } else {
+        store.books=store.books.map(x=>x.id===b.id?Object.assign({}, x, { pendingIsbn:false, title:'(ISBN '+b.isbn+' — not found online)', notes:((x.notes||'')+' Barcode not in the free book databases — add the title by hand.').trim(), updatedAt:now }):x);
+      }
+      commit();
+    }
+  }finally{ _filling=false; }
 }
 function scanCard(i){
   return '<div class="sc-card">'+(i.coverUrl?'<img src="'+esc(i.coverUrl)+'" alt="">':'<div class="sc-nocov">No cover</div>')+'<div><b>'+esc(i.title)+'</b><br>'+esc(i.author||'Unknown author')+(i.year?' · '+esc(i.year):'')+(i.publisher?'<br><span class="note" style="margin:0">'+esc(i.publisher)+'</span>':'')+'<br><span class="note" style="margin:0">ISBN '+esc(i.isbn)+'</span></div></div>';
@@ -2933,7 +3093,7 @@ $('wa-file').onchange=async e=>{
       'Dropbox-API-Arg':JSON.stringify({ path, mode:'add', autorename:true, mute:true }).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)) }, body:blob });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const now=Date.now();
-    placeBook({ title:'(Found on walk-through — title-page photo sent)', needsReview:true, idPhoto:path, idPhotoAt:now, notes:'Added during a walk-through; title-page photo is in photos/identify for Claude to read.' }, l);
+    placeBook({ id, title:'(Found on walk-through — title-page photo sent)', needsReview:true, idPhoto:path, idPhotoAt:now, notes:'Added during a walk-through; title-page photo is in photos/identify for Claude to read.' }, l);
   }catch(err){ toast('Couldn’t send the photo ('+err.message+') — try again'); }
 };
 $('un-walk').onclick=()=>openWalk();
@@ -3014,6 +3174,10 @@ renderLibrary(true);
 showPanel(ui.panel || 'library');
 renderDbxCard();
 loadFromIdb().then(()=>dbxHandleRedirect()).then(()=>{ if(lsGet(STORE_KEY)) writeLocal(); renderDbxCard(); setSync('', dbxTokens() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); });
+window.addEventListener('online', ()=>{ syncNow(); setTimeout(fillPendingIsbns, 1000); if($('scan-bg').classList.contains('open')) syncScanMode(); });
+window.addEventListener('offline', ()=>{ if(dbxTokens()) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); if($('scan-bg').classList.contains('open')) syncScanMode(); });
+// works with no signal: a small service worker keeps a copy of the app (and the barcode reader) on the phone
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 window.addEventListener('beforeunload', e=>{ if(pushTimer && dbxTokens() && sig(store)!==lastSyncedSig){ e.preventDefault(); e.returnValue=''; } });
 })();
 </script>
