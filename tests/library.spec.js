@@ -110,3 +110,32 @@ test('shelves tab lists every room', async ({ page }) => {
   const rooms = [...new Set(FIXTURE.books.filter(b => b.room).map(b => b.room))];
   for (const r of rooms) await expect(page.locator('#shelves')).toContainText(r);
 });
+
+test('"Added" filter lists recent additions newest first, with the date; "No shelf yet" finds unshelved books', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  // two books: one added today with no shelf, one added 50 days ago
+  await page.evaluate(() => {
+    const now = Date.now();
+    store.books.forEach(b => { b.addedAt = now - 400 * 864e5; });
+    store.books.push({ id: 'bnew1', title: 'Brand New Book', author: 'A Writer', room: '', addedAt: now, updatedAt: now });
+    store.books.push({ id: 'bnew2', title: 'Fairly New Book', author: 'B Writer', room: 'Den', bookcase: 'Oak', shelf: '1', addedAt: now - 50 * 864e5, updatedAt: now });
+    commit(); refreshLists(); renderLibrary(true);
+  });
+  await click(page, '#btn-more-filters');
+  await page.selectOption('#f-added', '7');
+  await expect(page.locator('#summary')).toContainText('Showing 1 of');
+  await expect(page.locator('#results')).toContainText('Brand New Book');
+  await expect(page.locator('#results')).toContainText('added');
+  await page.selectOption('#f-added', '91');
+  await expect(page.locator('#summary')).toContainText('Showing 2 of');
+  expect(await page.inputValue('#f-sort')).toBe('added');
+  const titles = await page.locator('#results h4, #results .t b').allTextContents();
+  expect(titles[0]).toBe('Brand New Book');
+  await expect(page.locator('#btn-more-filters')).toContainText('(1)');
+  await page.selectOption('#f-added', '');
+  await page.selectOption('#f-room', '__none');
+  await expect(page.locator('#results')).toContainText('Brand New Book');
+  await expect(page.locator('#results')).not.toContainText('Fairly New Book');
+  await click(page, '#btn-reset');
+  expect(await page.inputValue('#f-added')).toBe('');
+});

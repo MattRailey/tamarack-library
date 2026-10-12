@@ -265,7 +265,7 @@ $('btn-delete').onclick=()=>{
 };
 $('btn-returned').onclick=()=>{ $('e-loanedTo').value=''; $('e-loanedDate').value=''; $('btn-returned').classList.add('hide'); };
 $('e-loanedTo').addEventListener('input', ()=>{ if($('e-loanedTo').value.trim() && !$('e-loanedDate').value) $('e-loanedDate').value=todayLocal(); });
-$('btn-add').onclick=()=>openNew({ room:$('f-room').value, bookcase:$('f-case').value, shelf:$('f-shelf').value });
+$('btn-add').onclick=()=>openNew({ room:roomPick(), bookcase:$('f-case').value, shelf:$('f-shelf').value });
 document.addEventListener('keydown', e=>{
   if(!$('modal-bg').classList.contains('open')) return;
   if(e.key==='Escape') $('m-close').onclick();

@@ -54,7 +54,7 @@ async function openScanner(mode){
   $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent=''; lastCode='';
   batch=[]; batchSeen=new Set();
   syncScanMode();
-  if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||$('f-room').value||''; $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
+  if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||roomPick(); $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
   $('scan-bg').classList.add('open'); lockPage();
   beepInit();
   camWant=true; camHold=0; clearInterval(camDog); camDog=setInterval(camCheck, 1500);
@@ -134,7 +134,7 @@ function closeScanner(){
   camWant=false; camHold=0; clearInterval(camDog); stopCamera(); $('scan-bg').classList.remove('open');
   if(!$('modal-bg').classList.contains('open') && !$('walk-bg').classList.contains('open')) unlockPage();
   const n=batch.filter(r=>r.st==='added'||r.st==='pending').length;
-  if(n) toast(n+' book'+(n===1?'':'s')+' added'+(batch.some(r=>r.l&&r.l.room)?'':' (no shelf yet: “No shelf yet” in the filters finds them)'));
+  if(n) toast(n+' book'+(n===1?'':'s')+' added'+(batch.some(r=>r.l&&r.l.room)?'':' (Filters → Room: “No shelf yet” finds them)'));
 }
 /* a short beep and buzz on a good read (the sound is unlocked by the tap that opened the scanner) */
 let beepCtx=null;

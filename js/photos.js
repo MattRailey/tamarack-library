@@ -9,7 +9,7 @@
    ============================================================ */
 function openPhotos(){
   const L=ui.phLoc||{};
-  $('ph-room').value=L.room||$('f-room').value||''; $('ph-case').value=L.bookcase||$('f-case').value||''; $('ph-shelf').value=L.shelf||'';
+  $('ph-room').value=L.room||roomPick(); $('ph-case').value=L.bookcase||$('f-case').value||''; $('ph-shelf').value=L.shelf||'';
   $('ph-kind').value=L.kind||'shelf'; $('ph-note').value=''; $('ph-status').textContent='';
   $('ph-bg').classList.add('open'); lockPage();
 }

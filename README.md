@@ -8,7 +8,7 @@ A home book catalog: every book in the house, what it is, and exactly where it s
 
 ## What it does
 
-- **Find a book fast.** Search by title, author or keyword, with typo tolerance. Filter by room, genre, status or loans. Browse as a feed, as cards, or as a list.
+- **Find a book fast.** Search by title, author or keyword, with typo tolerance. Filter by room, genre, status, loans, or when a book was added ("Added in the last 3 months"). Browse as a feed, as cards, or as a list.
 - **Know where it is.** Each book has a shelf spot. The Shelves tab shows every bookcase in order.
 - **Add books three ways.**
   - Scan the barcode with the phone camera. **Scan a stack** adds book after book with no tapping, and the shelf can wait ("No shelf yet").

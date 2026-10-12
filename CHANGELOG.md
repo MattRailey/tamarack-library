@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2 — 2026-10-11 · Recently added
+
+**New**
+- **Filters → Added:** last week, last month, last 3 months, or "New since the library was catalogued" (leaves out the first big import). Choosing one sorts newest first and shows each book's added date.
+- **Filters → Room → "No shelf yet":** books with no room, such as a scanned stack not put away yet.
+
 ## 2.1 — 2026-10-11 · Scanning many books
 
 **Fixes**

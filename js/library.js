@@ -17,6 +17,9 @@ function refreshLists(){
   const L = live();
   const room = $('f-room').value, bc = $('f-case').value;
   fillSelect($('f-room'), uniq(L.map(b=>b.room)), 'Room — any');
+  if(L.some(b=>!b.room)){ $('f-room').insertAdjacentHTML('beforeend','<option value="'+NO_SHELF+'">No shelf yet</option>'); if(room===NO_SHELF) $('f-room').value=NO_SHELF; }
+  const ca=cataloguedAt(), on=$('f-added').querySelector('option[value="new"]');
+  if(on) on.textContent = 'New since the library was catalogued'+(ca?' ('+new Date(ca).toLocaleDateString(undefined,{day:'numeric',month:'short'})+' on)':'');
   fillSelect($('f-case'), uniq(L.filter(b=>!$('f-room').value || b.room===$('f-room').value).map(b=>b.bookcase)), 'Bookcase — any');
   fillSelect($('f-shelf'), uniq(L.filter(b=>(!$('f-room').value || b.room===$('f-room').value) && (!$('f-case').value || b.bookcase===$('f-case').value)).map(b=>b.shelf)), 'Shelf — any');
   fillSelect($('f-genre'), uniq(L.map(b=>b.genre)), 'All genres');
@@ -51,6 +54,8 @@ function chipsHTML(b){
   if(b.genre) c.push('<span class="chip">'+esc(b.genre)+'</span>');
   return c.join('');
 }
+/* the date a book went in, shown while looking at recent additions */
+function addedTag(b){ if(!b.addedAt || !($('f-added').value || $('f-sort').value==='added')) return ''; return ' · added '+esc(new Date(b.addedAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})); }
 function renderLibrary(resetPaging){
   renderCollBar();
   if(resetPaging) shown = PAGE;
@@ -72,15 +77,15 @@ function renderLibrary(resetPaging){
         (ser?'<div class="ser">'+ser+'</div>':'')+
         (b.about?'<p class="ab">'+esc(b.about)+'</p>':'')+
         '<div class="chips">'+chipsHTML(b)+'</div>'+
-        '<div class="loc">📍 '+esc(locText(b))+'</div></div></article>'; }).join('') + '</div>';
+        '<div class="loc">📍 '+esc(locText(b))+addedTag(b)+'</div></div></article>'; }).join('') + '</div>';
   } else if(ui.view==='list'){
     box.innerHTML = '<div class="lb-list">' + slice.map(b=>
-      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">'+(String(b.title||'').startsWith('(')?'unidentified':'partly identified')+'</span>':'')+'</span></div><div class="l">'+esc(locText(b))+'</div></div>'
+      '<div class="lr'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'"><div class="cover" style="width:30px;height:44px;">'+coverHTML(b)+'</div><div class="t"><b>'+esc(b.title||'(untitled)')+'</b><span>'+esc(b.author||'')+(b.loanedTo?' · <span style="color:#a33b17">loaned to '+esc(b.loanedTo)+'</span>':'')+(b.needsReview?' · <span style="color:#8a5a00">'+(String(b.title||'').startsWith('(')?'unidentified':'partly identified')+'</span>':'')+'</span></div><div class="l">'+esc(locText(b))+addedTag(b)+'</div></div>'
     ).join('') + '</div>';
   } else {
     box.innerHTML = '<div class="lb-grid">' + slice.map(b=>
       '<div class="bk'+(selected.has(b.id)?' selected':'')+'" data-id="'+b.id+'">'+(selectMode?'<div class="selbox">'+(selected.has(b.id)?'✓':'')+'</div>':'')+
-      '<div class="cover">'+coverHTML(b)+'</div><div class="bk-body"><h4>'+esc(b.title||'(untitled)')+'</h4><div class="au">'+esc(b.author||'Unknown author')+'</div><div class="loc">'+esc(locText(b))+'</div><div class="chips">'+chipsHTML(b)+'</div></div></div>'
+      '<div class="cover">'+coverHTML(b)+'</div><div class="bk-body"><h4>'+esc(b.title||'(untitled)')+'</h4><div class="au">'+esc(b.author||'Unknown author')+'</div><div class="loc">'+esc(locText(b))+addedTag(b)+'</div><div class="chips">'+chipsHTML(b)+'</div></div></div>'
     ).join('') + '</div>';
   }
   $('more-wrap').classList.toggle('hide', current.length <= shown);
@@ -110,19 +115,21 @@ function syncClearBtn(){ $('btn-clear-q').classList.toggle('hide', !$('f-q').val
 $('btn-clear-q').onclick = ()=>{ $('f-q').value=''; syncClearBtn(); renderLibrary(true); $('f-q').focus(); };
 $('f-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('f-q').blur(); } if(e.key==='Escape'){ $('btn-clear-q').onclick(); } });
 ['f-q'].forEach(id=>$(id).addEventListener('input', ()=>{ syncClearBtn(); clearTimeout(renderLibrary._t); renderLibrary._t=setTimeout(()=>renderLibrary(true),120); }));
-['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-sort','f-review'].forEach(id=>$(id).addEventListener('change', ()=>{
+['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added','f-sort','f-review'].forEach(id=>$(id).addEventListener('change', ()=>{
+  /* looking at recent additions: newest first */
+  if(id==='f-added' && $('f-added').value) $('f-sort').value='added';
   if(id==='f-room'){ $('f-case').value=''; $('f-shelf').value=''; }
   if(id==='f-case'){ $('f-shelf').value=''; }
   if(id==='f-room'||id==='f-case') refreshLists();
   ui.sort=$('f-sort').value; lsSet(UI_KEY, JSON.stringify(ui));
   renderLibrary(true);
 }));
-$('btn-reset').onclick = ()=>{ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); syncClearBtn && setTimeout(syncClearBtn); ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); };
+$('btn-reset').onclick = ()=>{ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); syncClearBtn && setTimeout(syncClearBtn); ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); };
 document.querySelectorAll('#view-seg button').forEach(b=>b.onclick=()=>{ ui.view=b.dataset.view; lsSet(UI_KEY, JSON.stringify(ui)); syncViewSeg(); renderLibrary(false); });
 const SCOPE_PH = { all:'Search title, author, keyword…', title:'Search titles (and series)…', author:'Search authors…' };
 function syncScope(){ document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.toggle('active', b.dataset.scope===(ui.scope||'all'))); $('f-q').placeholder = SCOPE_PH[ui.scope||'all']; }
 document.querySelectorAll('#scope-seg button').forEach(b=>b.onclick=()=>{ ui.scope=b.dataset.scope; lsSet(UI_KEY, JSON.stringify(ui)); syncScope(); renderLibrary(true); $('f-q').focus(); });
-function activeFilterCount(){ return ['f-room','f-case','f-shelf','f-status','f-loan','f-rating'].filter(id=>$(id).value).length + ($('f-review').checked?1:0); }
+function activeFilterCount(){ return ['f-room','f-case','f-shelf','f-status','f-loan','f-rating','f-added'].filter(id=>$(id).value).length + ($('f-review').checked?1:0); }
 function syncMoreBtn(){ const n=activeFilterCount(); $('btn-more-filters').textContent = (ui.moreOpen?'Fewer':'Filters') + (n?' ('+n+')':''); $('more-filters').classList.toggle('hide', !ui.moreOpen); }
 $('btn-more-filters').onclick = ()=>{ ui.moreOpen=!ui.moreOpen; lsSet(UI_KEY, JSON.stringify(ui)); syncMoreBtn(); };
 function syncViewSeg(){ document.querySelectorAll('#view-seg button').forEach(b=>b.classList.toggle('active', b.dataset.view===ui.view)); }

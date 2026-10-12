@@ -87,15 +87,23 @@ function tokScore(fields, tok, fuzzy){
   return best;
 }
 let lastFuzzy=false;
+/* "Room" can be "No shelf yet" (books with no room, e.g. a scanned stack not put away) */
+const NO_SHELF='__none';
+/* the room chosen in the filters, as a room name ('' for any room or "No shelf yet") */
+function roomPick(){ const v=$('f-room').value; return v===NO_SHELF ? '' : v; }
+/* when the library was first catalogued: the first day books went in plus 3 days (the bulk import and its photos) */
+function cataloguedAt(){ let m=Infinity; for(const b of live()) if(b.addedAt && b.addedAt<m) m=b.addedAt; return m===Infinity ? 0 : m+3*864e5; }
+/* the "Added" filter: '' = any time, a number of days back, or 'new' = since the library was catalogued */
+function addedSince(v){ if(!v) return 0; if(v==='new') return cataloguedAt(); return Date.now()-(+v)*864e5; }
 function filtered(){
   let q = words($('f-q').value).split(' ').filter(Boolean);
   if(q.some(t=>!STOP.has(t))) q = q.filter(t=>!STOP.has(t));      // "the hobbit" -> "hobbit"
   const scope = ui.scope || 'all';
   const f = { room:$('f-room').value, bc:$('f-case').value, shelf:$('f-shelf').value, status:$('f-status').value,
-    genre:$('f-genre').value, loan:$('f-loan').value, rating:$('f-rating').value, review:$('f-review').checked };
+    genre:$('f-genre').value, loan:$('f-loan').value, rating:$('f-rating').value, review:$('f-review').checked, added:addedSince($('f-added').value) };
   const out=[], pool=[];
   for(const b of live()){
-    if(f.room && b.room!==f.room) continue;
+    if(f.room && (f.room===NO_SHELF ? !!b.room : b.room!==f.room)) continue;
     if(f.bc && b.bookcase!==f.bc) continue;
     if(f.shelf && String(b.shelf)!==f.shelf) continue;
     if(f.status && (b.status||'unread')!==f.status) continue;
@@ -104,6 +112,7 @@ function filtered(){
     if(f.loan==='in' && b.loanedTo) continue;
     if(f.rating!==''){ const r=+b.rating||0, m=+f.rating; if(m===0 ? r!==0 : r<m) continue; }
     if(f.review && !b.needsReview) continue;
+    if(f.added && !((b.addedAt||0)>=f.added)) continue;
     if(ui.coll && !collsOf(b).includes(ui.coll)) continue;
     pool.push(b);
   }
