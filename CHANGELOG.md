@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1 — 2026-10-11 · Scanning many books
+
+**Fixes**
+- **Scanner only read one book:** once a book's card was up, the camera ignored every other barcode until a button was tapped. It now keeps reading: a new book replaces the card, and the same book held in view is not read twice.
+- **Camera that stopped:** the reading loop could die on a frame that failed to draw, and the camera stayed off after the screen locked, after another app took it, or after the photo picker was cancelled. A watchdog now restarts it whenever the scanner is open. The barcode reader keeps its settings between frames.
+
+**New**
+- **Scan a stack** (the scanner's first mode): scan one barcode after another and each book goes in by itself, with a beep and a green flash. Books already in the library are flagged, not added ("Add another copy" if you want it). A repeat scan is ignored. Each row has Undo. Where the books go is optional: left blank, they're listed as "No shelf yet". Offline, books go in by ISBN and fill in later.
+- **One photo of the whole stack for Claude:** in Scan a stack, the photo button sends a picture of new books to the inbox marked "New books, not shelved yet".
+- Tests: the camera is tested with a fake video of two barcodes, so the real reading loop runs.
+
 ## 2.0 — 2026-09-28 · Cleanup release
 
 **Fixes**

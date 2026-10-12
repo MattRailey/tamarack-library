@@ -54,14 +54,21 @@ async function sendToInbox(files, loc, note, statusEl, listEl){
 // from the scanner: a full-resolution photo of the shelf, labeled with the room/bookcase/shelf typed above
 $('sc-shelfphoto').onclick=async()=>{
   if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; }
-  stopCamera(); $('sc-file').click();
+  camHold=Date.now(); stopCamera(); $('sc-file').click();
 };
 $('sc-file').onchange=async e=>{
   const files=[...e.target.files]; e.target.value='';
   if(files.length){
-    const loc={ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), kind:'shelf' };
-    const ok=await sendToInbox(files, loc, '', $('sc-phstatus'), null);
-    if(ok) $('sc-phstatus').textContent='✓ Shelf photo sent to photos/inbox'+(loc.room?' ('+[loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')+')':'')+'. Take another, or keep scanning.';
+    /* "Scan a stack": a photo of new books, where they go not known yet (Claude adds them with no shelf) */
+    const pile=scanMode && scanMode.kind==='many';
+    const loc={ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), kind:pile?'new-books':'shelf' };
+    const where=[loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ');
+    const note=pile ? 'New books'+(where?', going to '+where:', not shelved yet (add them with no shelf)') : '';
+    const ok=await sendToInbox(files, loc, note, $('sc-phstatus'), null);
+    if(ok) $('sc-phstatus').textContent = pile
+      ? '✓ Stack photo sent to photos/inbox'+(where?' ('+where+')':' (no shelf yet)')+'. Claude reads the titles and adds them. Take another, or keep scanning.'
+      : '✓ Shelf photo sent to photos/inbox'+(where?' ('+where+')':'')+'. Take another, or keep scanning.';
   }
+  camHold=0;
   if($('scan-bg').classList.contains('open')) startCamera();
 };

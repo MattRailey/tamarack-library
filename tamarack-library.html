@@ -475,15 +475,16 @@
   <div class="modal scan-modal">
     <button class="modal-close" id="sc-close" aria-label="Close">&times;</button>
     <h3 id="sc-title">Scan books to add</h3>
-    <div class="seg sc-modes" id="sc-modes"><button data-k="add" class="active">Add books</button><button data-k="check">Do I own this?</button></div>
+    <div class="seg sc-modes" id="sc-modes"><button data-k="many" class="active">Scan a stack</button><button data-k="add">One at a time</button><button data-k="check">Do I own this?</button></div>
     <div class="note" id="sc-hint" style="margin-top:0;"></div>
     <div class="sc-view"><video id="sc-video" muted playsinline></video><div class="sc-frame"></div></div>
     <div class="row" id="sc-phrow" style="margin:0 0 8px;"><button class="secondary" id="sc-shelfphoto" style="flex:1;">📷 Photograph this shelf for Claude</button></div>
     <input type="file" id="sc-file" accept="image/*" capture="environment" class="hide">
     <div id="sc-phstatus" class="note" style="margin:-4px 0 8px;"></div>
     <div class="sc-type"><input id="sc-isbn" inputmode="numeric" placeholder="…or type the ISBN"><button class="secondary" id="sc-go">Look up</button></div>
+    <div id="sc-batch" class="sc-batch hide"></div>
     <div class="sc-loc" id="sc-loc">
-      <div class="note" style="margin:0 0 4px;">New books go here (the spot counts up as you scan along a shelf):</div>
+      <div class="note" id="sc-locnote" style="margin:0 0 4px;">New books go here (the spot counts up as you scan along a shelf):</div>
       <div class="grid">
         <div><label>Room</label><input id="sc-room" list="dl-room"></div>
         <div><label>Bookcase</label><input id="sc-case" list="dl-case"></div>

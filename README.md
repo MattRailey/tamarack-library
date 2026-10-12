@@ -11,9 +11,9 @@ A home book catalog: every book in the house, what it is, and exactly where it s
 - **Find a book fast.** Search by title, author or keyword, with typo tolerance. Filter by room, genre, status or loans. Browse as a feed, as cards, or as a list.
 - **Know where it is.** Each book has a shelf spot. The Shelves tab shows every bookcase in order.
 - **Add books three ways.**
-  - Scan the barcode with the phone camera.
+  - Scan the barcode with the phone camera. **Scan a stack** adds book after book with no tapping, and the shelf can wait ("No shelf yet").
   - Type the book in.
-  - Photograph whole shelves and let Claude read the spines.
+  - Photograph whole shelves, or one pile of new books, and let Claude read the spines.
 - **"Do I own this?"** Check a barcode or a title at a bookstore or sale. It works offline too.
 - **Mystery books.** A shelf-by-shelf walk-through for books that couldn't be identified from photos. Scan them, type them, or snap the title page.
 - **Collections, loans, reading status and ratings.**

@@ -77,3 +77,58 @@ test('offline: the scan is saved for later and fills in once back online', async
   await page.fill('#f-q', 'watership'); 
   await expect(page.locator('#results')).toContainText('Watership Down', { timeout: 15000 });
 });
+
+test('one at a time: the camera keeps reading after a result, and a second book replaces the first (no tap needed)', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  await openScanner(page, 'add');
+  await page.evaluate(() => gotCode('9780316769488'));
+  await expect(page.locator('#sc-result')).toContainText('The Catcher in the Rye');
+  // the same barcode still in front of the camera is ignored
+  await page.evaluate(() => gotCode('9780316769488'));
+  await expect(page.locator('#sc-result')).toContainText('The Catcher in the Rye');
+  // the next book, without tapping anything
+  await page.evaluate(() => gotCode('9780141182636'));
+  await expect(page.locator('#sc-result')).toContainText('Watership Down');
+  await click(page, '#sc-add');
+  await expect(page.locator('#sc-result')).toContainText('Added');
+  await page.evaluate(() => gotCode('9780316769488'));
+  await expect(page.locator('#sc-result')).toContainText('The Catcher in the Rye');
+});
+
+test('scan a stack: each barcode goes in by itself, owned books are flagged, repeats ignored, undo works, no shelf needed', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  const n0 = await page.evaluate(() => live().length);
+  await openScanner(page, 'many');
+  await page.fill('#sc-room', ''); await page.fill('#sc-case', ''); await page.fill('#sc-shelf', ''); await page.fill('#sc-pos', '');
+  await expect(page.locator('#sc-title')).toHaveText('Scan a stack of books');
+  await page.evaluate(() => { gotCode('9780316769488'); gotCode('9780141182636'); gotCode('9780547928227'); });
+  await expect(page.locator('#sc-batch .sc-bh')).toContainText('2 added', { timeout: 10000 });
+  await expect(page.locator('#sc-batch .sc-bh')).toContainText('1 already had');
+  await expect(page.locator('#sc-batch')).toContainText('The Catcher in the Rye');
+  await expect(page.locator('#sc-batch')).toContainText('Watership Down');
+  await expect(page.locator('#sc-batch')).toContainText('No shelf yet');
+  expect(await page.evaluate(() => live().length)).toBe(n0 + 2);
+  // the same book scanned again (typed, after the 4 s) is not added twice
+  await page.fill('#sc-isbn', '9780316769488'); await click(page, '#sc-go');
+  await expect(page.locator('#sc-hint')).toContainText('Already scanned');
+  expect(await page.evaluate(() => live().length)).toBe(n0 + 2);
+  // undo the Catcher
+  await page.locator('#sc-batch .sc-m', { hasText: 'Catcher' }).locator('[data-bu]').click();
+  await expect(page.locator('#sc-batch .sc-bh')).toContainText('1 added');
+  expect(await page.evaluate(() => live().length)).toBe(n0 + 1);
+  const w = await page.evaluate(() => live().find(b => b.isbn === '9780141182636'));
+  expect(w.room || '').toBe('');
+  await click(page, '#sc-done');
+  await expect(page.locator('#scan-bg')).not.toHaveClass(/open/);
+  await expect(page.locator('#toast')).toContainText('1 book added');
+});
+
+test('scan a stack offline: books go in with their ISBN and fill in later', async ({ page, context }) => {
+  const net = await mockNet(page); await openApp(page);
+  await context.setOffline(true); net.offline = true;
+  await openScanner(page, 'many');
+  await page.evaluate(() => { gotCode('9780316769488'); gotCode('9780141182636'); });
+  await expect(page.locator('#sc-batch .sc-bh')).toContainText('2 added');
+  await expect(page.locator('#sc-batch')).toContainText('title fills in when online');
+  expect(await page.evaluate(() => live().filter(b => b.pendingIsbn).length)).toBe(2);
+});

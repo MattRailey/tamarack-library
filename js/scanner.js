@@ -17,6 +17,11 @@ function isbn13(raw){
 function validEan13(d){ if(!/^\d{13}$/.test(d)) return false; let s=0; for(let i=0;i<12;i++) s+=(+d[i])*(i%2?3:1); return (10-s%10)%10===+d[12]; }
 function findByIsbn(code){ const k=isbn13(code); if(!k) return []; return live().filter(b=>isbn13(b.isbn)===k); }
 let scanStream=null, scanTimer=0, zxReader=null, scanMode=null, scanBusy=false, lastCode='', lastCodeAt=0;
+/* camera upkeep: camWant = the scanner is open; camHold = the photo picker has the camera; tickAt = the last
+   turn of the reading loop (a loop that stops, a paused video or an ended track is restarted by camCheck) */
+let camWant=false, camHold=0, camStarting=false, camFail=false, camDog=0, tickAt=0;
+/* "Scan a stack": every book scanned this time, in order */
+let batch=[], batchSeen=new Set();
 function loadZX(){
   if(window.ZXing) return Promise.resolve(window.ZXing);
   return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
@@ -26,67 +31,228 @@ function syncScanMode(){
   const k=scanMode.kind;
   $('sc-modes').classList.toggle('hide', k==='fill');
   document.querySelectorAll('#sc-modes button').forEach(b=>b.classList.toggle('active', b.dataset.k===k));
-  $('sc-title').textContent = k==='fill' ? 'Scan this book’s barcode' : k==='check' ? 'Do we own this?' : 'Scan books to add';
+  $('sc-title').textContent = k==='fill' ? 'Scan this book’s barcode' : k==='check' ? 'Do we own this?' : k==='many' ? 'Scan a stack of books' : 'Scan books to add';
   $('sc-hint').textContent = k==='check'
     ? 'Scan a book at the store or a sale — it only checks, nothing gets added. No barcode? Type the title below.'+(navigator.onLine===false?' (Offline: barcodes and titles are checked against the copy of the library on this phone.)':'')
+    : k==='many' ? 'Scan one barcode after another: each book goes in by itself, no tapping. Books you already have are flagged, not added. No barcodes? Take one photo of the whole stack.'
     : 'Point the camera at the barcode on the back cover (the one starting 978 or 979).';
   $('sc-isbn').placeholder = k==='check' ? '…or type an ISBN or a title' : '…or type the ISBN';
   $('sc-isbn').setAttribute('inputmode', k==='check' ? 'text' : 'numeric');
-  $('sc-loc').classList.toggle('hide', k!=='add');
-  $('sc-phrow').classList.toggle('hide', k!=='add'); $('sc-phstatus').classList.toggle('hide', k!=='add');
+  $('sc-go').textContent = k==='many' ? 'Add' : 'Look up';
+  const shelf = k==='add' || k==='many';
+  $('sc-loc').classList.toggle('hide', !shelf);
+  $('sc-locnote').textContent = k==='many' ? 'Where they go (optional: leave it blank and they’re listed as “No shelf yet” to sort out later):' : 'New books go here (the spot counts up as you scan along a shelf):';
+  $('sc-phrow').classList.toggle('hide', !shelf); $('sc-phstatus').classList.toggle('hide', !shelf);
+  $('sc-shelfphoto').textContent = k==='many' ? '📷 One photo of the whole stack for Claude' : '📷 Photograph this shelf for Claude';
+  $('sc-batch').classList.toggle('hide', k!=='many');
+  batchRender();
 }
-document.querySelectorAll('#sc-modes button').forEach(b=>b.onclick=()=>{ scanMode={kind:b.dataset.k}; ui.scanKind=b.dataset.k; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-result').innerHTML=''; scanBusy=false; syncScanMode(); });
+document.querySelectorAll('#sc-modes button').forEach(b=>b.onclick=()=>{ scanMode={kind:b.dataset.k}; ui.scanMode=b.dataset.k; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-result').innerHTML=''; scanBusy=false; lastCode=''; syncScanMode(); });
 async function openScanner(mode){
-  // mode: {kind:'add'} adds new books; {kind:'fill', onFound(fields)} hands the result back
-  scanMode=mode||{kind: ui.scanKind==='check' ? 'check' : 'add'};
-  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent='';
+  // mode: {kind:'many'} a stack, each scan added; {kind:'add'} one at a time; {kind:'check'}; {kind:'fill', onFound(fields)} hands the result back
+  scanMode=mode||{kind: ['many','add','check'].includes(ui.scanMode) ? ui.scanMode : 'many'};
+  $('sc-result').innerHTML=''; $('sc-isbn').value=''; $('sc-phstatus').textContent=''; lastCode='';
+  batch=[]; batchSeen=new Set();
   syncScanMode();
   if(scanMode.kind!=='fill'){ const L=ui.scanLoc||{}; $('sc-room').value=L.room||$('f-room').value||''; $('sc-case').value=L.bookcase||$('f-case').value||''; $('sc-shelf').value=L.shelf||$('f-shelf').value||''; $('sc-pos').value=L.nextPos||''; }
   $('scan-bg').classList.add('open'); lockPage();
+  beepInit();
+  camWant=true; camHold=0; clearInterval(camDog); camDog=setInterval(camCheck, 1500);
   startCamera();
 }
+/* one start at a time (the photo picker, the watchdog and a return to the page can all ask at once) */
 async function startCamera(){
+  if(camStarting) return;
+  camStarting=true; camFail=false;
+  try{ await startCamera0(); }finally{ camStarting=false; }
+}
+async function startCamera0(){
   stopCamera(); scanBusy=false;
   const v=$('sc-video');
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ $('sc-hint').textContent='This browser can’t use the camera here — type the ISBN below instead.'; return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ camFail=true; $('sc-hint').textContent='This browser can’t use the camera here — type the ISBN below instead.'; return; }
+  let st;
   try{
-    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false });
-  }catch(e){ $('sc-hint').textContent='No camera access (' + (e.name==='NotAllowedError'?'permission was denied':'no camera found') + ') — type the ISBN below instead.'; return; }
+    st = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false });
+  }catch(e){ camFail=true; $('sc-hint').textContent='No camera access (' + (e.name==='NotAllowedError'?'permission was denied':'no camera found') + ') — type the ISBN below instead.'; return; }
+  /* closed (or the picker took over) while the camera was starting */
+  if(!camWant || camHold){ st.getTracks().forEach(t=>t.stop()); return; }
+  scanStream=st;
   v.srcObject=scanStream; v.setAttribute('playsinline',''); try{ await v.play(); }catch(e){}
+  tickAt=Date.now();
   let native=null;
   if('BarcodeDetector' in window){ try{ const f=await BarcodeDetector.getSupportedFormats(); if(f.includes('ean_13')) native=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e'].filter(x=>f.includes(x))}); }catch(e){} }
+  const mine=scanStream;
   if(native){
-    const tick=async()=>{ if(!scanStream) return; if(!scanBusy && v.readyState>=2){ try{ const r=await native.detect(v); if(r&&r.length) gotCode(r[0].rawValue); }catch(e){} } scanTimer=setTimeout(tick, 180); };
+    const tick=async()=>{ if(scanStream!==mine) return; tickAt=Date.now();
+      try{ if(!scanBusy && v.readyState>=2){ const r=await native.detect(v); if(r&&r.length) gotCode(r[0].rawValue); } }catch(e){}
+      finally{ if(scanStream===mine) scanTimer=setTimeout(tick, 180); } };
     tick(); return;
   }
   try{
-    const ZX=await loadZX(); if(!scanStream) return;
+    const ZX=await loadZX(); if(scanStream!==mine) return;
     const hints=new Map(); hints.set(ZX.DecodeHintType.POSSIBLE_FORMATS,[ZX.BarcodeFormat.EAN_13,ZX.BarcodeFormat.EAN_8,ZX.BarcodeFormat.UPC_A,ZX.BarcodeFormat.UPC_E]); hints.set(ZX.DecodeHintType.TRY_HARDER,true);
     zxReader=new ZX.MultiFormatReader(); zxReader.setHints(hints);
     const c=document.createElement('canvas'), g=c.getContext('2d',{willReadFrequently:true});
-    const tick=()=>{ if(!scanStream) return;
-      if(!scanBusy && v.videoWidth){
-        const W=v.videoWidth, H=v.videoHeight, cw=Math.round(W*0.8), ch=Math.round(H*0.5); c.width=cw; c.height=ch;
-        g.drawImage(v,(W-cw)/2,(H-ch)/2,cw,ch,0,0,cw,ch);
-        try{ const lum=new ZX.HTMLCanvasElementLuminanceSource(c), bmp=new ZX.BinaryBitmap(new ZX.HybridBinarizer(lum)); const r=zxReader.decode(bmp); if(r) gotCode(r.getText()); }catch(e){}
-      }
-      scanTimer=setTimeout(tick, 150); };
+    /* every turn is in try / finally, so a frame that fails to draw or decode never stops the loop;
+       decodeWithState keeps the hints (decode() would reset them on every frame) */
+    const tick=()=>{ if(scanStream!==mine) return; tickAt=Date.now();
+      try{
+        if(!scanBusy && v.videoWidth){
+          const W=v.videoWidth, H=v.videoHeight, cw=Math.round(W*0.8), ch=Math.round(H*0.5); c.width=cw; c.height=ch;
+          g.drawImage(v,(W-cw)/2,(H-ch)/2,cw,ch,0,0,cw,ch);
+          let r=null;
+          try{ const lum=new ZX.HTMLCanvasElementLuminanceSource(c), bmp=new ZX.BinaryBitmap(new ZX.HybridBinarizer(lum)); r=zxReader.decodeWithState(bmp); }catch(e){}
+          finally{ try{ zxReader.reset(); }catch(e){} }
+          if(r) gotCode(r.getText());
+        }
+      }catch(e){}
+      finally{ if(scanStream===mine) scanTimer=setTimeout(tick, 150); } };
     tick();
   }catch(e){ $('sc-hint').textContent='The barcode reader couldn’t load (no internet?) — type the ISBN below instead.'; }
 }
 function stopCamera(){ clearTimeout(scanTimer); if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; } const v=$('sc-video'); if(v) v.srcObject=null; }
-function closeScanner(){ stopCamera(); $('scan-bg').classList.remove('open'); if(!$('modal-bg').classList.contains('open') && !$('walk-bg').classList.contains('open')) unlockPage(); }
+/* the watchdog: the phone pauses the video or ends the camera (screen locked, another app, a call, the photo picker
+   cancelled) and nothing tells the page; restart it whenever the scanner is open and it isn't running */
+function camCheck(){
+  if(!camWant || camStarting || camFail || document.hidden) return;
+  if(camHold && Date.now()-camHold<120000) return;
+  camHold=0;
+  const v=$('sc-video'), t=scanStream && scanStream.getVideoTracks()[0];
+  if(!scanStream || !t || t.readyState==='ended'){ startCamera(); return; }
+  if(v.paused) v.play().catch(()=>{});
+  if(Date.now()-tickAt>4000) startCamera();
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!camWant) return;
+  /* hidden: let the camera go (the phone takes it anyway); back: start again */
+  if(document.hidden){ if(!camHold) stopCamera(); }
+  else setTimeout(camCheck, 300);
+});
+/* the photo picker closed (a photo or Cancel): the camera comes back */
+window.addEventListener('focus', ()=>{ if(camWant && camHold && Date.now()-camHold>800){ camHold=0; setTimeout(camCheck, 300); } });
+function closeScanner(){
+  camWant=false; camHold=0; clearInterval(camDog); stopCamera(); $('scan-bg').classList.remove('open');
+  if(!$('modal-bg').classList.contains('open') && !$('walk-bg').classList.contains('open')) unlockPage();
+  const n=batch.filter(r=>r.st==='added'||r.st==='pending').length;
+  if(n) toast(n+' book'+(n===1?'':'s')+' added'+(batch.some(r=>r.l&&r.l.room)?'':' (no shelf yet: “No shelf yet” in the filters finds them)'));
+}
+/* a short beep and buzz on a good read (the sound is unlocked by the tap that opened the scanner) */
+let beepCtx=null;
+function beepInit(){ try{ if(!beepCtx){ const A=window.AudioContext||window.webkitAudioContext; if(A) beepCtx=new A(); } if(beepCtx && beepCtx.state==='suspended') beepCtx.resume(); }catch(e){} }
+function beep(hi){
+  try{ navigator.vibrate && navigator.vibrate(hi?60:[40,60,40]); }catch(e){}
+  try{ if(!beepCtx) return; const o=beepCtx.createOscillator(), g=beepCtx.createGain(), t=beepCtx.currentTime;
+    o.frequency.value=hi?1400:500; g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.14);
+    o.connect(g); g.connect(beepCtx.destination); o.start(t); o.stop(t+0.15); }catch(e){}
+  const f=document.querySelector('.sc-frame'); if(f){ f.classList.remove('hit','dup'); void f.offsetWidth; f.classList.add(hi?'hit':'dup'); }
+}
 function gotCode(raw){
   let d=String(raw||'').replace(/\D/g,'');
   if(d.length===12) d='0'+d;                       // UPC-A → EAN-13
   if(!validEan13(d)) return;
   if(!/^97[89]/.test(d)){ $('sc-hint').textContent='That’s a price or store barcode — look for the one starting 978 or 979.'; return; }
-  if(d===lastCode && Date.now()-lastCodeAt<4000 && $('sc-result').innerHTML) return;
+  /* the same barcode still in view: ignored while it stays there (each sighting keeps it ignored for 4 s more) */
+  if(d===lastCode && Date.now()-lastCodeAt<4000){ lastCodeAt=Date.now(); return; }
   lastCode=d; lastCodeAt=Date.now();
-  try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+  if(scanMode.kind==='many'){ batchCode(d); return; }
+  beep(true);
   handleIsbn(d);
 }
-$('sc-go').onclick=()=>{ const raw=$('sc-isbn').value.trim(); if(scanMode.kind==='check' && raw && !isbn13(raw) && /[a-z]/i.test(raw)){ checkTitle(raw); return; } const d=isbn13($('sc-isbn').value) || (!$('sc-isbn').value.trim() && lastCode) || ''; if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
+$('sc-go').onclick=()=>{ const raw=$('sc-isbn').value.trim(); if(scanMode.kind==='check' && raw && !isbn13(raw) && /[a-z]/i.test(raw)){ checkTitle(raw); return; }
+  if(scanMode.kind==='many'){ const d=isbn13(raw); if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } $('sc-isbn').value=''; batchCode(d); return; }
+  const d=isbn13($('sc-isbn').value) || (!$('sc-isbn').value.trim() && lastCode) || ''; if(!d){ toast('That doesn’t look like an ISBN (10 or 13 digits)'); return; } handleIsbn(d); };
+/* ---- "Scan a stack": each new barcode is looked up and added by itself, the scanner keeps reading ---- */
+function scLoc(){ return { room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() }; }
+function scRemember(l){ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; }
+function batchCode(code){
+  if(batchSeen.has(code)){
+    const r=batch.find(x=>x.code===code);
+    beep(false); $('sc-hint').textContent='Already scanned: '+((r&&r.title)||'ISBN '+code)+'. Next book!';
+    return;
+  }
+  batchSeen.add(code); beep(true);
+  /* the spot is taken now, in scan order, even if the look-ups finish in another order */
+  const l=scLoc(); if(l.room||l.position) scRemember(l);
+  const r={ code, st:'looking', title:'', l };
+  batch.push(r); batchRender();
+  batchLookup(r);
+}
+async function batchLookup(r){
+  const code=r.code, offline=navigator.onLine===false;
+  let info=null;
+  try{ const c=await idbGet('isbn:'+code); if(c && c.title) info=c; }catch(e){}
+  if(!info && !offline){ try{ info=await Promise.race([isbnLookup(code), new Promise(res=>setTimeout(()=>res(null), 9000))]); }catch(e){}
+    if(info && info.title){ try{ await idbPut('isbn:'+code, info); }catch(e){} } }
+  if(r.st!=='looking') return;
+  r.info=info && info.title ? info : null;
+  const m=libMatches(findByIsbn(code), r.info, false);
+  if(m.inL.length){ r.st='have'; r.have=m.inL[0]; r.title=(r.info&&r.info.title)||m.inL[0].title; r.author=(r.info&&r.info.author)||m.inL[0].author; batchRender(); return; }
+  r.maybe=m.mb[0]||null;
+  batchAdd(r);
+}
+function batchAdd(r){
+  const now=Date.now(), l=r.l, code=r.code;
+  const b = r.info
+    ? Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'scan', status:'unread', lookupV:0 }, r.info, l)
+    : Object.assign({ id:uid(), addedAt:now, updatedAt:now, source:'scan', status:'unread', title:'(ISBN '+code+' — details to fill in)', author:'', isbn:code, pendingIsbn:true, needsReview:true }, l);
+  if(!b.coverUrl) delete b.coverUrl;
+  store.books.push(b); commit();
+  r.id=b.id; r.st=r.info?'added':'pending'; r.title=b.title; r.author=b.author;
+  batchRender();
+  if(!r.info && navigator.onLine!==false) setTimeout(()=>fillPendingIsbns().then(()=>{ const x=byId(r.id); if(x && !x.pendingIsbn){ r.title=x.title; r.author=x.author; batchRender(); } }), 50);
+}
+function batchRender(){
+  const el=$('sc-batch'); if(!el) return;
+  if(!scanMode || scanMode.kind!=='many'){ el.innerHTML=''; return; }
+  const n=s=>batch.filter(r=>s.includes(r.st)).length, added=n(['added','pending']), had=n(['have']), look=n(['looking']);
+  const where=r=>r.l&&r.l.room ? [r.l.room, r.l.bookcase, r.l.shelf?'Shelf '+r.l.shelf:'', r.l.position?'spot '+r.l.position:''].filter(Boolean).join(' · ') : 'No shelf yet';
+  const row=(r,i)=>{
+    const t=r.title||'ISBN '+r.code;
+    const st = r.st==='looking' ? ['look','Looking up…']
+      : r.st==='added' ? ['ok','✓ Added · '+where(r)]
+      : r.st==='pending' ? ['ok','✓ Added · '+where(r)+' · title fills in when online']
+      : r.st==='have' ? ['have','Already in the library · '+(r.have.room?locText(r.have):'No shelf yet')+' · not added']
+      : ['undone','Taken out again'];
+    const btn = r.st==='added'||r.st==='pending' ? '<button class="secondary" data-bu="'+i+'">Undo</button>'
+      : r.st==='have' ? '<button class="secondary" data-bc="'+i+'">Add another copy</button>' : '';
+    const maybe = r.maybe && (r.st==='added'||r.st==='pending') ? '<div class="note" style="margin:0">◐ Could also be <a href="#" data-open="'+r.maybe.id+'">'+esc(r.maybe.title)+'</a> already in the library</div>' : '';
+    return '<div class="sc-m sc-b-'+st[0]+'"><div><b>'+(r.id?'<a href="#" data-open="'+r.id+'">'+esc(t)+'</a>':esc(t))+'</b>'+(r.author?' <span class="note" style="margin:0">'+esc(r.author)+'</span>':'')
+      +'<div class="note" style="margin:0">'+esc(st[1])+'</div>'+maybe+'</div><div class="sc-mb">'+btn+'</div></div>';
+  };
+  el.innerHTML = '<div class="sc-bh"><span><b>'+added+' added</b>'+(had?' · '+had+' already had':'')+(look?' · '+look+' looking up…':'')+'</span>'
+    +(batch.length?'<button id="sc-done">Done</button>':'')+'</div>'
+    + (batch.length ? '<div class="sc-blist">'+batch.map(row).reverse().join('')+'</div>' : '<div class="note" style="margin:4px 0 0;">Scanned books show up here as they go in.</div>');
+}
+$('sc-batch').addEventListener('click', e=>{
+  const a=e.target.closest('[data-open]'); if(a){ e.preventDefault(); const id=a.dataset.open; closeScanner(); openBook(id,[id]); return; }
+  if(e.target.closest('#sc-done')){ closeScanner(); return; }
+  const u=e.target.closest('[data-bu]'), c=e.target.closest('[data-bc]');
+  if(u){ const r=batch[+u.dataset.bu]; if(!r||!r.id) return; const now=Date.now();
+    store.books=store.books.map(x=>x.id===r.id?{id:x.id, deleted:true, updatedAt:now}:x); commit();
+    r.st='undone'; batchSeen.delete(r.code); batchRender(); }
+  if(c){ const r=batch[+c.dataset.bc]; if(!r) return; if(!r.info) r.info=r.have?{ title:r.have.title, author:r.have.author||'', isbn:r.code }:null; batchAdd(r); }
+});
+/* what in the library this book could be: same barcode or same title = have it; partly identified books = maybe */
+function libMatches(have, info, chk, here){
+  const partial=b=>isUnid(b) || !!b.needsReview;
+  const L0=live(), inLib=new Map(), maybe=new Map();
+  for(const b of have) ((partial(b) && !chk)?maybe:inLib).set(b.id,b);   // same barcode = same book
+  if(info && info.title){
+    const last=normKey(searchAuthor(info.author||'')).split(' ').filter(w=>w.length>=3).pop()||'';
+    for(const b of L0){
+      if(inLib.has(b.id)||maybe.has(b.id)) continue;
+      const tOk = !String(b.title||'').startsWith('(') && titleMatch(info.title, b.title) && (!b.author || !info.author || authorMatch(b.author,[info.author]));
+      if(tOk){ (partial(b)?maybe:inLib).set(b.id,b); continue; }
+      if(partial(b) && last && normKey((b.title||'')+' '+(b.author||'')).split(' ').includes(last)) maybe.set(b.id,b);   // e.g. "(Hermann Hesse — title not visible)"
+    }
+  }
+  // unreadable books on the very shelf being scanned could be this one too
+  if(here && here.room && here.bookcase && here.shelf){
+    const same=L0.filter(b=>isUnid(b) && !maybe.has(b.id) && b.room===here.room && b.bookcase===here.bookcase && String(b.shelf)===here.shelf).sort(posCmp);
+    same.slice(0,8).forEach(b=>maybe.set(b.id,b));
+  }
+  return { inL:[...inLib.values()], mb:[...maybe.values()].slice(0,10) };
+}
 $('sc-isbn').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('sc-go').onclick(); } });
 async function isbnLookup(code){
   const docs = await bookSearch('', '', code);
@@ -101,8 +267,9 @@ async function isbnLookup(code){
   return { title:d.title||'', author:(d.authors||[]).join(', '), isbn:code, year:f.year, publisher:f.publisher, pages:f.pages, subjects:f.subjects,
     about, coverUrl: f.coverUrl || (docs.find(x=>x.cover)||{}).cover || '' };
 }
+let hSeq=0;
 async function handleIsbn(code){
-  scanBusy=true; lastCode=code; lastCodeAt=Date.now();
+  const my=++hSeq; scanBusy=true; lastCode=code; lastCodeAt=Date.now();
   const box=$('sc-result');
   const have = scanMode.kind!=='fill' ? findByIsbn(code) : [];
   const offline = navigator.onLine===false;
@@ -112,7 +279,11 @@ async function handleIsbn(code){
   try{ const c=await idbGet('isbn:'+code); if(c && c.title) info=c; }catch(e){}
   if(!info && !offline){ try{ info=await Promise.race([isbnLookup(code), new Promise(r=>setTimeout(()=>r(null), 9000))]); }catch(e){}
     if(info && info.title){ try{ await idbPut('isbn:'+code, info); }catch(e){} } }
+  /* a newer scan (or a change of mode) took over while this one was looked up */
+  if(my!==hSeq || scanMode.kind==='many') return;
   if(!info) info={ title:'', author:'', isbn:code };
+  /* the card is up: the camera keeps reading, and a different barcode simply replaces this card */
+  scanBusy=false;
   if(scanMode.kind==='fill'){
     box.innerHTML = info.title
       ? scanCard(info)+'<div class="row" style="margin-top:10px;"><button id="sc-use">Use this</button><button class="secondary" id="sc-again">Scan again</button></div>'
@@ -124,26 +295,9 @@ async function handleIsbn(code){
   // ---- where does this book stand in the library? ----
   const loc=()=>({ room:$('sc-room').value.trim(), bookcase:$('sc-case').value.trim(), shelf:$('sc-shelf').value.trim(), position:$('sc-pos').value.trim() });
   const remember=l=>{ const n=parseInt(l.position); ui.scanLoc={room:l.room, bookcase:l.bookcase, shelf:l.shelf, nextPos: n?String(n+1):''}; lsSet(UI_KEY, JSON.stringify(ui)); $('sc-pos').value=ui.scanLoc.nextPos; };
-  const partial=b=>isUnid(b) || !!b.needsReview;
   const chk = scanMode.kind==='check';
-  const L0=live(), here = chk ? {} : loc();
-  const inLib=new Map(), maybe=new Map();
-  for(const b of have) ((partial(b) && !chk)?maybe:inLib).set(b.id,b);   // same barcode = same book
-  if(info.title){
-    const last=normKey(searchAuthor(info.author||'')).split(' ').filter(w=>w.length>=3).pop()||'';
-    for(const b of L0){
-      if(inLib.has(b.id)||maybe.has(b.id)) continue;
-      const tOk = !String(b.title||'').startsWith('(') && titleMatch(info.title, b.title) && (!b.author || !info.author || authorMatch(b.author,[info.author]));
-      if(tOk){ (partial(b)?maybe:inLib).set(b.id,b); continue; }
-      if(partial(b) && last && normKey((b.title||'')+' '+(b.author||'')).split(' ').includes(last)) maybe.set(b.id,b);   // e.g. "(Hermann Hesse — title not visible)"
-    }
-  }
-  // unreadable books on the very shelf being scanned could be this one too
-  if(here.room && here.bookcase && here.shelf){
-    const same=L0.filter(b=>isUnid(b) && !maybe.has(b.id) && b.room===here.room && b.bookcase===here.bookcase && String(b.shelf)===here.shelf).sort(posCmp);
-    same.slice(0,8).forEach(b=>maybe.set(b.id,b));
-  }
-  const inL=[...inLib.values()], mb=[...maybe.values()].slice(0,10);
+  const here = chk ? {} : loc();
+  const { inL, mb } = libMatches(have, info, chk, here);
   const status = inL.length ? 'have' : mb.length ? 'partial' : 'new';
   const badge = chk
     ? { have:['sc-st have','✓ Yes — you own this'+(inL.length>1?' ('+inL.length+' copies)':'')], partial:['sc-st partial','◐ Maybe — could be one of your partly identified books'], new:['sc-st new','✗ Not in the library'] }[status]
@@ -239,7 +393,7 @@ function scanCard(i){
   return '<div class="sc-card">'+(i.coverUrl?'<img src="'+esc(i.coverUrl)+'" alt="">':'<div class="sc-nocov">No cover</div>')+'<div><b>'+esc(i.title)+'</b><br>'+esc(i.author||'Unknown author')+(i.year?' · '+esc(i.year):'')+(i.publisher?'<br><span class="note" style="margin:0">'+esc(i.publisher)+'</span>':'')+'<br><span class="note" style="margin:0">ISBN '+esc(i.isbn)+'</span></div></div>';
 }
 $('sc-close').onclick=closeScanner;
-$('btn-scan').onclick=()=>openScanner({kind:'add'});
+$('btn-scan').onclick=()=>openScanner();
 // in the book form: scan to fill the blanks of this book
 $('btn-form-scan').onclick=()=>openScanner({kind:'fill', onFound:info=>{
   ['title','author','isbn','year','publisher','pages','subjects','about'].forEach(k=>{ const el=$('e-'+k); if(el && info[k] && (!el.value.trim() || (k==='title' && el.value.trim().startsWith('(')))) el.value=info[k]; });

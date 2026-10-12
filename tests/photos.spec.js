@@ -25,8 +25,23 @@ test('without Dropbox the app asks you to connect first', async ({ page }) => {
 test('the scanner can send a shelf photo too', async ({ page }) => {
   const net = await mockNet(page); await openApp(page, { dropbox: true });
   await click(page, '#btn-scan'); await page.waitForSelector('#scan-bg.open');
+  await click(page, '#sc-modes [data-k="add"]');
   await page.fill('#sc-room', 'Den'); await page.fill('#sc-case', 'Oak bookcase'); await page.fill('#sc-shelf', '3');
   await page.setInputFiles('#sc-file', 'tests/fixtures/shelf.jpg');
   await expect(page.locator('#sc-phstatus')).toContainText('Shelf photo sent', { timeout: 10000 });
   expect(net.uploads.map(u => u.path).find(p => p.includes('/photos/inbox/'))).toMatch(/Den Oak-bookcase shelf-3 shelf\.jpg$/);
+});
+
+test('"Scan a stack" can send one photo of new books with no shelf', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await click(page, '#btn-scan'); await page.waitForSelector('#scan-bg.open');
+  await click(page, '#sc-modes [data-k="many"]');
+  await page.fill('#sc-room', ''); await page.fill('#sc-case', ''); await page.fill('#sc-shelf', '');
+  await expect(page.locator('#sc-shelfphoto')).toContainText('whole stack');
+  await page.setInputFiles('#sc-file', 'tests/fixtures/shelf.jpg');
+  await expect(page.locator('#sc-phstatus')).toContainText('Stack photo sent', { timeout: 10000 });
+  await expect(page.locator('#sc-phstatus')).toContainText('no shelf yet');
+  const paths = net.uploads.map(u => u.path).filter(p => p.includes('/photos/inbox/'));
+  expect(paths.find(p => p.endsWith('.jpg'))).toMatch(/no-room no-bookcase new-books New-books-not-shelved-yet/);
+  expect(paths.some(p => p.endsWith('NOTE.txt'))).toBe(true);
 });

@@ -451,6 +451,18 @@ nav button:nth-child(3).active{ background:var(--page) !important; color:var(--n
 .sc-m{ display:flex; gap:8px; align-items:center; justify-content:space-between; padding:7px 0; border-top:1px solid var(--line); font-size:.84rem; }
 .sc-mb{ display:flex; gap:6px; flex:none; }
 .sc-mb button{ min-height:32px; padding:5px 10px; font-size:.76rem; }
+.sc-frame.hit{ animation:sc-hit .45s ease-out; }
+.sc-frame.dup{ animation:sc-dup .45s ease-out; }
+@keyframes sc-hit{ 0%{ border-color:#3ddc97; box-shadow:0 0 0 999px rgba(20,140,90,.35); } 100%{} }
+@keyframes sc-dup{ 0%{ border-color:#f0b43c; box-shadow:0 0 0 999px rgba(160,110,0,.3); } 100%{} }
+.sc-batch{ margin-top:8px; }
+.sc-bh{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:.88rem; }
+.sc-bh button{ min-height:34px; padding:6px 16px; }
+.sc-blist{ max-height:38vh; overflow-y:auto; margin-top:4px; }
+.sc-b-look .note{ color:var(--steel); }
+.sc-b-ok > div > .note:first-of-type{ color:#07785a; }
+.sc-b-have > div > .note:first-of-type{ color:#8a5a00; }
+.sc-b-undone{ opacity:.5; }
 .sc-ok{ background:#e3f6ef; color:#07785a; border-radius:8px; padding:10px; margin-top:10px; }
 .wk-modal{ max-width:560px; }
 .wk-head{ display:flex; align-items:baseline; gap:10px; }
