@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.1 — 2026-10-12 · Safer offline copy
+
+**Fixes**
+- **Previous save:** the device keeps the save before the last one in case the main copy is damaged, but the first save of each visit kept none, so a copy damaged after one change opened with no books (until Dropbox filled it back in). The copy on the device is now kept as the previous save on the first save too. This is what failed the automated tests on GitHub.
+
 ## 2.2 — 2026-10-11 · Recently added
 
 **New**

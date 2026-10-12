@@ -103,7 +103,12 @@ function writeLocal(){ clearTimeout(_saveT); _saveT=setTimeout(saveLocalNow, 400
 async function saveLocalNow(){
   const json=JSON.stringify(store);
   try{
-    if(_lastSaved) await idbPut(PREV_KEY, _lastSaved);
+    // the copy being replaced becomes the previous save; on the first save of a visit that is the copy on the device
+    // (before, the first save of every visit kept no previous save, so a damaged copy then opened empty)
+    let prev=_lastSaved;
+    if(!prev){ try{ const cur=await idbGet(STORE_KEY); if(cur && validStore(JSON.parse(cur))) prev=cur; }catch(e){} }
+    if(!prev){ const ls=lsGet(STORE_KEY); try{ if(ls && validStore(JSON.parse(ls))) prev=ls; }catch(e){} }
+    if(prev && prev!==json) await idbPut(PREV_KEY, prev);
     await idbPut(STORE_KEY, json);
     _lastSaved=json;
     try{ localStorage.removeItem(STORE_KEY); localStorage.removeItem(PREV_KEY); }catch(e){}   // free the old, cramped spot
