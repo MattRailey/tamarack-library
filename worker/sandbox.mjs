@@ -44,6 +44,13 @@ globalThis.fetch = async (url, opt = {}) => {
   if (!url.includes('dropboxapi.com/')) return realFetch(url, opt);
   if (dropboxDown) return new Response('{"error":"sandbox: Dropbox is down"}', { status: 503 });
   if (url.includes('/oauth2/token')) return new Response(JSON.stringify({ access_token: 'sandbox', expires_in: 14400 }));
+  if (url.includes('/files/move_v2')) {
+    const { from_path, to_path } = JSON.parse(opt.body);
+    if (!fs.existsSync(onDisk(from_path))) return new Response('{}', { status: 409 });
+    fs.mkdirSync(path.dirname(onDisk(to_path)), { recursive: true }); fs.renameSync(onDisk(from_path), onDisk(to_path));
+    log('Dropbox  moved  ' + from_path + ' -> ' + to_path);
+    return new Response(JSON.stringify({ metadata: { path_display: to_path } }));
+  }
   const arg = JSON.parse(opt.headers['Dropbox-API-Arg']);
   const file = onDisk(arg.path);
   const cur = fs.existsSync(file) ? fs.readFileSync(file) : null;

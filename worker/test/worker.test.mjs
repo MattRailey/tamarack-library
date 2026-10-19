@@ -21,6 +21,12 @@ function fakeDropbox() {
   globalThis.fetch = async (url, opt) => {
     calls.push(url);
     if (url.includes('oauth2/token')) return new Response(JSON.stringify({ access_token: 'acc', expires_in: 14400 }));
+    if (url.includes('/files/move_v2')) {
+      const { from_path, to_path } = JSON.parse(opt.body); const from = from_path.toLowerCase() + '/';
+      const keys = [...files.keys()].filter(k => k.startsWith(from)); if (!keys.length) return new Response('{}', { status: 409 });
+      for (const k of keys) { files.set(to_path.toLowerCase() + '/' + k.slice(from.length), files.get(k)); files.delete(k); }
+      return new Response(JSON.stringify({ metadata: { path_display: to_path } }));
+    }
     const arg = JSON.parse(opt.headers['Dropbox-API-Arg']);
     if (url.includes('/files/download')) {
       const f = files.get(arg.path.toLowerCase());
@@ -315,4 +321,36 @@ test('an older 8-letter code still works', async () => {
   await env.LIBS.put('code:ABCDEFGH', JSON.stringify({ lib: 'Old Library', title: 'Old', uses: 1, exp: Date.now() + 864e5 }));
   const r = await joinLib(call, 'abcd-efgh');
   assert.equal(r.status, 200); assert.equal(r.j.lib, 'Old Library');
+});
+
+test('Edit name: new title in the list, open codes and the catalog the phones read', async () => {
+  const { call, dbx } = setup();
+  const s = await friend(call);
+  await call('/files/upload', { token: s.token, headers: { 'X-Path': encodeURIComponent('/Smith Library/tamarack-library.json'), 'X-Mode': 'add' }, body: catalog([{ id: 'a', title: 'A' }]) });
+  const r = await call('/admin/rename', { admin: ADMIN, body: { lib: 'Smith Library', title: 'Smith Family Books' } });
+  assert.equal(r.status, 200);
+  const cat = JSON.parse(dbx.files.get('/smith library/tamarack-library.json').body.toString());
+  assert.equal(cat.settings.library.title, 'Smith Family Books'); assert.equal(cat.books.length, 1);
+  const list = await (await call('/admin/list', { admin: ADMIN })).json();
+  assert.equal(list.libs.find(l => l.lib === 'Smith Library').title, 'Smith Family Books');
+  assert.equal((await call('/admin/rename', { admin: ADMIN, body: { lib: 'Nobody', title: 'x' } })).status, 404);
+  assert.equal((await call('/admin/rename', { body: { lib: 'Smith Library', title: 'x' } })).status, 401);
+});
+
+test('Remove library: phones off, codes gone, out of the list, folder moved to _removed (not deleted)', async () => {
+  const { call, dbx } = setup();
+  const s = await friend(call);
+  const keep = await friend(call, 'Jones Library');
+  await upAs(call, s)('/Smith Library/photos/inbox/a 01.jpg');
+  await call('/files/upload', { token: s.token, headers: { 'X-Path': encodeURIComponent('/Smith Library/tamarack-library.json'), 'X-Mode': 'add' }, body: catalog([{ id: 'a', title: 'A' }]) });
+  await adminInvite(call, 'Smith Library');
+  const r = await (await call('/admin/remove', { admin: ADMIN, body: { lib: 'Smith Library' } })).json();
+  assert.equal(r.phones, 1); assert.ok(r.codes >= 1); assert.match(r.movedTo, /^\/_removed\/Smith Library \d{4}-\d\d-\d\d$/);
+  assert.equal((await call('/whoami', { token: s.token })).status, 401);
+  assert.equal((await call('/whoami', { token: keep.token })).status, 200);
+  const list = await (await call('/admin/list', { admin: ADMIN })).json();
+  assert.equal(list.libs.some(l => l.lib === 'Smith Library'), false);
+  assert.equal([...dbx.files.keys()].some(k => k.startsWith('/smith library/')), false);
+  assert.ok([...dbx.files.keys()].some(k => k.startsWith('/_removed/smith library ') && k.endsWith('/tamarack-library.json')));
+  assert.equal((await call('/admin/remove', { admin: ADMIN, body: { lib: 'Smith Library' } })).status, 404);
 });

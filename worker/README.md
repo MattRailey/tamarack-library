@@ -86,6 +86,8 @@ node admin.mjs invite "Smith Library" "The Smith Library"
 - It works for two phones (a couple) for 30 days.
 - More phones can join later from the app: **Data & Sync → Add another phone** makes a one-time link.
 
+In the app's box each library also has **Edit name** (the name the phones show; the folder keeps its name) and **Remove library** (switches off its phones, cancels its codes, and moves its folder to `Apps\Tamarack Friends\_removed\<Library> <date>`: nothing is deleted, so moving the folder back undoes it, and deleting it in Dropbox removes it for good).
+
 Other commands:
 - `node admin.mjs list`: every library, its phones, and open codes.
 - `node admin.mjs revoke <phone id>`: switch off one lost or replaced phone. The library keeps working on the others.

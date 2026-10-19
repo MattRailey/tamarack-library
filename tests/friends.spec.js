@@ -17,6 +17,13 @@ async function startService() {
   // Dropbox as the service sees it
   globalThis.fetch = async (url, opt) => {
     if (url.includes('oauth2/token')) return new Response(JSON.stringify({ access_token: 'acc', expires_in: 14400 }));
+    if (url.includes('ntfy.sh')) return new Response('ok');
+    if (url.includes('/files/move_v2')) {
+      const { from_path, to_path } = JSON.parse(opt.body); const keys = [...files.keys()].filter(k => k.startsWith(from_path + '/'));
+      if (!keys.length) return new Response('{}', { status: 409 });
+      for (const k of keys) { files.set(to_path + k.slice(from_path.length), files.get(k)); files.delete(k); }
+      return new Response(JSON.stringify({ metadata: { path_display: to_path } }));
+    }
     const arg = JSON.parse(opt.headers['Dropbox-API-Arg']);
     const cur = files.get(arg.path);
     if (url.includes('/files/download')) return cur ? new Response(cur.body, { headers: { 'Dropbox-API-Result': JSON.stringify({ rev: cur.rev }) } }) : new Response('{}', { status: 409 });
@@ -254,4 +261,30 @@ test('when the service is down, the phone says so in plain words', async ({ page
   await expect(page.locator('#sync-text')).toContainText('paused', { timeout: 10000 });
   await expect(page.locator('#sync-text')).not.toContainText('HTTP');
   svc.env.PAUSED = '0';
+});
+
+test('Invite a friend: Edit name changes what the phones show; Remove library switches it off and moves its folder', async ({ page }) => {
+  const svc = await startService(); await connect(page, svc);
+  const answers = [];
+  page.on('dialog', d => d.type() === 'prompt' ? d.accept(answers.shift()) : d.accept());
+  await openApp(page, { dropbox: true, extra: { tamarack_library_friend_server: SERVER } });
+  // a friend's library with a catalog
+  const inv = await svc.invite('Gray Library', 'Gray Library');
+  const joined = await (await svc.worker.fetch(new Request(SERVER + '/join', { method: 'POST', body: JSON.stringify({ code: inv.code, device: 'iPhone' }) }), svc.env, {})).json();
+  await svc.worker.fetch(new Request(SERVER + '/files/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + joined.token, 'X-Path': encodeURIComponent('/Gray Library/tamarack-library.json'), 'X-Mode': 'add' },
+    body: JSON.stringify({ books: [{ id: 'g1', title: 'Gray Book' }] }) }), svc.env, {});
+  await epilogue(page, 'data'); await page.click('#adm-card summary');
+  await page.fill('#adm-secret', ADMIN); await page.click('#adm-login button[type=submit]');
+  const item = page.locator('#adm-list .sr-item', { hasText: 'Gray Library' });
+  await expect(item).toContainText('1 phone');
+  answers.push('The Gray Family Books');
+  await item.locator('.adm-rename').click();
+  await expect(page.locator('#adm-list .sr-item', { hasText: 'The Gray Family Books' })).toBeVisible();
+  expect(svc.catalog('Gray Library').settings.library.title).toBe('The Gray Family Books');
+  await page.locator('#adm-list .sr-item', { hasText: 'The Gray Family Books' }).locator('.adm-remove').click();
+  await expect(page.locator('#adm-list')).not.toContainText('Gray');
+  expect([...svc.files.keys()].some(k => k.startsWith('/_removed/Gray Library '))).toBeTruthy();
+  expect([...svc.files.keys()].some(k => k.startsWith('/Gray Library/'))).toBeFalsy();
+  const who = await svc.worker.fetch(new Request(SERVER + '/whoami', { method: 'POST', headers: { Authorization: 'Bearer ' + joined.token } }), svc.env, {});
+  expect(who.status).toBe(401);
 });

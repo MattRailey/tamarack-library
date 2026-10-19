@@ -76,19 +76,35 @@ async function adminList(){
   const libs=new Map(), add=l=>{ if(!libs.has(l)) libs.set(l,{ phones:[], codes:[] }); return libs.get(l); };
   admData.devices.filter(d=>!d.moved).forEach(d=>add(d.lib).phones.push(d));
   const libInfo=new Map((admData.libs||[]).map(l=>[l.lib,l]));
+  (admData.libs||[]).forEach(l=>add(l.lib));
   admData.codes.forEach(c=>add(c.lib).codes.push(c));
   const day=t=>t?new Date(t).toLocaleDateString(undefined,{ day:'numeric', month:'short', year:'numeric' }):'';
   $('adm-list').innerHTML = libs.size ? [...libs.entries()].sort((a,b)=>natCmp(a[0],b[0])).map(([lib,x])=>
-    '<div class="sr-item"><h4>'+esc(lib)+' <span class="note" style="font-weight:400;">· '+x.phones.length+' phone'+(x.phones.length===1?'':'s')
+    '<div class="sr-item"><h4>'+esc((libInfo.get(lib)||{}).title||lib)+((libInfo.get(lib)||{}).title&&libInfo.get(lib).title!==lib?' <span class="note" style="font-weight:400;">('+esc(lib)+')</span>':'')+' <span class="note" style="font-weight:400;">· '+x.phones.length+' phone'+(x.phones.length===1?'':'s')
       +((libInfo.get(lib)||{}).lastUpload?' · photos last sent '+day(libInfo.get(lib).lastUpload):'')+'</span></h4>'
     +x.phones.map(d=>'<div class="sr-loc adm-row"><span>'+esc(d.name||'Phone')+' <span class="note">joined '+day(d.at)+(d.seen?', last used '+day(d.seen):'')+'</span></span><button class="secondary adm-off" data-id="'+esc(d.id)+'" data-name="'+esc(d.name||'Phone')+'" data-lib="'+esc(lib)+'">Switch off</button></div>').join('')
     +x.codes.map(c=>'<div class="sr-loc adm-row"><span>Open invite <b>'+esc(c.code)+'</b> <span class="note">'+c.uses+' use'+(c.uses===1?'':'s')+' left, until '+day(c.exp)+'</span></span></div>').join('')
     +'<div class="row" style="margin-top:6px;"><button class="secondary adm-more" data-lib="'+esc(lib)+'">Invite another</button>'
-    +(x.phones.length?'<button class="danger adm-all" data-lib="'+esc(lib)+'">Switch off every phone</button>':'')+'</div></div>').join('')
+    +(x.phones.length?'<button class="secondary adm-all" data-lib="'+esc(lib)+'">Switch off every phone</button>':'')
+    +'<button class="secondary adm-rename" data-lib="'+esc(lib)+'" data-title="'+esc((libInfo.get(lib)||{}).title||lib)+'">Edit name</button>'
+    +'<button class="danger adm-remove" data-lib="'+esc(lib)+'">Remove library</button></div></div>').join('')
     : '<p class="note">No friends’ libraries yet.</p>';
 }
 $('adm-list').onclick=async e=>{
   const off=e.target.closest('.adm-off'), all=e.target.closest('.adm-all'), more=e.target.closest('.adm-more');
+  const ren=e.target.closest('.adm-rename'), rem=e.target.closest('.adm-remove');
+  try{
+    if(ren){
+      const t=prompt('New name for '+ren.dataset.lib+' (what the phones show; the folder keeps its name):', ren.dataset.title);
+      if(!t || !t.trim() || t.trim()===ren.dataset.title) return;
+      await adminCall('rename', { lib:ren.dataset.lib, title:t.trim() }); toast('Renamed. Phones show it after their next sync.'); adminList(); return;
+    }
+    if(rem){
+      if(!confirm('Remove '+rem.dataset.lib+'?\n\nEvery phone in it is switched off, its codes stop working, and its folder moves to Apps › Tamarack Friends › _removed (nothing is deleted; move it back to undo).')) return;
+      const j=await adminCall('remove', { lib:rem.dataset.lib });
+      toast(j.removed+' removed: '+j.phones+' phone'+(j.phones===1?'':'s')+' switched off'+(j.movedTo?', folder moved to '+j.movedTo:'')); adminList(); return;
+    }
+  }catch(err){ adminFail(err); return; }
   if(more){ $('adm-lib').value=more.dataset.lib; $('adm-title').value=''; $('adm-lib').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
   try{
     if(off){

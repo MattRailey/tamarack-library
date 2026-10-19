@@ -35,7 +35,9 @@
      /whoami               (device)                    → { lib, name, id }
      /admin/invite         { lib, title, uses, days }  → { code, link }
      /admin/list                                       → { devices, codes, libs }
-     /admin/revoke         { id }                      → { revoked }
+     /admin/revoke         { id } | { lib }            → { revoked, codes }
+     /admin/rename         { lib, title }              → { title }      the name shown (not the folder)
+     /admin/remove         { lib }                     → { removed, phones, codes, movedTo }   folder → _removed/
 */
 
 const CATALOG = 'tamarack-library.json';
@@ -229,7 +231,49 @@ async function admin(p, req, env) {
     if (body.id) await env.LIBS.delete('inv:' + body.id);
     return json({ revoked: n, codes });
   }
+  if (p === '/admin/rename') {
+    const lib = cleanLib(body.lib), title = String(body.title || '').replace(/[\x00-\x1f]/g, ' ').trim().slice(0, 80);
+    if (!lib || !title) throw err(400, 'library and new name needed');
+    const L = await kvGet(env, 'lib:' + lib); if (!L) throw err(404, 'No library named "' + lib + '"');
+    await env.LIBS.put('lib:' + lib, JSON.stringify(Object.assign({}, L, { title })));
+    await eachKey(env, 'code:', async (k, v) => { if (v.lib === lib) await env.LIBS.put(k, JSON.stringify(Object.assign({}, v, { title })), v.exp ? { expiration: Math.floor(v.exp / 1000) } : {}); });
+    // the name the phones show lives in the catalog: change it there (rev-guarded, merged by the phones like any edit)
+    await setCatalogTitle(env, lib, title);
+    return json({ title });
+  }
+  if (p === '/admin/remove') {
+    const lib = cleanLib(body.lib);
+    if (!lib || !(await env.LIBS.get('lib:' + lib))) throw err(404, 'No library named "' + lib + '"');
+    let phones = 0, codes = 0;
+    await eachKey(env, 'dev:', async (k, v) => { if (v.lib === lib) { await env.LIBS.delete(k); await env.LIBS.delete('inv:' + v.id); phones++; } });
+    await eachKey(env, 'code:', async (k, v) => { if (v.lib === lib) { await env.LIBS.delete(k); codes++; } });
+    for (const k of ['lib:', 'snap:', 'note:']) await env.LIBS.delete(k + lib);
+    // never deleted: the folder moves to _removed/ (move it back to undo; delete it in Dropbox to remove it for good)
+    const to = root(env) + '/_removed/' + lib + ' ' + new Date().toISOString().slice(0, 10);
+    const r = await dbx(env, 'https://api.dropboxapi.com/2/files/move_v2', { 'Content-Type': 'application/json' },
+      JSON.stringify({ from_path: root(env) + '/' + lib, to_path: to, autorename: true }));
+    let movedTo = null;
+    if (r.ok) { const j = await r.json().catch(() => ({})); movedTo = ((j.metadata || {}).path_display) || to; }
+    else if (r.status !== 409) throw err(502, 'The phones are switched off, but Dropbox didn’t move the folder (' + r.status + '). Move it by hand.');
+    return json({ removed: lib, phones, codes, movedTo });
+  }
   throw err(404, 'not found');
+}
+async function setCatalogTitle(env, lib, title) {
+  const path = root(env) + '/' + lib + '/' + CATALOG;
+  for (let i = 0; i < 3; i++) {
+    const r = await dbx(env, 'https://content.dropboxapi.com/2/files/download', { 'Dropbox-API-Arg': dbxArg({ path }) });
+    if (!r.ok) return;   // no catalog yet: the first phone's sync uses the new title from the invite
+    let rev = null; try { rev = JSON.parse(r.headers.get('Dropbox-API-Result') || '{}').rev; } catch (e) {}
+    let s; try { s = JSON.parse(await r.text()); } catch (e) { return; }
+    if (!s || !Array.isArray(s.books)) return;
+    const now = Date.now();
+    s.settings = Object.assign({}, s.settings, { library: Object.assign({}, (s.settings || {}).library, { title }), updatedAt: now });
+    s.updatedAt = now;
+    const u = await dbx(env, 'https://content.dropboxapi.com/2/files/upload',
+      { 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': dbxArg({ path, mode: { '.tag': 'update', update: rev }, autorename: false, mute: true }) }, JSON.stringify(s, null, 2));
+    if (u.ok || u.status !== 409) return;   // 409: a phone saved in between; read it again
+  }
 }
 
 /* ---------------- files ---------------- */
