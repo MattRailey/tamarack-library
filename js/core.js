@@ -43,8 +43,9 @@ const DBX_APPKEY_KEY  = 'tamarack_library_dropbox_appkey'+LIB_NS;
 const DBX_TOKENS_KEY  = 'tamarack_library_dropbox_tokens'+LIB_NS;    // this library's own Dropbox login
 const DBX_VERIFIER_KEY= 'tamarack_library_dropbox_pkce'+LIB_NS;
 // Friends' libraries live in Matt's Dropbox behind a small service (worker/): this phone holds a device key for one library.
-const DEFAULT_FRIEND_SERVER = '';   // the service's address once deployed, e.g. https://tamarack-friends.<you>.workers.dev
-function friendServer(){ return (DEFAULT_FRIEND_SERVER || lsGet('tamarack_library_friend_server') || '').trim(); }   // the second is for testing only
+const DEFAULT_FRIEND_SERVER = 'https://tamarack-friends.railey.workers.dev';   // the friends service (worker/), deployed 2026-10-19
+// On this computer only (tests, sandbox) a stored address wins, so tests never reach the real service.
+function friendServer(){ const local=/^(localhost|127\.0\.0\.1)$/.test(location.hostname); return ((local && lsGet('tamarack_library_friend_server')) || DEFAULT_FRIEND_SERVER || '').trim(); }
 const FRIEND_KEY      = 'tamarack_library_friend'+LIB_NS;              // { server, token, lib, device }
 function dbxFolder(){ let f=String(lsGet(FOLDER_KEY)||'/Railey Library').trim().replace(/\\/g,'/').replace(/\/+$/,''); if(!f.startsWith('/')) f='/'+f; return f||'/Railey Library'; }
 function dbxArg(o){ return JSON.stringify(o).replace(/[\u007f-\uffff]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)); }

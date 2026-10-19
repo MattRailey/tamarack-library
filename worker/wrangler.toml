@@ -1,13 +1,15 @@
 # Tamarack Library friends service — Cloudflare Worker settings. Setup steps: worker/README.md
 name = "tamarack-friends"
 main = "src/index.js"
+# only the one address below; no extra preview addresses per upload
+preview_urls = false
 compatibility_date = "2026-06-01"
 
 # Invite codes and device keys. Create once with: npx wrangler kv namespace create LIBS
 # then paste the id it prints here.
 [[kv_namespaces]]
 binding = "LIBS"
-id = "PASTE_KV_NAMESPACE_ID_HERE"
+id = "0d94ae6472c1459c811f27ea94fc0382"
 
 [vars]
 ALLOWED_ORIGINS = "https://mattrailey.github.io"
