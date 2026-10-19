@@ -91,6 +91,12 @@ Their photos land in `Dropbox/Apps/Tamarack Friends/<Library>/photos/inbox/`. Li
 - **Upload size limits:** one photo up to 15 MB, a catalog up to 25 MB.
 - **Dropbox:** everything counts against your Dropbox storage. Catalogs are small, and shelf photos are deleted after reading. Cover photos taken in the app add up slowly.
 
+## Known limits (fine for a few friends)
+
+- **Switching off a phone takes about a minute** to reach everywhere, because Cloudflare's storage is shared out with a short delay. Switching it off also cancels any invite links that phone made.
+- **A one-time link opened on two phones at the very same moment** could let both in. If that happens, use `list` and `revoke` the extra phone.
+- **Upload cap:** a library can send about 600 photos or covers a day, so a lost or misused phone can't fill your Dropbox. A whole shed is about 200 photos.
+
 ## Tests
 
 ```

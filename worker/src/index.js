@@ -59,7 +59,12 @@ async function route(req, env) {
   if (p.startsWith('/admin/')) { await adminAuth(req, env); return admin(p, req, env); }
   const dev = await deviceAuth(req, env);
   if (p === '/whoami') return json({ lib: dev.lib, name: dev.name, id: dev.id });
-  if (p === '/invite') return invite(env, dev.lib, (await libTitle(env, dev.lib)), 1, 14, dev.id);
+  if (p === '/invite') {   // one open "add another phone" code per phone: a new one replaces the last
+    const prev = await env.LIBS.get('inv:' + dev.id); if (prev) await env.LIBS.delete('code:' + prev);
+    const res = await invite(env, dev.lib, (await libTitle(env, dev.lib)), 1, 14, dev.id);
+    const j = await res.clone().json(); await env.LIBS.put('inv:' + dev.id, j.code.replace('-', ''), { expirationTtl: 14 * 86400 });
+    return res;
+  }
   if (p === '/files/download') return download(req, env, dev);
   if (p === '/files/upload') return upload(req, env, dev);
   throw err(404, 'not found');
@@ -71,7 +76,7 @@ async function join(req, env) {
   const code = normCode(body.code);
   if (!code) throw err(400, 'Type the invite code');
   const rec = await kvGet(env, 'code:' + code);
-  if (!rec) throw err(404, 'That code didn’t work. Check it, or ask for a new one.');
+  if (!rec || (rec.exp && rec.exp < Date.now())) throw err(404, 'That code didn’t work. Check it, or ask for a new one.');
   const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const id = 'd' + b64url(crypto.getRandomValues(new Uint8Array(6)));
   const name = String(body.device || 'Phone').slice(0, 60);
@@ -108,6 +113,10 @@ async function admin(p, req, env) {
     const lib = cleanLib(body.lib);
     if (!lib) throw err(400, 'lib name needed, e.g. "Smith Library"');
     const title = String(body.title || lib).slice(0, 80);
+    // Dropbox folder names ignore case: "smith library" and "Smith Library" would be the same folder
+    const fold = x => x.normalize('NFC').toLowerCase();
+    const same = (await env.LIBS.list({ prefix: 'lib:' })).keys.map(k => k.name.slice(4)).find(n => n !== lib && fold(n) === fold(lib));
+    if (same) throw err(409, 'A library named "' + same + '" already exists — use exactly that name');
     if (!(await env.LIBS.get('lib:' + lib))) await env.LIBS.put('lib:' + lib, JSON.stringify({ title, at: Date.now() }));
     return invite(env, lib, title, Math.max(1, Math.min(10, +body.uses || 2)), Math.max(1, Math.min(90, +body.days || 30)), 'admin');
   }
@@ -133,7 +142,15 @@ async function admin(p, req, env) {
       for (const k of r.keys) { const v = await kvGet(env, k.name); if (v && (v.id === body.id || (body.lib && v.lib === body.lib))) { await env.LIBS.delete(k.name); n++; } }
       cursor = r.list_complete ? null : r.cursor;
     } while (cursor);
-    return json({ revoked: n });
+    // and any invite codes that phone (or that library) handed out, so a lost phone can't let itself back in
+    let codes = 0; cursor = undefined;
+    do {
+      const r = await env.LIBS.list({ prefix: 'code:', cursor });
+      for (const k of r.keys) { const v = await kvGet(env, k.name); if (v && ((body.id && v.by === body.id) || (body.lib && v.lib === body.lib))) { await env.LIBS.delete(k.name); codes++; } }
+      cursor = r.list_complete ? null : r.cursor;
+    } while (cursor);
+    if (body.id) await env.LIBS.delete('inv:' + body.id);
+    return json({ revoked: n, codes });
   }
   throw err(404, 'not found');
 }
@@ -146,7 +163,8 @@ function checkPath(env, raw, dev, dirs, allowCatalog) {
   const pre = '/' + dev.lib + '/';
   if (!path.startsWith(pre)) throw err(403, 'not your library');
   const rest = path.slice(pre.length);
-  if (!rest || rest.length > 200 || /(^|\/)\.\.?(\/|$)/.test(rest) || /[\x00-\x1f\\]/.test(rest)) throw err(400, 'bad path');
+  // plain printable ASCII only, and no name part that is "." / ".." or ends in a dot or space (Windows/Dropbox trim those)
+  if (!rest || rest.length > 200 || !/^[\x20-\x7e]+$/.test(rest) || /\\/.test(rest) || rest.split('/').some(seg => !seg || /[. ]$/.test(seg))) throw err(400, 'bad path');
   const ok = (allowCatalog && rest === CATALOG) || dirs.some(d => rest.startsWith(d) && rest.length > d.length && !rest.slice(d.length).includes('/'));
   if (!ok) throw err(403, 'that file is off-limits');
   return { path, real: root(env) + path, rest };
@@ -164,10 +182,11 @@ async function download(req, env, dev) {
 async function upload(req, env, dev) {
   const { real, rest } = checkPath(env, req.headers.get('X-Path'), dev, UPLOAD_DIRS, true);
   const isCatalog = rest === CATALOG;
-  const len = +(req.headers.get('Content-Length') || 0);
+  const limit = isCatalog ? MAX_CATALOG : MAX_PHOTO;
+  if (+(req.headers.get('Content-Length') || 0) > limit) throw err(413, 'file too large');   // refuse before reading it
+  if (!isCatalog && !allowUpload(dev.lib)) throw err(429, 'Too many photos today — try again tomorrow, or ask Matt');
   const body = await req.arrayBuffer();
-  const size = body.byteLength || len;
-  if (size > (isCatalog ? MAX_CATALOG : MAX_PHOTO)) throw err(413, 'file too large');
+  if (body.byteLength > limit) throw err(413, 'file too large');
   if (isCatalog) {
     try { const s = JSON.parse(new TextDecoder().decode(body)); if (!s || !Array.isArray(s.books)) throw 0; }
     catch (e) { throw err(400, 'not a library file'); }
@@ -184,6 +203,17 @@ async function upload(req, env, dev) {
   const shown = String(j.path_display || real);
   const rt = root(env);
   return json({ path: rt && shown.toLowerCase().startsWith(rt.toLowerCase() + '/') ? shown.slice(rt.length) : shown, rev: j.rev || null });
+}
+
+// A brake on a lost or misused phone filling Matt's Dropbox: photos/covers per library per day, counted in memory
+// (per Worker instance — rough, but free; a whole shed is ~200 photos). Switching the phone off is the real remedy.
+const DAILY_FILES = 600;
+const _count = new Map();
+function allowUpload(lib) {
+  const day = new Date().toISOString().slice(0, 10), k = day + '|' + lib;
+  if (_count.size > 500) for (const key of _count.keys()) if (!key.startsWith(day)) _count.delete(key);
+  const n = (_count.get(k) || 0) + 1; _count.set(k, n);
+  return n <= DAILY_FILES;
 }
 
 /* ---------------- Dropbox sign-in (Matt's, kept here only) ---------------- */
@@ -227,4 +257,4 @@ function fmtCode(c) { return c.slice(0, 4) + '-' + c.slice(4); }
 function cleanLib(s) { const v = String(s || '').replace(/[\\/\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return v && v !== '.' && v !== '..' ? v : ''; }
 function dbxArg(o) { return JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4)); }
 
-export const _test = { checkPath, normCode, cleanLib, resetToken: () => { _tok = null; } };
+export const _test = { checkPath, normCode, cleanLib, resetToken: () => { _tok = null; _count.clear(); } };

@@ -162,3 +162,29 @@ test('library names cannot climb out of their folder', () => {
   assert.equal(_test.cleanLib('..'), '');
   assert.equal(_test.cleanLib('  Smith   Library '), 'Smith Library');
 });
+
+test('switching off a phone also cancels the invite links it made; one open link per phone', async () => {
+  const { call } = setup();
+  const a = (await joinLib(call, (await adminInvite(call, 'Smith Library')).code)).j;
+  const first = await (await call('/invite', { token: a.token })).json();
+  const second = await (await call('/invite', { token: a.token })).json();
+  assert.equal((await joinLib(call, first.code)).status, 404);          // replaced by the second
+  await call('/admin/revoke', { admin: ADMIN, body: { id: a.device } });
+  assert.equal((await joinLib(call, second.code)).status, 404);         // cancelled with the phone
+});
+
+test('names Dropbox would treat as the same, and odd file names, are refused', async () => {
+  const { call } = setup();
+  await adminInvite(call, 'Smith Library');
+  assert.equal((await call('/admin/invite', { admin: ADMIN, body: { lib: 'smith library' } })).status, 409);
+  const s = (await joinLib(call, (await adminInvite(call, 'Smith Library')).code)).j;
+  for (const p of ['/Smith Library/covers/x.jpg ', '/Smith Library/covers/x.', '/Smith Library/covers//x.jpg', '/Smith Library/covers/x／..', '/Smith Library/covers/ü.jpg'])
+    assert.equal((await call('/files/upload', { token: s.token, headers: { 'X-Path': encodeURIComponent(p), 'X-Mode': 'add' }, body: new Uint8Array([1]) })).status, 400, p);
+});
+
+test('oversized uploads are refused before being read', async () => {
+  const { call } = setup();
+  const s = (await joinLib(call, (await adminInvite(call, 'Smith Library')).code)).j;
+  const r = await call('/files/upload', { token: s.token, headers: { 'X-Path': encodeURIComponent('/Smith Library/covers/x.jpg'), 'X-Mode': 'add', 'Content-Length': String(16 * 1024 * 1024) }, body: new Uint8Array([1]) });
+  assert.equal(r.status, 413);
+});
