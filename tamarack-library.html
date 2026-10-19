@@ -50,7 +50,7 @@
       <span class="sync-dot" id="sync-dot"></span>
     </button>
     <div class="menu-pop" id="menu-pop">
-      <button data-go="import"><b>Import &amp; Export</b><span>Photos, mystery books, duplicates, series, recheck</span></button>
+      <button data-go="import"><b>Import &amp; Export</b><span>Photos, mystery books, duplicates, split series, loans, recheck</span></button>
       <button data-go="data"><b>Data &amp; Sync</b><span id="sync-text">Local only</span></button>
       <button data-go="help"><b>How it works</b><span>A short guide to the library</span></button>
       <div class="menu-foot" id="lookup-hdr"></div>
@@ -135,6 +135,7 @@
         </div>
       </div>
 
+      <div class="filter-bar hide" id="filter-bar" role="status"></div>
       <div class="coll-bar hide" id="coll-bar"></div>
       <div class="card batchbar hide" id="batchbar">
         <div class="row">
@@ -171,7 +172,7 @@
       <div class="appx-tabs"><button type="button" data-go="import" class="on"><small>Appendix A</small>Import &amp; Export</button><button type="button" data-go="data"><small>Appendix B</small>Data &amp; Sync</button><button type="button" data-go="help"><small>Appendix C</small>How it works</button></div>
       <h2>Import &amp; Export</h2>
       <p class="sub">Build the library from shelf photos, then tidy it: books that couldn’t be read, extra copies, series spread around the house, and shelves that have moved.</p>
-      <div class="seg ie-tabs" id="ie-seg"><button data-ie="import" class="active">From photos</button><button data-ie="unid">Unidentified</button><button data-ie="dups">Duplicates</button><button data-ie="series">Series</button><button data-ie="recheck">Recheck shelves</button></div>
+      <div class="seg ie-tabs" id="ie-seg"><button data-ie="import" class="active">From photos</button><button data-ie="unid">Unidentified</button><button data-ie="dups">Duplicates</button><button data-ie="series">Split series</button><button data-ie="loans">Loaned</button><button data-ie="recheck">Recheck shelves</button></div>
       <div id="ie-unid" class="hide">
         <div class="card">
           <div class="row" style="justify-content:space-between;align-items:flex-start;">
@@ -205,6 +206,15 @@
           </div>
         </div>
         <div id="sr-list"></div>
+      </div>
+      <div id="ie-loans" class="hide">
+        <div class="card">
+          <h3 style="margin-bottom:2px;">Loaned books</h3>
+          <p class="note" style="margin-top:0;" id="ln-summary"></p>
+          <div class="search-wrap"><input type="search" id="ln-q" placeholder="Search by book, author or who has it…" autocomplete="off"></div>
+          <p class="note">Longest out first. Tap a book to open it; to mark it back, clear <b>Loaned to</b> in Edit details.</p>
+        </div>
+        <div id="ln-list"></div>
       </div>
       <div id="ie-recheck" class="hide">
         <div class="card photo-start">
@@ -321,7 +331,8 @@
         <h3>Tidying up</h3>
         <ul>
           <li><b>Duplicates</b> lists books you have more than one copy of, and where each copy is.</li>
-          <li><b>Series</b> lists sets and series spread over more than one place, with where every book is.</li>
+          <li><b>Split series</b> lists sets and series spread over more than one place, with where every book is.</li>
+          <li><b>Loaned</b> lists every book that’s out, who has it and since when. Search it by book or by name.</li>
           <li><b>Recheck shelves</b>: when books have moved around, photograph a bookcase again. Claude moves each book to its new spot and never adds a second copy.</li>
         </ul>
         <h3>Phones, computers and no signal</h3>
@@ -367,9 +378,9 @@
       <details class="card adm-card hide" id="adm-card">
         <summary><h3>Invite a friend</h3><span class="note">Friends’ libraries in your Dropbox: make invites, see their phones, switch one off.</span></summary>
         <form id="adm-login" autocomplete="on" style="margin-top:10px;">
-          <p class="note" style="margin-top:0;">Paste the <b>admin secret</b> once on this device (from your password manager). It stays in this browser only, and can make invites and switch phones off, but can’t read anyone’s books.</p>
+          <p class="note" style="margin-top:0;">Type the <b>password</b> once on this device (Dashlane can fill it). It stays in this browser only, and can make invites and switch phones off, but can’t read anyone’s books.</p>
           <input type="text" name="username" value="admin" autocomplete="username" class="hide" readonly>
-          <label for="adm-secret">Admin secret</label>
+          <label for="adm-secret">Password</label>
           <input type="password" id="adm-secret" name="password" autocomplete="current-password" spellcheck="false">
           <div class="row" style="margin-top:8px;"><button type="submit">Save on this device</button></div>
         </form>
@@ -382,7 +393,7 @@
           <div id="adm-invite-out" style="margin-top:8px;"></div>
           <h4 style="margin:16px 0 6px;">Libraries and phones</h4>
           <div id="adm-list"></div>
-          <div class="row" style="margin-top:10px;"><button class="secondary" id="adm-refresh">Refresh</button><button class="secondary" id="adm-forget">Forget admin secret on this device</button></div>
+          <div class="row" style="margin-top:10px;"><button class="secondary" id="adm-refresh">Refresh</button><button class="secondary" id="adm-forget">Forget password on this device</button></div>
         </div>
         <p class="note" id="adm-msg"></p>
       </details>

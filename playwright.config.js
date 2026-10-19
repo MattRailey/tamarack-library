@@ -4,6 +4,7 @@ const { defineConfig } = require('@playwright/test');
 const dir = process.env.APP_DIR || '.';
 module.exports = defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.js',   // tests/*.test.mjs run with node --test
   timeout: 45_000,
   fullyParallel: true,
   workers: process.env.CI ? 2 : 4,

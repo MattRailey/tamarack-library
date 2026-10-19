@@ -66,7 +66,7 @@ Each person still signs in to their own Dropbox. The app key only lets the app i
 
 The app sends shelf photos to `photos/inbox/` in the library's Dropbox folder. Title-page photos from the mystery-book walk-through go to `photos/identify/`. File names say where each photo was taken.
 
-With that folder linked, ask Claude to *"check the photo inbox."* Claude then:
+With that folder open in a Claude session, ask Claude to *"check the photo inbox"* (for a friend: *"check the photo inbox for the Smith Library"*). Claude reads the photos into a short list and runs `tools/photo-merge.mjs`, which:
 - reads the photos;
 - adds or corrects the books in `tamarack-library.json`;
 - logs the changes in `imports/`;

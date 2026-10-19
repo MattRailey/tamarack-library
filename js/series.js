@@ -90,3 +90,24 @@ function renderDups(){
 $('dp-list').onclick=null;
 $('sr-byshelf').onchange = renderSplitSeries;
 $('sr-room').onchange = renderSplitSeries;
+
+/* ============================================================
+   Loaned books (Epilogue tab): who has what, since when; searchable
+   ============================================================ */
+function loanDays(b){ const t=Date.parse(b.loanedDate||''); return isNaN(t) ? null : Math.max(0, Math.floor((Date.now()-t)/864e5)); }
+function renderLoans(){
+  const all=live().filter(b=>String(b.loanedTo||'').trim());
+  const q=norm($('ln-q').value).trim().split(/\s+/).filter(Boolean);
+  const L=all.filter(b=>{ const hay=norm([b.title, b.author, b.loanedTo].join(' ')); return q.every(w=>hay.includes(w)); })
+    .sort((a,b)=>(Date.parse(a.loanedDate||'')||Infinity)-(Date.parse(b.loanedDate||'')||Infinity) || natCmp(a.loanedTo,b.loanedTo));
+  const people=new Set(all.map(b=>normKey(b.loanedTo)));
+  $('ln-summary').textContent = all.length ? all.length+' book'+(all.length===1?'':'s')+' out with '+people.size+' '+(people.size===1?'person':'people')+'.' : '';
+  const day=b=>{ const t=Date.parse(b.loanedDate||''); if(isNaN(t)) return 'date not noted'; const d=loanDays(b);
+    return fmtLocalDate(b.loanedDate)+' · '+(d===0?'today':d===1?'1 day':d<60?d+' days':Math.round(d/30)+' months'); };
+  $('ln-list').innerHTML = !all.length ? '<div class="card empty">No books are loaned out.</div>'
+    : !L.length ? '<div class="card empty">No loaned books match “'+esc($('ln-q').value)+'”.</div>'
+    : L.map(b=>'<div class="sr-item ln-item" data-id="'+b.id+'"><div class="ln-row"><div style="min-width:0;"><b>'+esc(b.title)+'</b>'+(b.author?' <span class="note">· '+esc(b.author)+'</span>':'')
+      +'<div class="note" style="margin:2px 0 0;">Lives at '+esc(locText(b))+'</div></div><div class="ln-who"><b>'+esc(b.loanedTo)+'</b><span class="note">'+esc(day(b))+'</span></div></div></div>').join('');
+  $('ln-list').onclick=e=>{ const el=e.target.closest('.ln-item'); if(el) openBook(el.dataset.id, L.map(b=>b.id)); };
+}
+$('ln-q').addEventListener('input', ()=>{ clearTimeout(renderLoans._t); renderLoans._t=setTimeout(renderLoans, 120); });

@@ -9,6 +9,7 @@ jobs:
         with: { node-version: 20 }
       - run: npm ci
       - run: node --test worker/test/worker.test.mjs
+      - run: node --test tests/photo-merge.test.mjs
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test
       - uses: actions/upload-artifact@v4

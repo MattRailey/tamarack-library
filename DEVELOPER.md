@@ -133,13 +133,19 @@ The app only uploads. Claude does the reading, with the library's Dropbox folder
 
 - **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `recheck`, `new-books`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`. From the shelf camera (`shelfcam.js`) the number is three digits and counts through one bookcase (`001`, `002`…). `NNN redo.jpg` replaces photo `NNN` (a retake that couldn't overwrite it).
 - **Title-page photos** from the walk-through go to `photos/identify/` as `<Room> <Bookcase> shelf-<n> pos-<p> <bookId>.jpg`. That book gets `idPhoto` so the list shows 📷.
-- **After reading**, Claude does four things:
-  - edits the catalog, matching books that have no location to the shelf they were seen on instead of adding duplicates;
-  - clears `idPhoto`;
-  - writes a change log to `imports/`;
-  - deletes the photos.
-
-  It never force-overwrites the JSON. If the app synced in between, Claude reloads the file and applies its changes again.
+- **Reading them: `tools/photo-merge.mjs`**, so every run follows the same rules. With the library's folder on the PC (e.g. `D:\Dropbox\Apps\Tamarack Friends\Smith Library`):
+  1. `node tools/photo-merge.mjs "<folder>"` lists the photos waiting (and any already in the ledger).
+  2. Claude looks at the photos in order and writes a **readings file** in the compact format, one book per line, `title | author | spot from left | high/medium/low [| note]`, under an `@ <photo name> [| shelf=n]` line per photo (or per shelf of a photo). `?` = can't be read. Title-page photos: `@ identify/<name>`, one line, `-` for the spot. The full format is at the top of the script.
+  3. `node tools/photo-merge.mjs "<folder>" readings.txt` is a dry run: what would be added, moved, flagged.
+  4. `… --apply` writes it:
+     - the catalog: each change stamped like an edit in the app (`updatedAt`, `ft`), so a phone's own edits survive the merge;
+     - a log (`imports/<date> photos <batch>.md`) and the readings as JSON beside it;
+     - the ledger `photos/processed.json` (name, batch, checksum): a photo in it is never processed twice (`--force` to redo one);
+     - then it deletes the photos (`--keep-photos` to keep them).
+  - The books it adds share one `importBatch`, so **Undo last import** in the app takes them out again.
+  - Matching: normalized title + author surname (as Duplicates). A book with no place yet is placed; a book already on this bookcase is moved within it; a book on **another** bookcase is added only as a flagged "Possible second copy". Low-confidence readings are flagged "Partly identified" (the walk-through visits them).
+  - It never force-overwrites the JSON: if the catalog changes while it works (a phone synced), it starts again on the new version. A Dropbox "conflicted copy" of the catalog is merged in (as the app merges) and moved to `imports/conflicts/`.
+  - Tests: `node --test tests/photo-merge.test.mjs`.
 
 ### Recheck photos (`kind` = `recheck`)
 
@@ -151,6 +157,8 @@ Sent from **Epilogue → Import & Export → Recheck shelves** when books have d
 4. Not in the catalog at all: add it where it was seen, with `needsReview: true` and a note `Found at recheck YYYY-MM-DD`. A spine that can't be read becomes a mystery book only if no unread mystery book already sits on that shelf at that spot.
 5. In the catalog on this bookcase (or this shelf, if one was given) but not seen in the photos: leave its place, set `needsReview: true` and add to its notes `Not seen at recheck YYYY-MM-DD`. Never delete it.
 6. A book that later turns up in a recheck clears that note and the flag (if nothing else set it).
+
+`tools/photo-merge.mjs` applies these rules; "not seen" covers what the photo name says (the bookcase, or the one shelf typed in the app).
 7. The change log in `imports/` lists moved / added / not seen, with counts.
 
 The Recheck tab lists bookcases by the latest `checkedAt` (or `addedAt`), oldest first, and counts the "not seen" ones.

@@ -61,7 +61,7 @@ You need Node.js on your computer (nodejs.org, the LTS version) and a free Cloud
 
 ## Inviting a friend
 
-**The easy way, in the app** (on your own phone or computer): *Epilogue → Data & Sync → Invite a friend*. Paste the admin secret once per device (Dashlane can save and fill it), type the library's name, tap **Make invite**, then **Share invite**. The same box lists every library's phones, with **Switch off** for a lost one. The box never shows on a friend's phone. *Forget admin secret on this device* removes it.
+**The easy way, in the app** (on your own phone or computer): *Epilogue → Data & Sync → Invite a friend*. Type the password once per device (Dashlane can save and fill it; it's the ADMIN_SECRET you stored), type the library's name, tap **Make invite**, then **Share invite**. The same box lists every library's phones, with **Switch off** for a lost one. The box never shows on a friend's phone. *Forget password on this device* removes it.
 
 **Or from a terminal:**
 

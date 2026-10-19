@@ -12,7 +12,7 @@ async function adminCall(ep, body){
   const r=await fetch(friendServer().replace(/\/+$/,'')+'/admin/'+ep, { method:'POST',
     headers:{ 'Content-Type':'application/json', 'X-Admin':adminSecret() }, body:JSON.stringify(body||{}) });
   const j=await r.json().catch(()=>({}));
-  if(r.status===401) throw Object.assign(new Error('The service didn’t accept the admin secret. Check it, or paste it again.'), { badSecret:true });
+  if(r.status===401) throw Object.assign(new Error('The service didn’t accept that password. Check it, or paste it again.'), { badSecret:true });
   if(!r.ok) throw new Error(j.error || 'HTTP '+r.status);
   return j;
 }
@@ -37,13 +37,13 @@ $('adm-card').addEventListener('toggle', ()=>{ if($('adm-card').open && adminSec
 $('adm-login').onsubmit=async e=>{
   e.preventDefault();
   const s=$('adm-secret').value.trim();
-  if(s.length<16){ adminMsg('That’s too short to be the admin secret.'); return; }
+  if(s.length<16){ adminMsg('That’s too short to be the password.'); return; }
   lsSet(ADMIN_KEY, s); $('adm-secret').value='';
   adminMsg('Checking…');
-  try{ await adminCall('list'); adminMsg(''); renderAdmin(); toast('Admin secret saved on this device'); }
+  try{ await adminCall('list'); adminMsg(''); renderAdmin(); toast('Password saved on this device'); }
   catch(err){ adminFail(err); }
 };
-$('adm-forget').onclick=()=>{ if(!confirm('Forget the admin secret on this device? You can paste it again any time.')) return;
+$('adm-forget').onclick=()=>{ if(!confirm('Forget the password on this device? You can paste it again any time.')) return;
   try{ localStorage.removeItem(ADMIN_KEY); }catch(e){} adminMsg(''); $('adm-invite-out').innerHTML=''; renderAdmin(); };
 
 $('adm-invite').onclick=async()=>{

@@ -66,7 +66,8 @@ function renderLibrary(resetPaging){
   if(!all.length){
     box.innerHTML = '<div class="card empty">No books yet. Head to <b>Import</b> to load the file from your shelf photos, or tap <b>+ Add book</b>.</div>';
   } else if(!current.length){
-    box.innerHTML = '<div class="card empty">No books match. Try fewer words or clear the filters.</div>';
+    const on=activeFilters();
+    box.innerHTML = '<div class="card empty">No books match.'+(on.length?' A filter is on: <b>'+esc(on.map(f=>f.label).join(' · '))+'</b>.<div style="margin-top:10px;"><button class="filter-clear-btn" data-clear-filters>Clear filters</button></div>':' Try fewer words.')+'</div>';
   } else if(ui.view==='feed'){
     box.innerHTML = '<div class="feed">' + slice.map(b=>{
       const ser = b.series ? esc(b.series)+(b.seriesNo?' #'+esc(b.seriesNo):'') : '';
@@ -99,6 +100,7 @@ function renderLibrary(resetPaging){
   $('hdr-count').textContent = all.length.toLocaleString() + ' book' + (all.length===1?'':'s');
   updateBatchBar();
   syncMoreBtn();
+  syncFilterFlags();
 }
 $('results').addEventListener('click', e=>{
   const el = e.target.closest('[data-id]'); if(!el) return;
@@ -129,6 +131,32 @@ document.querySelectorAll('#view-seg button').forEach(b=>b.onclick=()=>{ ui.view
 const SCOPE_PH = { all:'Search title, author, keyword…', title:'Search titles (and series)…', author:'Search authors…' };
 function syncScope(){ document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.toggle('active', b.dataset.scope===(ui.scope||'all'))); $('f-q').placeholder = SCOPE_PH[ui.scope||'all']; }
 document.querySelectorAll('#scope-seg button').forEach(b=>b.onclick=()=>{ ui.scope=b.dataset.scope; lsSet(UI_KEY, JSON.stringify(ui)); syncScope(); renderLibrary(true); $('f-q').focus(); });
+/* Filters that are on, so a forgotten one is easy to see: highlighted on the page, listed above the books. */
+const FILTER_NAMES={ 'f-genre':'Genre', 'f-room':'Room', 'f-case':'Bookcase', 'f-shelf':'Shelf', 'f-status':'Read status', 'f-loan':'Loaned', 'f-rating':'Rating', 'f-added':'Added' };
+function activeFilters(){
+  const out=[];
+  for(const [id,name] of Object.entries(FILTER_NAMES)){ const el=$(id); if(el.value) out.push({ id, label:name+': '+(el.selectedOptions[0]?el.selectedOptions[0].textContent.replace(/^.*?—\s*/,'').trim():el.value) }); }
+  if($('f-review').checked) out.push({ id:'f-review', label:'Needs review only' });
+  return out;
+}
+function syncFilterFlags(){
+  const on=activeFilters(), ids=new Set(on.map(f=>f.id));
+  Object.keys(FILTER_NAMES).forEach(id=>$(id).classList.toggle('filter-on', ids.has(id)));
+  $('btn-more-filters').classList.toggle('filter-on', on.some(f=>f.id!=='f-genre'));
+  const bar=$('filter-bar'); bar.classList.toggle('hide', !on.length);
+  if(on.length) bar.innerHTML='<span class="fb-label">Showing only</span>'+on.map(f=>'<button class="fb-chip" data-off="'+f.id+'" title="Turn this filter off">'+esc(f.label)+' <span aria-hidden="true">×</span></button>').join('')
+    +'<button class="fb-clear" data-clear-filters>Clear filters</button>';
+}
+// one filter off (its chip), or all of them (search text stays)
+function clearFilters(){ ['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); }
+document.addEventListener('click', e=>{
+  if(e.target.closest('[data-clear-filters]')){ clearFilters(); return; }
+  const chip=e.target.closest('[data-off]'); if(!chip) return;
+  const id=chip.dataset.off;
+  if(id==='f-review') $('f-review').checked=false; else $(id).value='';
+  if(id==='f-room'){ $('f-case').value=''; $('f-shelf').value=''; } if(id==='f-case') $('f-shelf').value='';
+  refreshLists(); renderLibrary(true);
+});
 function activeFilterCount(){ return ['f-room','f-case','f-shelf','f-status','f-loan','f-rating','f-added'].filter(id=>$(id).value).length + ($('f-review').checked?1:0); }
 function syncMoreBtn(){ const n=activeFilterCount(); $('btn-more-filters').textContent = (ui.moreOpen?'Fewer':'Filters') + (n?' ('+n+')':''); $('more-filters').classList.toggle('hide', !ui.moreOpen); }
 $('btn-more-filters').onclick = ()=>{ ui.moreOpen=!ui.moreOpen; lsSet(UI_KEY, JSON.stringify(ui)); syncMoreBtn(); };

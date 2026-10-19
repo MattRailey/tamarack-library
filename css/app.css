@@ -587,3 +587,13 @@ button.wz-opt.quiet{ background:transparent; border-style:dashed; }
 .cam-redo{ align-self:flex-start; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:5px 12px; min-height:32px; font-size:.78rem; }
 .cam-redo.on{ background:#ffd98a; color:#222; border-color:#ffd98a; }
 .cam-redo:disabled{ opacity:.35; }
+/* a filter that's on is hard to miss: highlighted, and listed above the books with a Clear button */
+select.filter-on, button.filter-on{ background:#fbe3a8 !important; border-color:#c8901c !important; color:#5a3b00 !important; font-weight:700; box-shadow:0 0 0 2px rgba(200,144,28,.25); }
+.filter-bar{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; background:#fff4d6; border:1px solid #e3c06a; border-radius:12px; padding:8px 10px; margin:0 0 10px; }
+.filter-bar .fb-label{ font-size:.8rem; font-weight:700; color:#5a3b00; margin-right:2px; }
+.filter-bar .fb-chip{ background:#fbe3a8; color:#5a3b00; border:1px solid #c8901c; border-radius:999px; padding:3px 10px; min-height:30px; font-size:.8rem; }
+.filter-bar .fb-clear, .filter-clear-btn{ margin-left:auto; padding:4px 12px; min-height:30px; font-size:.8rem; }
+.ln-item{ cursor:pointer; }
+.ln-row{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.ln-who{ text-align:right; flex:none; display:flex; flex-direction:column; max-width:45%; }
+.ln-who .note{ margin:2px 0 0; }

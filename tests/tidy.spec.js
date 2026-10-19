@@ -9,7 +9,7 @@ async function addBooks(page, books) {
 test('the tabs are photos, unidentified, duplicates, series and recheck — nothing about selling', async ({ page }) => {
   await mockNet(page); await openApp(page);
   await epilogue(page, 'import');
-  await expect(page.locator('#ie-seg button')).toHaveText(['From photos', 'Unidentified', 'Duplicates', 'Series', 'Recheck shelves']);
+  await expect(page.locator('#ie-seg button')).toHaveText(['From photos', 'Unidentified', 'Duplicates', 'Split series', 'Loaned', 'Recheck shelves']);
   await expect(page.locator('#import')).not.toContainText(/sell|eBay|Etsy/i);
   await expect(page.locator('#btn-dups')).toHaveCount(0);
   await expect(page.locator('#btn-series')).toHaveCount(0);
@@ -73,4 +73,26 @@ test('recheck needs a room and bookcase first', async ({ page }) => {
   await click(page, '#rc-take');
   await expect(page.locator('#toast')).toContainText('room and bookcase');
   expect(net.uploads.filter(u => u.path.includes('/photos/'))).toHaveLength(0);
+});
+
+test('loaned books: who has each one and since when, longest out first, searchable by book or person', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  await addBooks(page, [
+    { id: 'loan-t1', title: 'Borrowed Recently', author: 'R Author', room: 'Den', bookcase: 'N1', loanedTo: 'Aunt Jo', loanedDate: '2026-10-01' },
+    { id: 'loan-t2', title: 'Out For Ages', author: 'O Author', room: 'Den', bookcase: 'N1', loanedTo: 'Pastor Tim', loanedDate: '2025-01-15' },
+  ]);
+  await epilogue(page, 'import'); await click(page, '#ie-seg [data-ie="loans"]');
+  const items = page.locator('#ln-list .ln-item');
+  await expect(items.filter({ hasText: 'Out For Ages' })).toContainText('Pastor Tim');
+  await expect(items.filter({ hasText: 'Borrowed Recently' })).toContainText('Aunt Jo');
+  const titles = await items.locator('b:first-child').allTextContents();
+  expect(titles.indexOf('Out For Ages')).toBeLessThan(titles.indexOf('Borrowed Recently'));
+  await page.fill('#ln-q', 'aunt jo');
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Borrowed Recently');
+  await page.fill('#ln-q', 'ages');
+  await expect(items).toHaveCount(1);
+  await expect(items.first()).toContainText('Out For Ages');
+  await items.first().click();
+  await expect(page.locator('#m-title')).toHaveText('Out For Ages');
 });

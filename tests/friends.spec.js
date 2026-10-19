@@ -180,7 +180,7 @@ test('Invite a friend (Matt’s devices): secret saved once, invite made, phones
   await page.click('#adm-card summary');
   // a wrong secret is refused and not kept
   await page.fill('#adm-secret', 'not-the-secret-at-all'); await page.click('#adm-login button[type=submit]');
-  await expect(page.locator('#adm-msg')).toContainText('didn’t accept');
+  await expect(page.locator('#adm-msg')).toContainText('didn’t accept that password');
   expect(await page.evaluate(() => localStorage.getItem('tamarack_library_admin'))).toBeNull();
   await page.fill('#adm-secret', ADMIN); await page.click('#adm-login button[type=submit]');
   await expect(page.locator('#adm-tools')).toBeVisible();

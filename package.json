@@ -9,7 +9,8 @@
     "test:headed": "playwright test --headed",
     "visual": "node tests/visual.compare.js",
     "test:worker": "node --test worker/test/worker.test.mjs",
-    "sandbox": "node worker/sandbox.mjs"
+    "sandbox": "node worker/sandbox.mjs",
+    "test:merge": "node --test tests/photo-merge.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.0"

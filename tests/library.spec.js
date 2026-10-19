@@ -139,3 +139,25 @@ test('"Added" filter lists recent additions newest first, with the date; "No she
   await click(page, '#btn-reset');
   expect(await page.inputValue('#f-added')).toBe('');
 });
+
+test('a filter that is on stands out, is listed above the books, and Clear filters turns them all off', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  await expect(page.locator('#filter-bar')).toBeHidden();
+  const genre = await page.evaluate(() => document.querySelector('#f-genre option:nth-child(2)').value);
+  await page.selectOption('#f-genre', genre);
+  await expect(page.locator('#f-genre')).toHaveClass(/filter-on/);
+  await expect(page.locator('#filter-bar')).toBeVisible();
+  await expect(page.locator('#filter-bar')).toContainText('Genre: ' + genre);
+  // one more, from inside Filters: the Filters button lights up too
+  await page.evaluate(() => { const s = document.getElementById('f-status'); s.value = 'read'; s.dispatchEvent(new Event('change')); });
+  await expect(page.locator('#btn-more-filters')).toHaveClass(/filter-on/);
+  await expect(page.locator('#filter-bar .fb-chip')).toHaveCount(2);
+  // a chip turns just that one off
+  await page.locator('#filter-bar .fb-chip', { hasText: 'Read status' }).click();
+  await expect(page.locator('#filter-bar .fb-chip')).toHaveCount(1);
+  await expect(page.locator('#btn-more-filters')).not.toHaveClass(/filter-on/);
+  await page.click('#filter-bar .fb-clear');
+  await expect(page.locator('#filter-bar')).toBeHidden();
+  await expect(page.locator('#f-genre')).toHaveValue('');
+  await expect(page.locator('#f-genre')).not.toHaveClass(/filter-on/);
+});

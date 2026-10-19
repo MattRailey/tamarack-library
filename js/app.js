@@ -26,8 +26,8 @@ $('menu-btn').onclick=e=>{ e.stopPropagation(); $('menu-pop').classList.toggle('
 document.addEventListener('click', e=>{ if(!e.target.closest('#menu-pop')) $('menu-pop').classList.remove('open'); });
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ $('menu-pop').classList.remove('open'); showPanel(b.dataset.go); });
 // Import & Export: building the library from photos, then tidying it (mystery books, duplicates, series, recheck)
-const IE_TABS=['import','unid','dups','series','recheck'];
-function renderIE(which){ if(which==='unid') renderUnid(); if(which==='dups') renderDups(); if(which==='series'){ fillSeriesRooms(); renderSplitSeries(); } if(which==='recheck') renderRecheck(); }
+const IE_TABS=['import','unid','dups','series','loans','recheck'];
+function renderIE(which){ if(which==='unid') renderUnid(); if(which==='dups') renderDups(); if(which==='series'){ fillSeriesRooms(); renderSplitSeries(); } if(which==='recheck') renderRecheck(); if(which==='loans') renderLoans(); }
 function showIE(which){ document.querySelectorAll('#ie-seg button').forEach(y=>y.classList.toggle('active',y.dataset.ie===which));
   IE_TABS.forEach(k=>$('ie-'+k).classList.toggle('hide', k!==which));
   renderIE(which); ui.ie=which; lsSet(UI_KEY, JSON.stringify(ui)); }
