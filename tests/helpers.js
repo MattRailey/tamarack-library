@@ -31,9 +31,9 @@ async function mockNet(page, opts = {}) {
     if (u.includes('content.dropboxapi.com/2/files/upload')) {
       const arg = JSON.parse(route.request().headers()['dropbox-api-arg']);
       const raw = route.request().postDataBuffer();
-      net.uploads.push({ path: arg.path, raw, body: raw ? raw.toString('utf8') : '' });
+      net.uploads.push({ path: arg.path, mode: arg.mode, raw, body: raw ? raw.toString('utf8') : '' });
       if (arg.path.endsWith('tamarack-library.json')) { try { net.remote = JSON.parse(raw.toString('utf8')); } catch (e) {} }
-      return route.fulfill({ status: 200, body: JSON.stringify({ path_display: arg.path }) });
+      return route.fulfill({ status: 200, body: JSON.stringify({ path_display: arg.path, rev: 'rev' + net.uploads.length }) });
     }
     if (u.includes('openlibrary.org/search.json')) {
       const isbn = new URL(u).searchParams.get('isbn');

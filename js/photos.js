@@ -15,6 +15,12 @@ function openPhotos(){
 }
 $('btn-photos').onclick=openPhotos;
 $('ph-close').onclick=()=>{ $('ph-bg').classList.remove('open'); unlockPage(); };
+$('ph-cam').onclick=()=>{
+  const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
+  ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
+  openShelfCam(Object.assign({}, loc, { build:true, finishLabel:'Done', fallback:()=>$('ph-file').click(),
+    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent to the inbox.'; renderRetry(); } }));
+};
 $('ph-take').onclick=async()=>{ if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; } $('ph-file').click(); };
 $('ph-file').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;

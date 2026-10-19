@@ -32,6 +32,7 @@
 <script src="js/scanner.js" defer></script>
 <script src="js/mystery.js" defer></script>
 <script src="js/photos.js" defer></script>
+<script src="js/shelfcam.js" defer></script>
 <script src="js/recheck.js" defer></script>
 <script src="js/settings.js" defer></script>
 <script src="js/wizard.js" defer></script>
@@ -539,7 +540,7 @@
       <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="recheck">Recheck (books already in the library)</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
       <div style="grid-column:1/-1;"><label>Note for Claude (optional)</label><input id="ph-note" placeholder="e.g. left half of shelf 2 · these are new from the thrift store"></div>
     </div>
-    <div class="row" style="margin-top:12px;"><button id="ph-take">Take or choose photos</button></div>
+    <div class="row" style="margin-top:12px;"><button id="ph-cam">📷 Open camera</button><button class="secondary" id="ph-take">Choose photos</button></div>
     <input type="file" id="ph-file" accept="image/*" multiple class="hide">
     <div id="ph-status" class="note"></div>
     <div id="ph-retry" class="row hide" style="margin-top:8px;align-items:center;"><span id="ph-retry-n" class="note" style="margin:0;flex:1;"></span><button class="secondary" id="ph-retry-btn">Send them now</button></div>
@@ -559,6 +560,21 @@
 </div>
 <datalist id="dl-coll"></datalist><datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
 <datalist id="dl-author"></datalist><datalist id="dl-series"></datalist><datalist id="dl-genre"></datalist><datalist id="dl-loan"></datalist>
+<!-- shelf camera: stays open, one tap = one photo -->
+<div class="cam-bg" id="cam-bg">
+  <div class="cam-top">
+    <input id="cam-room" list="dl-room" placeholder="Room" aria-label="Room" autocomplete="off">
+    <input id="cam-case" list="dl-case" placeholder="Bookcase" aria-label="Bookcase or bay" autocomplete="off">
+    <button class="cam-x" id="cam-close" aria-label="Close camera">&times;</button>
+  </div>
+  <div class="cam-view"><video id="cam-video" muted playsinline></video><div class="cam-flash" id="cam-flash"></div></div>
+  <div class="cam-info"><span id="cam-count"></span><span id="cam-msg"></span></div>
+  <div class="cam-bottom">
+    <div class="cam-left"><button class="cam-redo" id="cam-redo" disabled>↺ Redo last</button><div class="cam-thumbs" id="cam-thumbs"></div></div>
+    <button class="cam-shutter" id="cam-shutter" aria-label="Take photo"></button>
+    <div class="cam-acts"><button class="secondary" id="cam-next">Finished with this bookcase →</button><button id="cam-finish">Done</button></div>
+  </div>
+</div>
 <!-- first-run setup -->
 <div class="modal-bg" id="wz-bg">
   <div class="modal wz-modal" role="dialog" aria-modal="true" aria-labelledby="wz-body">

@@ -558,3 +558,32 @@ button.wz-opt.quiet{ background:transparent; border-style:dashed; }
 .adm-card summary .note{ display:block; margin:2px 0 0; }
 .adm-row{ align-items:center; cursor:default; }
 .adm-row button{ padding:4px 10px; min-height:30px; font-size:.78rem; }
+/* shelf camera: full screen, stays open */
+.cam-bg{ position:fixed; inset:0; z-index:250; background:#000; display:none; flex-direction:column; color:#fff; touch-action:manipulation; }
+.cam-bg.open{ display:flex; }
+.cam-top{ display:flex; gap:6px; padding:calc(8px + env(safe-area-inset-top)) 10px 8px; align-items:center; }
+.cam-top input{ flex:1; min-width:0; background:rgba(255,255,255,.14); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:10px; padding:8px 10px; font-size:16px; }
+.cam-top input::placeholder{ color:rgba(255,255,255,.6); }
+.cam-x{ background:none; border:none; color:#fff; font-size:2rem; line-height:1; padding:0 6px; min-height:40px; }
+.cam-view{ position:relative; flex:1; min-height:0; overflow:hidden; }
+.cam-view video{ width:100%; height:100%; object-fit:contain; background:#000; }
+.cam-flash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
+.cam-flash.go{ animation:camflash .25s ease-out; }
+@keyframes camflash{ from{ opacity:.7; } to{ opacity:0; } }
+.cam-info{ display:flex; justify-content:space-between; gap:8px; padding:6px 12px 0; font-size:.85rem; min-height:22px; }
+.cam-info #cam-msg{ color:#ffd98a; text-align:right; }
+.cam-bottom{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; padding:10px 12px calc(12px + env(safe-area-inset-bottom)); }
+.cam-thumbs{ display:flex; gap:4px; overflow:hidden; }
+.cam-th{ position:relative; flex:none; width:40px; height:40px; border-radius:6px; overflow:hidden; border:2px solid transparent; }
+.cam-th img{ width:100%; height:100%; object-fit:cover; }
+.cam-th.sending{ opacity:.55; }
+.cam-th.sent{ border-color:#7fd17f; }
+.cam-th.waiting{ border-color:#ffb04a; }
+.cam-shutter{ width:76px; height:76px; border-radius:50%; background:#fff; border:5px solid rgba(255,255,255,.45); background-clip:padding-box; padding:0; }
+.cam-shutter:active{ transform:scale(.92); }
+.cam-acts{ display:flex; flex-direction:column; gap:6px; align-items:stretch; }
+.cam-acts button{ font-size:.78rem; padding:6px 8px; min-height:34px; white-space:normal; }
+.cam-left{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.cam-redo{ align-self:flex-start; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:5px 12px; min-height:32px; font-size:.78rem; }
+.cam-redo.on{ background:#ffd98a; color:#222; border-color:#ffd98a; }
+.cam-redo:disabled{ opacity:.35; }

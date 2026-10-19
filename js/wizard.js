@@ -154,7 +154,7 @@ const WZ_STEPS={
       +'<h3>Photograph your shelves</h3>'
       +'<p class="wz-lead">One bookcase at a time. Claude reads the spines and adds every book, with where it sits.</p>'
       +'<ul class="wz-list wz-tight">'
-      +'<li><b>Name each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) and photograph a sticky note with the name first.</li>'
+      +'<li><b>Name each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) and put it on the bookcase, e.g. a piece of tape or a printed label. Photograph the label first.</li>'
       +'<li><b>Top shelf to bottom</b>, two photos per shelf (left half, right half), phone level and square to the spines.</li>'
       +'<li><b>Good light, no flash.</b> Lying-down stacks and books two deep get their own photo.</li>'
       +'</ul>'
@@ -163,7 +163,7 @@ const WZ_STEPS={
       +'<div><label for="wz-case">Bookcase or bay</label><input id="wz-case" list="dl-case" placeholder="e.g. N1" value="'+esc(cur)+'"></div></div>'
       +'<button id="wz-shoot" class="wz-shoot">📷 '+(curN?'More photos of ':'Take photos of ')+(cur?esc(cur):'this bookcase')+'</button>'
       +'<input type="file" id="wz-file" accept="image/*" multiple class="hide">'
-      +'<p class="note" style="margin-top:6px;">Take as many as the bookcase needs, in one go or several. You can also take them in the Camera app first and choose them here.</p>'
+      +'<p class="note" style="margin-top:6px;">The camera stays open: tap the big button for each photo, and they send while you keep going. <a href="#" id="wz-pick">Choose photos instead</a> (if you took them with the Camera app).</p>'
       +'<p class="wz-err hide" id="wz-err"></p>'
       +'<div id="wz-phstatus" class="note">'+(curN?'✓ '+curN+' photo'+(curN===1?'':'s')+' of '+esc(cur)+' sent.':'')+'</div><div id="wz-sent" class="wz-sent"></div>'
       +'<div class="row wz-nav">'
@@ -186,8 +186,20 @@ const WZ_STEPS={
       $('wz-shoot').onclick=()=>{
         const room=$('wz-room').value.trim(), bc=$('wz-case').value.trim();
         if(!room || !bc){ wzErr('Type the room and the bookcase name first, so Claude knows where these books live.'); return; }
-        wzErr(''); $('wz-file').click();
+        wzErr('');
+        const before=(wz.cases||[]).map(c=>Object.assign({}, c));
+        const merge=camCases=>{ const out=before.map(c=>Object.assign({}, c));
+          for(const c of camCases){ const o=out.find(x=>x.room===c.room && x.bookcase===c.bookcase); if(o) o.n+=c.n; else out.push(Object.assign({}, c)); }
+          return out; };
+        openShelfCam({ room, bookcase:bc, kind:'shelf', build:true, fallback:()=>$('wz-file').click(),
+          onUpdate:(cases, next)=>{ wzSave({ cases:merge(cases), room:$('cam-room').value.trim(), bookcase:next!=null?next:$('cam-case').value.trim() }); },
+          onFinish:(cases, finished)=>{
+            wzSave({ cases:merge(cases), room:$('cam-room').value.trim()||room });
+            if(finished) wzGo('unread'); else wzDraw();
+          } });
       };
+      $('wz-pick').onclick=e=>{ e.preventDefault(); const room=$('wz-room').value.trim(), bc=$('wz-case').value.trim();
+        if(!room || !bc){ wzErr('Type the room and the bookcase name first, so Claude knows where these books live.'); return; } wzErr(''); $('wz-file').click(); };
       $('wz-file').onchange=async e=>{
         const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
         const loc={ room:$('wz-room').value.trim(), bookcase:$('wz-case').value.trim(), shelf:'', kind:'shelf' };

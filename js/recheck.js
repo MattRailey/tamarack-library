@@ -36,7 +36,10 @@ function renderRecheck(){
 $('rc-take').onclick=()=>{
   if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; }
   if(!$('rc-room').value.trim() || !$('rc-case').value.trim()){ toast('Type the room and bookcase first, so Claude knows which books to look for'); return; }
-  $('rc-file').click();
+  openShelfCam({ room:$('rc-room').value.trim(), bookcase:$('rc-case').value.trim(), shelf:$('rc-shelf').value.trim(), kind:'recheck', build:true, finishLabel:'Done',
+    fallback:()=>$('rc-file').click(),
+    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0);
+      if(n) $('rc-status').textContent='✓ '+n+' recheck photo'+(n===1?'':'s')+' sent ('+cases.map(c=>c.bookcase+': '+c.n).join(', ')+'). Ask Claude to “check the photo inbox”.'; } });
 };
 $('rc-file').onchange=async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;

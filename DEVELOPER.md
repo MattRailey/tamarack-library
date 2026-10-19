@@ -41,6 +41,7 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `mystery.js` | The unidentified-books list and the shelf-by-shelf walk-through, including "add a book we missed". |
 | `photos.js` | Uploading shelf and title-page photos to the Dropbox photo inbox. |
 | `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones, switch off, through the service's `/admin/*` with the admin secret kept in this browser (`tamarack_library_admin`). |
+| `shelfcam.js` | The shelf camera: stays open, one tap per photo, sends in the background, Redo last, next bookcase. |
 | `recheck.js` | Recheck shelves tab: bookcases by when they were last photographed, recheck photos. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |
 | `wizard.js` | First-run setup wizard (invite code, own Dropbox, or this device only; photo tips; home screen). "Add another phone" links. |
@@ -130,7 +131,7 @@ There are two ways a library can be kept, and nothing else in the app knows the 
 
 The app only uploads. Claude does the reading, with the library's Dropbox folder linked.
 
-- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `recheck`, `new-books`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`.
+- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `recheck`, `new-books`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`. From the shelf camera (`shelfcam.js`) the number is three digits and counts through one bookcase (`001`, `002`…). `NNN redo.jpg` replaces photo `NNN` (a retake that couldn't overwrite it).
 - **Title-page photos** from the walk-through go to `photos/identify/` as `<Room> <Bookcase> shelf-<n> pos-<p> <bookId>.jpg`. That book gets `idPhoto` so the list shows 📷.
 - **After reading**, Claude does four things:
   - edits the catalog, matching books that have no location to the shelf they were seen on instead of adding duplicates;

@@ -1,0 +1,42 @@
+// The shelf camera: stays open, one tap = one photo (no "Use Photo" step), each sent in the background in order;
+// "Redo last" replaces the last photo under the same name; "Finished with N1 →" moves on to N2.
+const { test, expect } = require('@playwright/test');
+const { mockNet, openApp, click } = require('./helpers');
+
+test.use({ launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] } });
+
+test('tap, tap, tap: photos go in order; redo replaces the last; next bookcase starts a new count', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await click(page, '#btn-photos'); await page.waitForSelector('#ph-bg.open');
+  await page.fill('#ph-room', 'Den'); await page.fill('#ph-case', 'N1');
+  await click(page, '#ph-cam');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  await expect(page.locator('#cam-redo')).toBeDisabled();
+  for (let i = 0; i < 3; i++) { await page.click('#cam-shutter'); await page.waitForTimeout(150); }
+  const inbox = () => net.uploads.filter(u => u.path.includes('/photos/inbox/'));
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(3);
+  expect(inbox().map(u => u.path.slice(-12))).toEqual(['N1 shelf 001.jpg'.slice(-12), 'N1 shelf 002.jpg'.slice(-12), 'N1 shelf 003.jpg'.slice(-12)]);
+  expect(inbox()[0].path).toMatch(/^\/Railey Library\/photos\/inbox\/\d{4}-\d\d-\d\d \d{6} Den N1 shelf 001\.jpg$/);
+  await expect(page.locator('#cam-count')).toContainText('3 of N1');
+  // redo: the next shot overwrites 003 (same name, by its revision), and the count stays at 3
+  await page.click('#cam-redo');
+  await expect(page.locator('#cam-msg')).toContainText('replaces the last one');
+  await page.click('#cam-shutter');
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(4);
+  const redo = inbox()[3];
+  expect(redo.path).toBe(inbox()[2].path);
+  expect(redo.mode['.tag']).toBe('update');
+  await expect(page.locator('#cam-count')).toContainText('3 of N1');
+  await expect(page.locator('#cam-redo')).toHaveText('↺ Redo last');
+  // finished with N1: on to N2, new count from 001
+  await expect(page.locator('#cam-next')).toHaveText('Finished with N1 →');
+  await page.click('#cam-next');
+  await expect(page.locator('#cam-case')).toHaveValue('N2');
+  await page.click('#cam-shutter');
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(5);
+  expect(inbox()[4].path).toMatch(/ Den N2 shelf 001\.jpg$/);
+  await page.click('#cam-finish');
+  await expect(page.locator('#cam-bg')).not.toHaveClass(/open/);
+  await expect(page.locator('#ph-status')).toContainText('4 photos sent');
+});

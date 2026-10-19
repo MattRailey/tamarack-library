@@ -6,6 +6,8 @@
 - **Setup wizard.** It opens by itself the first time the app runs on a phone. You pick one of three ways in (invite code, your own Dropbox, or just this device), then get shelf-photo tips and how to add the app to the home screen. Run it again from Data & Sync.
 - **Friends' libraries.** Friends can keep their library in Matt's Dropbox through a small service (`worker/`), with no Dropbox account of their own. Each phone's key opens only its own library.
 - **Add another phone.** A one-time link brings a second phone in the household into the same library.
+- **A camera that stays open.** Tap the shutter for each photo, with no "Use Photo" step; photos send in the background while you keep going. **Redo last** retakes the last photo under the same name. **Finished with N1 →** moves on to N2. Used in setup, Send photos and Recheck shelves; *Choose photos* is still there for pictures taken with the Camera app.
+- **Bookcase labels:** the tips now say a piece of tape or a printed label (not a sticky note).
 - **Setup goes straight into photographing.** After joining, the wizard asks for the room and bookcase and takes the photos right there, then shows how the walk-through finds the books Claude couldn't read.
 - **Recheck shelves.** Photograph a bookcase again when books have moved: Claude only moves books to their new spots, never adds second copies, and flags books it didn't see. Bookcases are listed oldest-checked first.
 - **Duplicates and Series are tabs** in Import & Export. Series lists every book of a split-up series under the place it sits, volumes in order, and can be narrowed to one room.

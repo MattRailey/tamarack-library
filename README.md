@@ -60,7 +60,7 @@ Each person still signs in to their own Dropbox. The app key only lets the app i
 ## Claude and the photo inbox
 
 **Photo tips.**
-- Label each bookcase or bay (*N1*, *N2*…). Type it in **Bookcase or bay**, and photograph a sticky note with the code first.
+- Label each bookcase or bay (*N1*, *N2*…). Type it in **Bookcase or bay**, and put the code on the bookcase (e.g. a piece of tape or a printed label). Photograph the label first.
 - Shoot top to bottom, two photos per shelf, in good, even light, with no flash.
 - Photos are numbered `01`, `02`… in the order taken. If one doesn't go through, it waits on the phone and sends by itself when the signal is back (or tap *Send them now*), under the same name, so nothing is sent twice.
 
