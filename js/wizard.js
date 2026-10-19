@@ -70,6 +70,7 @@ const WZ_STEPS={
       +'<button class="wz-opt quiet" data-go="local"><b>Just try it on this device</b><span>Nothing is synced. You can set up syncing later.</span></button>'
       +(friendServer() ? '<p class="note" style="margin-top:10px;"><a href="#" data-go="lost">Lost your place?</a> Joined before, but the app is empty now?</p>' : ''),
     wire:b=>b.querySelectorAll('[data-go]').forEach(x=>x.onclick=e=>{ e.preventDefault();
+      if(x.dataset.go==='code' && needsHomeScreen()){ wzGo('install-first'); return; }
       if(x.dataset.go==='local'){ closeWizard(true); toast('Saved on this device only — run setup again any time from Data & Sync'); return; }
       wzGo(x.dataset.go); }),
   },
@@ -188,17 +189,17 @@ const WZ_STEPS={
      The page address carries the code too (?join=…), in case iOS keeps it for the icon. */
   'install-first':{
     html:()=>'<h3>First, put the library on your Home Screen</h3>'
-      +'<p class="wz-lead">On iPhone the library lives on your Home Screen. Your code is used there, once.</p>'
-      +'<div class="wz-code" id="wz-fcode">'+esc(wz.code||'')+'</div>'
-      +'<div class="row" style="justify-content:center;margin:6px 0 10px;"><button id="wz-copy">Copy the code</button></div>'
-      +'<ol class="wz-list wz-tight"><li>Tap <b>Copy the code</b> above.</li>'
+      +'<p class="wz-lead">On iPhone the library lives on your Home Screen. Your code goes in there, once.'+(wz.code?'':' Don’t type it here.')+'</p>'
+      +(wz.code ? '<div class="wz-code" id="wz-fcode">'+esc(wz.code)+'</div>'
+        +'<div class="row" style="justify-content:center;margin:6px 0 10px;"><button id="wz-copy">Copy the code</button></div>' : '')
+      +'<ol class="wz-list wz-tight">'+(wz.code?'<li>Tap <b>Copy the code</b> above.</li>':'')
       +'<li>Tap the <b>Share</b> button at the bottom of Safari (the square with an arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
-      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, then <b>Paste</b> (or type it).</li></ol>'
+      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, then '+(wz.code?'<b>Paste</b> (or type it).':'type your code.')+'</li></ol>'
       +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<p class="note"><a href="#" id="wz-safari">Can’t add it right now? Use it in Safari instead</a> (Safari may forget it after a week unused).</p>',
     wire:()=>{
       try{ if(wz.code) history.replaceState(null,'', location.pathname+'?join='+encodeURIComponent(String(wz.code).replace(/[^A-Za-z0-9]/g,''))); }catch(e){}
-      $('wz-copy').onclick=async()=>{
+      if($('wz-copy')) $('wz-copy').onclick=async()=>{
         const c=String(wz.code||'');
         try{ await navigator.clipboard.writeText(c); toast('Code copied'); $('wz-copy').textContent='Copied ✓'; }
         catch(e){ const r=document.createRange(); r.selectNodeContents($('wz-fcode')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('Press and hold the code to copy it'); }

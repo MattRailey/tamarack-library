@@ -256,6 +256,17 @@ test('iPhone: one code, entered once: Safari shows it for the Home Screen; the i
   await expect(icon2.locator('#wz-code')).toHaveValue(inv.code);
 });
 
+test('iPhone Safari with only the number: no code box in Safari, just "Home Screen first, type it in the icon"', async ({ browser }) => {
+  const svc = await startService();
+  const safari = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(safari, svc);
+  await freshPhone(safari);
+  await safari.click('#wz-body [data-go="code"]');
+  await expect(safari.locator('#wz-body')).toContainText('First, put the library on your Home Screen');
+  await expect(safari.locator('#wz-body')).toContainText('Don’t type it here');
+  await expect(safari.locator('#wz-code')).toHaveCount(0);
+  await expect(safari.locator('#wz-fcode')).toHaveCount(0);
+});
+
 test('iPhone Safari can still choose to stay in Safari', async ({ browser }) => {
   const svc = await startService();
   const safari = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(safari, svc);
