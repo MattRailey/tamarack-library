@@ -107,7 +107,7 @@ The admin box (Invite a friend) also shows when each library last sent photos an
 - **File names**: letters, numbers, spaces, `_ . -` only (they sync to your Windows PC). Only `.jpg .jpeg .png .heic` pictures, checked by their first bytes, not just the name; plus a small `NOTE.txt` beside photos.
 - **Sizes**: a photo up to 8 MB (the app sends 2–4 MB), a cover photo up to 1.5 MB, the catalog up to 25 MB.
 - **About 600 photos or covers a day per library.** Counted in the service's memory, so it's rough: it resets when Cloudflare restarts the service, and retries count too.
-- **`/join`**: at most 10 tries a minute from one address (the `[[ratelimits]]` block in `wrangler.toml`). If Cloudflare ever refuses that block on the free plan, delete those five lines and redeploy; the service works without it.
+- **Codes are 5 digits** (easy to type), so guessing is held back: codes expire (invites 30 days, *Add another phone* 14, the iPhone Home Screen code 2), one address gets 10 tries a minute (`JOIN_LIMIT`), and more than 30 wrong codes a minute from anywhere (`JOIN_FAIL`) closes joining for 10 minutes and sends you a notice. Older 8-letter codes keep working until they expire.
 - **Daily catalog backup**: before the first save each day, the service copies the catalog to `<Library>/backups/tamarack-library-slot-NN.json` (14 slots, overwritten in turn, so the last two weeks are kept). Phones can't reach `backups/`. No extra Dropbox permission is needed.
 - **Logs**: `[observability]` is on, so Cloudflare's dashboard shows each request (Workers → tamarack-friends → Observability).
 

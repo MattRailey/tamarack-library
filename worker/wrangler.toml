@@ -34,3 +34,12 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 10
   period = 60
+
+# wrong codes from anywhere: over 30 a minute closes joining for 10 minutes (codes are only 5 digits)
+[[ratelimits]]
+name = "JOIN_FAIL"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60

@@ -27,7 +27,7 @@ const KNOWN_KEY  = 'tamarack_library_known';           // per device: libraries 
   q.delete('folder'); q.delete('appkey'); history.replaceState(null,'', location.pathname+(q.toString()?'?'+q:'')+location.hash);
   window.__libSetup=f;
 })();
-(function(){ // invite link from the friends service: ?join=ABCD-EFGH — the setup wizard takes it from here
+(function(){ // invite link from the friends service: ?join=48213 — the setup wizard takes it from here
   const q=new URLSearchParams(location.search); if(!q.has('join')) return;
   window.__join={ code:q.get('join').trim() };   // the service address is built in (never taken from a link)
   q.delete('join'); history.replaceState(null,'', location.pathname+(q.toString()?'?'+q:'')+location.hash);

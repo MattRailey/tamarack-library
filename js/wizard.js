@@ -74,9 +74,9 @@ const WZ_STEPS={
       wzGo(x.dataset.go); }),
   },
   code:{
-    html:()=>'<h3>Enter your invite code</h3>'
-      +'<p class="wz-lead">It looks like <b>ABCD-EFGH</b>. If you tapped an invite link, it’s already filled in.</p>'
-      +'<label for="wz-code">Invite code</label><input id="wz-code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(wz.code||'')+'">'
+    html:()=>'<h3>Enter your code</h3>'
+      +'<p class="wz-lead">It’s a 5-digit number, like <b>48213</b>. If you tapped an invite link, it’s already filled in.</p>'
+      +'<label for="wz-code">Code</label><input id="wz-code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" maxlength="12" value="'+esc(wz.code||'')+'">'
       +'<p class="wz-err hide" id="wz-err"></p>'
       +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<div class="row wz-nav"><button class="secondary" data-back>Back</button><button id="wz-join">Join the library</button></div>',

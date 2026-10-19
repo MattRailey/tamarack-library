@@ -66,8 +66,8 @@ const catalog = books => JSON.stringify({ format: 'tamarack-library', version: 1
 test('admin makes an invite; a phone joins with it and gets the library', async () => {
   const { call } = setup();
   const inv = await adminInvite(call, 'Smith Library', { title: 'The Smiths’ Books' });
-  assert.match(inv.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-  assert.match(inv.link, /\?join=[A-Z2-9]{8}$/);
+  assert.match(inv.code, /^\d{5}$/);
+  assert.match(inv.link, /\?join=\d{5}$/);
   const { status, j } = await joinLib(call, inv.code.toLowerCase());
   assert.equal(status, 200); assert.equal(j.lib, 'Smith Library'); assert.equal(j.title, 'The Smiths’ Books'); assert.ok(j.token.length > 30);
 });
@@ -79,6 +79,7 @@ test('invite codes run out, and a wrong code is refused', async () => {
   assert.equal((await joinLib(call, inv.code)).status, 200);
   assert.equal((await joinLib(call, inv.code)).status, 404);
   assert.equal((await joinLib(call, 'ZZZZ-ZZZZ')).status, 404);
+  assert.equal((await joinLib(call, '00000')).status === 404 || inv.code === '00000', true);
 });
 
 test('husband and wife: "add another phone" gives a one-time code for the same library', async () => {
@@ -294,4 +295,24 @@ test('a Dropbox sign-in failure tells Matt once and gives phones a 502', async (
   assert.equal((await upAs(call, s)('/Smith Library/photos/inbox/x 01.jpg')).status, 502);
   await upAs(call, s)('/Smith Library/photos/inbox/x 02.jpg');
   assert.equal(dbx.calls.filter(u => String(u).startsWith('https://ntfy.sh/')).length, 1);
+});
+
+test('5-digit codes: typed with spaces works; lots of wrong codes from anywhere close joining for a while', async () => {
+  let n = 0;
+  const { call, env } = setup({ NTFY_TOPIC: 't', JOIN_FAIL: { limit: async () => ({ success: ++n <= 3 }) } });
+  const inv = await adminInvite(call, 'Smith Library');
+  assert.match(inv.code, /^\d{5}$/);
+  assert.equal((await joinLib(call, inv.code.slice(0, 2) + ' ' + inv.code.slice(2))).status, 200);
+  const wrong = String((+inv.code + 1) % 100000).padStart(5, '0');
+  for (let i = 0; i < 4; i++) await joinLib(call, wrong);
+  const r = await joinLib(call, inv.code);
+  assert.equal(r.status, 429); assert.match(r.j.error, /Wait 10 minutes/);
+  assert.ok(await env.LIBS.get('joinlock'));
+});
+
+test('an older 8-letter code still works', async () => {
+  const { call, env } = setup();
+  await env.LIBS.put('code:ABCDEFGH', JSON.stringify({ lib: 'Old Library', title: 'Old', uses: 1, exp: Date.now() + 864e5 }));
+  const r = await joinLib(call, 'abcd-efgh');
+  assert.equal(r.status, 200); assert.equal(r.j.lib, 'Old Library');
 });

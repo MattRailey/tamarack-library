@@ -49,7 +49,11 @@ const MAX_CATALOG = 25 * 1024 * 1024;   // the catalog JSON
 const NAME_RE = /^[A-Za-z0-9 _.-]+$/;
 const IMAGE_EXT = /\.(jpe?g|png|heic)$/i;
 const BACKUP_SLOTS = 14;
-const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O, 1/I/L
+// Codes are 5 digits (Matt, 2026-10-19: easy to type). Only 100,000 of them, so guessing is held back three ways: they
+// expire, one address gets 10 tries a minute (JOIN_LIMIT), and more than 30 wrong codes a minute from anywhere
+// (JOIN_FAIL) closes joining for 10 minutes and tells Matt. Older 8-letter codes still work until they expire.
+const CODE_DIGITS = 5;
+const LOCK_MINUTES = 10;
 
 export default {
   async fetch(req, env, ctx) {
@@ -107,8 +111,18 @@ async function join(req, env) {
   // the same join tried again (the answer got lost on a weak signal): same answer, the code isn't used twice
   const nonce = /^[A-Za-z0-9_-]{8,64}$/.test(String(body.nonce || '')) ? String(body.nonce) : '';
   if (nonce) { const done = await kvGet(env, 'jn:' + nonce); if (done && done.code === code) return json(done.res); }
+  if (await env.LIBS.get('joinlock')) throw err(429, 'Too many wrong codes were tried just now. Wait 10 minutes and try again.');
   const rec = await kvGet(env, 'code:' + code);
-  if (!rec || (rec.exp && rec.exp < Date.now())) throw err(404, 'That code didn’t work. Check it, or ask for a new link.');
+  if (!rec || (rec.exp && rec.exp < Date.now())) {
+    if (env.JOIN_FAIL) {
+      const { success } = await env.JOIN_FAIL.limit({ key: 'all' });
+      if (!success) {
+        await env.LIBS.put('joinlock', '1', { expirationTtl: LOCK_MINUTES * 60 });
+        await notify(env, 'Library service: joining paused', 'Lots of wrong invite codes were tried, so joining is closed for ' + LOCK_MINUTES + ' minutes. If it keeps happening, set PAUSED = "1" and redeploy.');
+      }
+    }
+    throw err(404, 'That code didn’t work. Check it, or ask for a new link.');
+  }
   const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const id = 'd' + b64url(crypto.getRandomValues(new Uint8Array(6)));
   const name = String(body.device || 'Phone').slice(0, 60);
@@ -363,10 +377,10 @@ async function kvGet(env, k) { const v = await env.LIBS.get(k); if (!v) return n
 function b64url(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 async function sha256(s) { return b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))); }
 async function safeEqual(a, b) { return (await sha256(a)) === (await sha256(b)); }
-function makeCode() { const r = crypto.getRandomValues(new Uint8Array(8)); return [...r].map(x => CODE_ALPHABET[x % CODE_ALPHABET.length]).join(''); }
-// typed codes: ignore case, spaces and dashes (codes never use the look-alikes 0, O, 1, I or L)
+function makeCode() { const r = crypto.getRandomValues(new Uint32Array(1))[0]; return String(r % 10 ** CODE_DIGITS).padStart(CODE_DIGITS, '0'); }
+// typed codes: ignore case, spaces and dashes (5 digits now; older codes are 8 letters/digits)
 function normCode(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); }
-function fmtCode(c) { return c.slice(0, 4) + '-' + c.slice(4); }
+function fmtCode(c) { return /^\d+$/.test(c) ? c : c.slice(0, 4) + '-' + c.slice(4); }
 function cleanLib(s) { const v = String(s || '').replace(/[\\/\x00-\x1f:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return v && v !== '.' && v !== '..' ? v : ''; }
 function dbxArg(o) { return JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4)); }
 

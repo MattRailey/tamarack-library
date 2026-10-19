@@ -128,7 +128,7 @@ test('husband and wife: "Add another phone" brings the second phone into the sam
   await epilogue(his, 'data');
   await click(his, '#btn-addphone');
   const link = await his.locator('#addphone-link').inputValue({ timeout: 10000 });
-  expect(link).toMatch(/\?join=[A-Z2-9]{8}$/);
+  expect(link).toMatch(/\?join=\d{5}$/);
   // her phone opens it
   const her = await (await browser.newContext()).newPage(); await connect(her, svc);
   await freshPhone(her, '?join=' + new URL(link).searchParams.get('join'));
@@ -186,8 +186,8 @@ test('Invite a friend (Matt’s devices): secret saved once, invite made, phones
   await expect(page.locator('#adm-tools')).toBeVisible();
   // make an invite: code + link, and the library shows with its open invite
   await page.fill('#adm-lib', 'Jones Library'); await page.click('#adm-invite');
-  await expect(page.locator('#adm-invite-out .wz-code')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
-  await expect(page.locator('#adm-link')).toHaveValue(/\?join=[A-Z0-9]{8}$/);
+  await expect(page.locator('#adm-invite-out .wz-code')).toHaveText(/^\d{5}$/);
+  await expect(page.locator('#adm-link')).toHaveValue(/\?join=\d{5}$/);
   await expect(page.locator('#adm-list .sr-item', { hasText: 'Jones Library' })).toContainText('Open invite');
   // a phone joins with it, shows up in the list, and is switched off from here
   const code = (await page.locator('#adm-invite-out .wz-code').textContent()).replace('-', '');
@@ -217,7 +217,7 @@ test('iPhone Safari: after joining, Home Screen first with a code; the icon join
   await expect(safari.locator('#wz-body')).toContainText('Good to know');
   await safari.click('#wz-join');
   await expect(safari.locator('#wz-body')).toContainText('First, put it on your Home Screen', { timeout: 20000 });
-  await expect(safari.locator('#wz-hcode')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/, { timeout: 10000 });
+  await expect(safari.locator('#wz-hcode')).toHaveText(/^\d{5}$/, { timeout: 10000 });
   const code = (await safari.locator('#wz-hcode').textContent()).replace('-', '');
   // the Home Screen copy (its own storage): types the code and lands in the same library
   const icon = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(icon, svc);
