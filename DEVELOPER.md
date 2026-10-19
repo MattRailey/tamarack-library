@@ -140,7 +140,7 @@ The app only uploads. Claude does the reading, with the library's Dropbox folder
   4. `… --apply` writes it:
      - the catalog: each change stamped like an edit in the app (`updatedAt`, `ft`), so a phone's own edits survive the merge;
      - a log (`imports/<date> photos <batch>.md`) and the readings as JSON beside it;
-     - the ledger `photos/processed.json` (name, batch, checksum): a photo in it is never processed twice (`--force` to redo one);
+     - the ledger `photos/inbox/_processed.json` (the library's existing list: file, time, batch, checksum): a photo in it is never processed twice (`--force` to redo one);
      - then it deletes the photos (`--keep-photos` to keep them).
   - The books it adds share one `importBatch`, so **Undo last import** in the app takes them out again.
   - Matching: normalized title + author surname (as Duplicates). A book with no place yet is placed; a book already on this bookcase is moved within it; a book on **another** bookcase is added only as a flagged "Possible second copy". Low-confidence readings are flagged "Partly identified" (the walk-through visits them).

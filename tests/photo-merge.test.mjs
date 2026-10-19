@@ -56,8 +56,9 @@ test('first pass adds books and mystery books; dry run writes nothing; a second 
   assert.equal(c.imports.at(-1).added, 3); assert.equal(c.imports.at(-1).label, 'Photos: Living Room N1');
   assert.ok(find(dir, 'The Hobbit')[0].importBatch === c.imports.at(-1).id, 'Undo last import in the app removes them');
   // photos deleted, ledger and log written
-  assert.deepEqual(fs.readdirSync(path.join(dir, 'photos', 'inbox')), []);
-  assert.ok(JSON.parse(fs.readFileSync(path.join(dir, 'photos', 'processed.json'), 'utf8')).photos[P1]);
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'photos', 'inbox')), ['_processed.json']);
+  const led = JSON.parse(fs.readFileSync(path.join(dir, 'photos', 'inbox', '_processed.json'), 'utf8'));
+  assert.ok(led.processed.some(e => e.file === P1 && e.batch));
   assert.equal(fs.readdirSync(path.join(dir, 'imports')).filter(x => x.endsWith('.md')).length, 1);
   // the same readings again: nothing changes
   run(dir, f, { apply: true, now: 3000 });
@@ -129,4 +130,15 @@ test('a Dropbox conflicted copy of the catalog is merged in and set aside', () =
   assert.equal(find(dir, 'Only In The Copy').length, 1);
   assert.ok(fs.existsSync(path.join(dir, 'imports', 'conflicts')));
   assert.equal(fs.readdirSync(dir).some(f => /conflicted copy/.test(f)), false);
+});
+
+test("an existing _processed.json (older format) is kept and added to, and its photos aren't read again", () => {
+  const dir = lib([]);
+  fs.writeFileSync(path.join(dir, 'photos', 'inbox', '_processed.json'), JSON.stringify({ about: 'Old note', processed: [{ file: P1, at: 1, batch: 'old' }, { note: 'a note line' }] }));
+  photo(dir, P1); photo(dir, P2);
+  run(dir, readings(dir, '@ ' + P1 + ' | shelf=1\nOld Book | X | 1 | high\n@ ' + P2 + ' | shelf=2\nNew Book | Y | 1 | high\n'), { apply: true, now: 2000 });
+  assert.equal(find(dir, 'Old Book').length, 0, 'P1 was done before');
+  assert.equal(find(dir, 'New Book').length, 1);
+  const led = JSON.parse(fs.readFileSync(path.join(dir, 'photos', 'inbox', '_processed.json'), 'utf8'));
+  assert.equal(led.about, 'Old note'); assert.equal(led.processed.length, 3); assert.ok(led.processed.some(e => e.note));
 });

@@ -234,7 +234,19 @@ function readCatalog(dir) {
 }
 // Dropbox keeps both versions when two devices save at once: "tamarack-library (Matt's conflicted copy 2026-10-19).json"
 function conflictedCopies(dir) { return fs.readdirSync(dir).filter(f => /^tamarack-library .*conflicted copy.*\.json$/i.test(f)); }
-function readLedger(dir) { try { return JSON.parse(fs.readFileSync(path.join(dir, 'photos', 'processed.json'), 'utf8')); } catch (e) { return { photos: {} }; } }
+// The ledger is the library's existing photos/inbox/_processed.json: { about, processed:[{ file, at, batch, sha1? }] }
+const LEDGER = ['photos', 'inbox', '_processed.json'];
+const LEDGER_ABOUT = "Photo inbox for this library. Photos are read by Claude, merged with tools/photo-merge.mjs, logged in imports/, then deleted. Every photo processed is listed here so it is never read twice.";
+function readLedger(dir) {
+  let raw = null; try { raw = JSON.parse(fs.readFileSync(path.join(dir, ...LEDGER), 'utf8')); } catch (e) {}
+  const led = { about: (raw && raw.about) || LEDGER_ABOUT, processed: (raw && Array.isArray(raw.processed)) ? raw.processed : [], photos: {} };
+  for (const e of led.processed) if (e && e.file) led.photos[e.file] = e;
+  return led;
+}
+function writeLedger(dir, led) {
+  fs.mkdirSync(path.join(dir, 'photos', 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(dir, ...LEDGER), JSON.stringify({ about: led.about, processed: led.processed }, null, 2));
+}
 function photoPath(dir, name) { return /^identify\//i.test(name.replace(/\\/g, '/')) ? path.join(dir, 'photos', name) : path.join(dir, 'photos', 'inbox', name); }
 function listInbox(dir) {
   const out = [];
@@ -290,8 +302,9 @@ export function run(dir, readingsFile, opts = {}) {
     for (const c of conflicts) { fs.mkdirSync(path.join(dir, 'imports', 'conflicts'), { recursive: true }); fs.renameSync(path.join(dir, c), path.join(dir, 'imports', 'conflicts', c)); }
     // the ledger: every photo processed, with its checksum, so it's never read twice
     fs.mkdirSync(path.join(dir, 'photos'), { recursive: true });
-    for (const b of readings.blocks) { const p = photoPath(dir, b.photo); ledger.photos[b.photo] = { batch: res.batch, at: new Date(now).toISOString(), sha1: fs.existsSync(p) ? sha1(fs.readFileSync(p)) : null }; }
-    fs.writeFileSync(path.join(dir, 'photos', 'processed.json'), JSON.stringify(ledger, null, 2));
+    for (const f of new Set(readings.blocks.map(b => b.photo))) { const p = photoPath(dir, f);
+      const e = { file: f, at: now, batch: res.batch, sha1: fs.existsSync(p) ? sha1(fs.readFileSync(p)) : null }; ledger.processed.push(e); ledger.photos[f] = e; }
+    writeLedger(dir, ledger);
     let deleted = 0;
     if (!opts.keepPhotos) {
       for (const f of new Set(readings.blocks.map(b => b.photo))) {
@@ -302,7 +315,7 @@ export function run(dir, readingsFile, opts = {}) {
         if (fs.existsSync(note) && !listInbox(dir).some(x => photoPath(dir, x).startsWith(base + ' ') || photoPath(dir, x) === base + '.jpg')) fs.unlinkSync(note);
       }
     }
-    out.push(text, 'Written: catalog, log in imports/, ledger photos/processed.json' + (opts.keepPhotos ? '' : '; ' + deleted + ' photo(s) deleted') + '.');
+    out.push(text, 'Written: catalog, log in imports/, ledger photos/inbox/_processed.json' + (opts.keepPhotos ? '' : '; ' + deleted + ' photo(s) deleted') + '.');
     return { text: out.join('\n'), res };
   }
   throw new Error('The catalog kept changing while working; try again in a minute.');
