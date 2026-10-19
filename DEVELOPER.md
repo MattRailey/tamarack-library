@@ -42,6 +42,7 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `mystery.js` | The unidentified-books list and the shelf-by-shelf walk-through, including "add a book we missed". |
 | `photos.js` | Uploading shelf and title-page photos to the Dropbox photo inbox. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |
+| `wizard.js` | First-run setup wizard (invite code, own Dropbox, or this device only; photo tips; home screen). "Add another phone" links. |
 | `app.js` | Panels (tabs), `refreshAll()`, start-up. |
 
 **The one rule for changes to data:** mutate `store.books`, give each changed book a new `updatedAt`, then call `commit()`. `commit()` stamps the changed fields, saves on the device, schedules a Dropbox sync and redraws.
@@ -106,11 +107,28 @@ A library is a Dropbox folder. The folder name is kept per device in localStorag
 - A **set-up link**, `tamarack-library.html?folder=/Smith%20Library&appkey=…`, is handled in `core.js` before any key is computed. The query is then removed from the address bar.
 - The library name and tagline are stored in the catalog (`settings.library`), so they sync. The folder and app key are per device, because they are how a device finds the catalog in the first place.
 
+## Where a library is kept: own Dropbox or friends service
+
+There are two ways a library can be kept, and nothing else in the app knows the difference. Every read and write of a library file goes through `cloudGet(path)` / `cloudPut(path, body, {rev, autorename})` in `dropbox.js`. Use them for any new file access. `cloudOn()` says whether this library is connected at all.
+
+- **Own Dropbox:** straight to the Dropbox API with this device's sign-in (`DBX_TOKENS_KEY`).
+- **Friend library:** through the friends service in `worker/`, with this phone's device key (`FRIEND_KEY`, `{ server, token, lib, device }`).
+  - The service holds the only Dropbox sign-in. It checks that every path is `/<this phone's library>/` plus an allowed file: the catalog, `covers/*`, `photos/inbox/*` or `photos/identify/*`.
+  - It keeps the same never-overwrite rules: `add`, or `update:<rev>`.
+  - Paths look the same to the app either way, so `dbx:` cover paths and `idPhoto` work unchanged.
+- **Joining:** `?join=CODE` (parsed in `core.js`) opens the wizard. `/join` returns a device key. The wizard stores it under the library's namespace, sets the folder, and reloads.
+- **The service address** is `DEFAULT_FRIEND_SERVER` in `core.js`. It is never taken from a link. Until it is set, the wizard hides the invite option.
+- **Setup and admin:** see `worker/README.md`.
+
+**Photos waiting to send.** A photo that fails to upload is kept in IndexedDB (`photoq:<path>`) and retried on `online`, at start-up, or with *Send them now*.
+- Retries go to the same name with no autorename. A name that is already taken means an earlier try did arrive, so it counts as sent. That way a retry never makes a duplicate.
+- Shelf and spine photos are sent at 3600 px and JPEG quality 0.9 (`PHOTO_SIZE` in `photos.js`) so small spine print stays readable.
+
 ## Photo inbox (the Claude workflow)
 
 The app only uploads. Claude does the reading, with the library's Dropbox folder linked.
 
-- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [i].jpg`. `kind` is `shelf`, `spines`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`.
+- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`.
 - **Title-page photos** from the walk-through go to `photos/identify/` as `<Room> <Bookcase> shelf-<n> pos-<p> <bookId>.jpg`. That book gets `idPhoto` so the list shows 📷.
 - **After reading**, Claude does four things:
   - edits the catalog, matching books that have no location to the shelf they were seen on instead of adding duplicates;

@@ -11,7 +11,7 @@ test('photos are named with date, room, bookcase, shelf and kind; notes go along
   await expect(page.locator('#ph-status')).toContainText('2 photos sent', { timeout: 10000 });
   const paths = net.uploads.map(u => u.path).filter(p => p.includes('/photos/inbox/'));
   expect(paths.filter(p => p.endsWith('.jpg'))).toHaveLength(2);
-  expect(paths[0]).toMatch(/^\/Railey Library\/photos\/inbox\/\d{4}-\d\d-\d\d \d{6} Living-Room Tall-bookcase shelf-2 shelf left-half 1\.jpg$/);
+  expect(paths[0]).toMatch(/^\/Railey Library\/photos\/inbox\/\d{4}-\d\d-\d\d \d{6} Living-Room Tall-bookcase shelf-2 shelf left-half 01\.jpg$/);
   expect(paths.some(p => p.endsWith('NOTE.txt'))).toBeTruthy();
 });
 

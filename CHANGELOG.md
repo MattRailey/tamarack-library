@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1 — 2026-10 · Friends' libraries and setup wizard
+
+**New**
+- **Setup wizard.** It opens by itself the first time the app runs on a phone. You pick one of three ways in (invite code, your own Dropbox, or just this device), then get shelf-photo tips and how to add the app to the home screen. Run it again from Data & Sync.
+- **Friends' libraries.** Friends can keep their library in Matt's Dropbox through a small service (`worker/`), with no Dropbox account of their own. Each phone's key opens only its own library.
+- **Add another phone.** A one-time link brings a second phone in the household into the same library.
+
+**Fixes**
+- **Photos that fail to send are no longer lost.** They wait on the phone and send by themselves later, without duplicates.
+- **Photo order:** photos are numbered `01`, `02`… so 10 no longer sorts before 2.
+- **Sharper shelf photos:** shelf and spine photos are now sent at 3600 px and higher quality (was 2600 px), so small spine print stays readable.
+
 ## 2.2.1 — 2026-10-12 · Safer offline copy
 
 **Fixes**

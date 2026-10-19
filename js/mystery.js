@@ -171,24 +171,24 @@ function identify(b, info){
 $('wk-file').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f) return;
   const b=walkCur(); if(!b) return;
-  const t=await dbxToken(); if(!t){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
+  if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
   toast('Sending photo…');
   try{
     const blob=await shrinkPhoto(f, 1600);
     const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
     const path=dbxFolder()+'/photos/identify/'+[slug(b.room),slug(b.bookcase),'shelf-'+slug(b.shelf),'pos-'+slug(b.position),b.id].join(' ')+'.jpg';
-    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
-      'Dropbox-API-Arg':dbxArg({ path, mode:'add', autorename:true, mute:true }).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)) }, body:blob });
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    const r=await cloudPut(path, blob, { autorename:true });
+    if(!r.ok) throw new Error(r.signedOut?'not connected':'upload failed');
     const now=Date.now();
     store.books=store.books.map(x=>x.id===b.id?Object.assign({}, x, { idPhoto:path, idPhotoAt:now, updatedAt:now }):x);
     commit(); toast('Photo sent — Claude will read it next time you ask'); walkSkipped.add(b.id); walkI++; drawWalk();
   }catch(err){ toast('Couldn’t send the photo ('+err.message+') — try again'); }
 };
-function shrinkPhoto(file, max){
+// Resize a phone photo before sending. Shelf photos keep enough pixels for small spine print (see photos.js).
+function shrinkPhoto(file, max, quality){
   return new Promise((res,rej)=>{ const img=new Image(), url=URL.createObjectURL(file);
     img.onload=()=>{ const s=Math.min(1, max/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(bl=>bl?res(bl):rej(new Error('photo failed')),'image/jpeg',0.82); };
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url); c.toBlob(bl=>bl?res(bl):rej(new Error('photo failed')),'image/jpeg',quality||0.82); };
     img.onerror=()=>rej(new Error('couldn’t read the photo')); img.src=url; });
 }
 
@@ -244,7 +244,7 @@ function drawAddMissed(){
     if(!on && addCtx.side!=='other'){ addCtx.side='other'; $('wa-sides').querySelectorAll('[data-side]').forEach(x=>x.classList.toggle('on', x.dataset.side==='other')); $('wa-posbox').classList.remove('hide'); } }));
   $('wa-back').onclick=()=>{ if(!walkIds.length || addFromPicker) drawPicker(); else drawWalk(); };
   $('wa-type').onclick=()=>{ $('wa-form').classList.remove('hide'); $('wa-title').focus(); };
-  $('wa-photo').onclick=async()=>{ if(!checkLoc()) return; if(!(await dbxToken())){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; } $('wa-file').click(); };
+  $('wa-photo').onclick=async()=>{ if(!checkLoc()) return; if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; } $('wa-file').click(); };
   $('wa-scan').onclick=()=>{ if(!checkLoc()) return; openScanner({kind:'fill', onFound:info=>{
     if(!info.title){ $('wa-form').classList.remove('hide'); addPending={isbn:info.isbn}; $('wa-title').focus(); toast('Not found online — type the title'); return; }
     checkThenAdd(info); }}); };
@@ -311,15 +311,14 @@ function checkThenAdd(info){
 }
 $('wa-file').onchange=async e=>{
   const f=e.target.files[0]; e.target.value=''; if(!f || !addCtx) return;
-  const t=await dbxToken(); if(!t){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
+  if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so the photo can reach Claude'); return; }
   const l=addLoc(); toast('Sending photo…');
   try{
     const blob=await shrinkPhoto(f, 1600), id=uid();
     const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
     const path=dbxFolder()+'/photos/identify/'+['found',slug(l.room),slug(l.bookcase),'shelf-'+slug(l.shelf),id].join(' ')+'.jpg';
-    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
-      'Dropbox-API-Arg':dbxArg({ path, mode:'add', autorename:true, mute:true }).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)) }, body:blob });
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    const r=await cloudPut(path, blob, { autorename:true });
+    if(!r.ok) throw new Error(r.signedOut?'not connected':'upload failed');
     const now=Date.now();
     placeBook({ id, title:'(Found on walk-through — title-page photo sent)', needsReview:true, idPhoto:path, idPhotoAt:now, notes:'Added during a walk-through; title-page photo is in photos/identify for Claude to read.' }, l);
   }catch(err){ toast('Couldn’t send the photo ('+err.message+') — try again'); }

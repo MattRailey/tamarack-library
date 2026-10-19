@@ -22,20 +22,67 @@ async function dbxToken(){
     return t;
   }catch(e){ return null; }
 }
-async function dbxDownload(){
-  const t = await dbxToken();
-  if(!t) return { connected:false };
-  const r = await fetch('https://content.dropboxapi.com/2/files/download', { method:'POST',
-    headers:{ 'Authorization':'Bearer '+t.access_token, 'Dropbox-API-Arg':dbxArg({path:dbxPath()}) } });
-  if(r.status===409) return { connected:true, data:null, rev:null };   // no file yet
-  if(r.status===401) return { connected:false, expired:true };
+/* ---- Files in the library folder, wherever this library is kept ----
+   Own Dropbox: straight to the Dropbox API with this device's sign-in.
+   Friend library: through the friends service, which only lets this phone into its own folder.
+   Paths are always "<library folder>/<file>", the same in both. */
+function friendCfg(){ try{ const r=lsGet(FRIEND_KEY); const f=r?JSON.parse(r):null; return f && f.token && f.server ? f : null; }catch(e){ return null; } }
+function cloudOn(){ return !!(friendCfg() || dbxTokens()); }
+function cloudName(){ return friendCfg() ? 'the library' : 'Dropbox'; }
+async function friendCall(ep, headers, body){
+  const f=friendCfg();
+  return fetch(f.server.replace(/\/+$/,'')+ep, { method:'POST', headers:Object.assign({ Authorization:'Bearer '+f.token }, headers||{}), body });
+}
+// → { ok, res, rev } | { missing } | { signedOut, expired }
+async function cloudGet(path){
+  if(friendCfg()){
+    const r=await friendCall('/files/download', { 'X-Path':encodeURIComponent(path) });
+    if(r.status===404) return { missing:true };
+    if(r.status===401) return { signedOut:true, expired:true, revoked:true };
+    if(!r.ok) throw new Error('download failed (HTTP '+r.status+')');
+    return { ok:true, res:r, rev:r.headers.get('X-Rev')||null };
+  }
+  const t=await dbxToken(); if(!t) return { signedOut:true };
+  const r=await fetch('https://content.dropboxapi.com/2/files/download', { method:'POST',
+    headers:{ 'Authorization':'Bearer '+t.access_token, 'Dropbox-API-Arg':dbxArg({path}) } });
+  if(r.status===409) return { missing:true };
+  if(r.status===401) return { signedOut:true, expired:true };
   if(!r.ok) throw new Error('download failed (HTTP '+r.status+')');
-  let rev = null;
-  try{ rev = JSON.parse(r.headers.get('Dropbox-API-Result')||'{}').rev || null; }catch(e){}
-  const data = JSON.parse(await r.text());
+  let rev=null; try{ rev=JSON.parse(r.headers.get('Dropbox-API-Result')||'{}').rev || null; }catch(e){}
+  return { ok:true, res:r, rev };
+}
+// opts.rev: replace only if nobody saved since that revision; otherwise "add" (never a blind overwrite).
+// opts.autorename: on a name clash keep both. → { ok, path, rev } | { conflict } | { signedOut }
+async function cloudPut(path, body, opts){
+  opts=opts||{};
+  if(friendCfg()){
+    const r=await friendCall('/files/upload', { 'Content-Type':'application/octet-stream', 'X-Path':encodeURIComponent(path),
+      'X-Mode':opts.rev?'update:'+opts.rev:'add', 'X-Autorename':opts.autorename?'1':'0' }, body);
+    if(r.status===409) return { conflict:true };
+    if(r.status===401) return { signedOut:true, revoked:true };
+    if(!r.ok) throw new Error('upload failed (HTTP '+r.status+')');
+    const j=await r.json(); return { ok:true, path:j.path||path, rev:j.rev||null };
+  }
+  const t=await dbxToken(); if(!t) return { signedOut:true };
+  const mode = opts.rev ? { '.tag':'update', update:opts.rev } : 'add';
+  const r=await fetch('https://content.dropboxapi.com/2/files/upload', { method:'POST',
+    headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':dbxArg({ path, mode, autorename:!!opts.autorename, mute:true }) }, body });
+  if(r.status===409) return { conflict:true };
+  if(r.status===401) return { signedOut:true };
+  if(!r.ok) throw new Error('upload failed (HTTP '+r.status+')');
+  let j={}; try{ j=await r.json(); }catch(e){}
+  return { ok:true, path:j.path_display||path, rev:j.rev||null };
+}
+
+async function dbxDownload(){
+  const g=await cloudGet(dbxPath());
+  if(g.signedOut) return { connected:false, expired:!!g.expired, revoked:!!g.revoked };
+  if(g.missing) return { connected:true, data:null, rev:null };   // no file yet
+  const data = JSON.parse(await g.res.text());
   if(!validStore(data)) throw new Error('the Dropbox file isn\'t a library file — not touching it');
   if(!Array.isArray(data.imports)) data.imports = [];
-  return { connected:true, data, rev };
+  return { connected:true, data, rev:g.rev };
 }
 // The Dropbox copy is written neatly (indented, title and author first in each book) so a person can open it and read it.
 const KEY_ORDER=['id','title','author','series','seriesNo','genre','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','collections','isbn','year','publisher','pages','format','about','subjects','notes','needsReview','coverUrl'];
@@ -44,18 +91,12 @@ function readableJSON(s){
   return JSON.stringify(Object.assign({}, s, { books:s.books.map(tidy) }), null, 2);
 }
 async function dbxUpload(s, rev){
-  const t = await dbxToken();
-  if(!t) return { ok:false };
   // With a rev: only succeeds if nobody else wrote the file since we read it.
   // Without one (first upload): 'add' fails rather than clobbering a file that appeared meanwhile.
-  const mode = rev ? { '.tag':'update', update:rev } : 'add';
-  const r = await fetch('https://content.dropboxapi.com/2/files/upload', { method:'POST',
-    headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
-      'Dropbox-API-Arg':dbxArg({ path:dbxPath(), mode, autorename:false, mute:true }) },
-    body: readableJSON(s) });
+  const r=await cloudPut(dbxPath(), readableJSON(s), { rev });
   if(r.ok) return { ok:true };
-  if(r.status===409) return { ok:false, conflict:true };
-  throw new Error('upload failed (HTTP '+r.status+')');
+  if(r.conflict) return { ok:false, conflict:true };
+  return { ok:false };
 }
 
 function b64url(bytes){ return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
@@ -86,38 +127,48 @@ async function dbxHandleRedirect(){
   }catch(e){ toast('Dropbox connection failed: '+e.message); }
 }
 function dbxDisconnect(){
-  if(!confirm('Disconnect Dropbox on this device? Your books stay saved here and in Dropbox.')) return;
-  try{ localStorage.removeItem(DBX_TOKENS_KEY); }catch(e){}
+  if(friendCfg()){
+    if(!confirm('Take this phone out of the library? Your books stay saved in the library for your other phones. To get back in you’ll need a new invite.')) return;
+    try{ localStorage.removeItem(FRIEND_KEY); }catch(e){}
+  } else {
+    if(!confirm('Disconnect Dropbox on this device? Your books stay saved here and in Dropbox.')) return;
+    try{ localStorage.removeItem(DBX_TOKENS_KEY); }catch(e){}
+  }
   lastSyncAt=0; setSync('', 'Local only (Dropbox not connected)'); renderDbxCard();
 }
 function renderDbxCard(){
-  const on = !!dbxTokens();
+  const fr = friendCfg(), on = cloudOn();
   $('dbx-appkey').value = dbxAppKey();
-  $('dbx-appkey-row').classList.toggle('hide', on || !!DEFAULT_DBX_APP_KEY);
+  $('dbx-appkey-row').classList.toggle('hide', on || !!DEFAULT_DBX_APP_KEY || !!fr);
   $('btn-connect').classList.toggle('hide', on);
   $('btn-disconnect').classList.toggle('hide', !on);
+  $('btn-disconnect').textContent = fr ? 'Remove this phone' : 'Disconnect';
   $('btn-sync').classList.toggle('hide', !on);
+  $('btn-addphone').classList.toggle('hide', !fr);
+  $('dbx-title').textContent = fr ? 'Sync' : 'Dropbox';
+  document.querySelectorAll('.own-dbx').forEach(e=>e.classList.toggle('hide', !!fr));
+  document.querySelectorAll('.friend-only').forEach(e=>e.classList.toggle('hide', !fr));
   $('dbx-redirect').textContent = redirectUri();
 }
 let syncing=false, syncAgain=false, pushTimer=null, lastSyncAt=0, lastSyncedSig=lsGet(SYNCED_KEY)||'';
-function markDirty(){ if(dbxTokens()) setSync('warn','Unsynced changes…'); }
+function markDirty(){ if(cloudOn()) setSync('warn','Unsynced changes…'); }
 function setSync(kind, text){
   $('sync-dot').className = 'sync-dot' + (kind?' '+kind:'');
   $('sync-text').textContent = text;
   const d = $('dbx-status');
-  if(!dbxTokens()) d.innerHTML = '<b>Not connected on this device.</b> Your catalog is saved on this device only until you connect Dropbox below.';
+  if(!cloudOn()) d.innerHTML = '<b>Not connected on this device.</b> Your catalog is saved on this device only until you connect Dropbox below, or run the setup again.';
   else d.textContent = text;
 }
-function schedulePush(){ if(!dbxTokens()) return; clearTimeout(pushTimer); pushTimer=setTimeout(syncNow, 1500); }
+function schedulePush(){ if(!cloudOn()) return; clearTimeout(pushTimer); pushTimer=setTimeout(syncNow, 1500); }
 async function syncNow(){
-  if(!dbxTokens()){ setSync('', 'Local only (Dropbox not connected)'); setTimeout(()=>autoLookup(false), 800); return; }
+  if(!cloudOn()){ setSync('', 'Local only (Dropbox not connected)'); setTimeout(()=>autoLookup(false), 800); return; }
   if(syncing){ syncAgain=true; return; }
   syncing=true; setSync('warn','Syncing…');
   try{
     let done=false;
     for(let attempt=0; attempt<4 && !done; attempt++){
       const remote = await dbxDownload();
-      if(!remote.connected){ setSync('err', remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
+      if(!remote.connected){ setSync('err', remote.revoked ? 'This phone was taken out of the library — ask for a new invite' : remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
       const merged = remote.data ? mergeStores(store, remote.data) : store;
       if(sig(merged)!==sig(store)){ stampFields(); store = merged; snapAll(); writeLocal(); refreshAll(); }
       if(remote.data && sig(merged)===sig(remote.data)){ done=true; break; }

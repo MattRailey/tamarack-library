@@ -20,7 +20,15 @@ A home book catalog: every book in the house, what it is, and exactly where it s
 - **Selling.** Mark books to sell, then export eBay and Etsy listing files.
 - **Offline.** After the first visit the app opens with no signal. Changes sync when the phone is back online.
 
-## Start your own library
+## Getting started
+
+The first time the app opens on a phone, a **setup wizard** walks through everything. You can run it again any time from **Epilogue → Data & Sync → Run setup again**.
+
+- **Friends (invite code).** Matt sends a link. Tap it and the wizard opens with the code filled in. Tap *Join the library* and you're in. There's no Dropbox account to make and nothing to share. The library is kept in Matt's Dropbox through a small service, and your phone can only open your own library. See [worker/README.md](worker/README.md).
+- **Two phones, one household.** On the first phone, go to **Data & Sync → Add another phone**. That makes a one-time link; open it on the second phone. Both phones see and edit the same books.
+- **Your own Dropbox.** Choose *Use my own Dropbox* in the wizard, or follow the manual steps below.
+
+## Start your own library in your own Dropbox
 
 You need a Dropbox account and about ten minutes.
 
@@ -50,6 +58,11 @@ Each person still signs in to their own Dropbox. The app key only lets the app i
 **Several libraries on one device.** Libraries never mix. Each one keeps its own books, Dropbox sign-in and settings, and you can switch between them under Library settings.
 
 ## Claude and the photo inbox
+
+**Photo tips.**
+- Label each bookcase or bay (*N1*, *N2*…). Type it in **Bookcase or bay**, and photograph a sticky note with the code first.
+- Shoot top to bottom, two photos per shelf, in good, even light, with no flash.
+- Photos are numbered `01`, `02`… in the order taken. If one doesn't go through, it waits on the phone and sends by itself when the signal is back (or tap *Send them now*), under the same name, so nothing is sent twice.
 
 The app sends shelf photos to `photos/inbox/` in the library's Dropbox folder. Title-page photos from the mystery-book walk-through go to `photos/identify/`. File names say where each photo was taken.
 
