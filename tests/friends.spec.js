@@ -53,7 +53,9 @@ async function freshPhone(page, query = '') {
   await page.goto(APP + query);
 }
 async function finishWizard(page) {
-  await expect(page.locator('#wz-body')).toContainText('Adding books', { timeout: 20000 });
+  await expect(page.locator('#wz-body')).toContainText('Photograph your shelves', { timeout: 20000 });
+  await page.click('#wz-photos-done');
+  await expect(page.locator('#wz-body')).toContainText('Books Claude can’t read');
   await page.click('#wz-next');
   await expect(page.locator('#wz-body')).toContainText('home screen');
   await page.click('#wz-done');
@@ -84,6 +86,21 @@ test('a friend taps an invite link: joins, the library is named, and books sync 
   await expect(page.locator('#wz-code')).toHaveValue(inv.code.replace('-', ''));
   await page.click('#wz-join');
   await expect(page.locator('#wz-body')).toContainText('Your library is ready', { timeout: 20000 });
+  // build-library mode: the first bookcase is photographed right in the wizard, through the service
+  await page.click('#wz-shoot');
+  await expect(page.locator('#wz-err')).toContainText('room and the bookcase');
+  await page.fill('#wz-room', 'Den'); await page.fill('#wz-case', 'N1');
+  await page.setInputFiles('#wz-file', ['tests/fixtures/shelf.jpg', 'tests/fixtures/shelf.jpg']);
+  await expect(page.locator('#wz-phstatus')).toContainText('2 photos of N1 sent', { timeout: 15000 });
+  // more of the same bookcase, then on to the next one: the name counts up and the finished one is listed
+  await expect(page.locator('#wz-shoot')).toContainText('More photos of N1');
+  await expect(page.locator('#wz-nextcase')).toHaveText('Finished with N1 →');
+  await page.click('#wz-nextcase');
+  await expect(page.locator('#wz-case')).toHaveValue('N2');
+  await expect(page.locator('#wz-room')).toHaveValue('Den');
+  await expect(page.locator('.wz-done-list')).toContainText('N1 · 2 photos');
+  await expect(page.locator('#wz-photos-done')).toHaveText('Finished adding to library');
+  expect([...svc.files.keys()].filter(k => k.startsWith('/Smith Library/photos/inbox/') && / Den N1 shelf 0[12]\.jpg$/.test(k))).toHaveLength(2);
   await finishWizard(page);
   await expect(page.locator('#lib-name')).toHaveText('The Smith Library');
   // add a book by hand; it lands in the Smith folder via the service, and nothing talks to Dropbox directly
@@ -96,6 +113,7 @@ test('a friend taps an invite link: joins, the library is named, and books sync 
   await expect(page.locator('#btn-addphone')).toBeVisible();
   await expect(page.locator('#dbx-appkey-row')).toBeHidden();
   await expect(page.locator('#cfg-folder')).toBeHidden();
+  await expect(page.locator('#adm-card')).toBeHidden();
 });
 
 test('husband and wife: "Add another phone" brings the second phone into the same library', async ({ browser }) => {
@@ -151,4 +169,40 @@ test('photos that fail to send wait on the phone and go later, under the same na
   expect(sent).toHaveLength(3);
   expect(sent.map(p => p.match(/ (\d\d)\.jpg$/)[1]).sort()).toEqual(['01', '02', '03']);
   expect(sent.every(p => / Shed N1 shelf-1 shelf \d\d\.jpg$/.test(p))).toBe(true);
+});
+
+test('Invite a friend (Matt’s devices): secret saved once, invite made, phones listed and switched off; hidden on friends', async ({ page }) => {
+  const svc = await startService(); await connect(page, svc);
+  page.on('dialog', d => d.accept());
+  await openApp(page, { dropbox: true, extra: { tamarack_library_friend_server: SERVER } });
+  await epilogue(page, 'data');
+  await expect(page.locator('#adm-card')).toBeVisible();
+  await page.click('#adm-card summary');
+  // a wrong secret is refused and not kept
+  await page.fill('#adm-secret', 'not-the-secret-at-all'); await page.click('#adm-login button[type=submit]');
+  await expect(page.locator('#adm-msg')).toContainText('didn’t accept');
+  expect(await page.evaluate(() => localStorage.getItem('tamarack_library_admin'))).toBeNull();
+  await page.fill('#adm-secret', ADMIN); await page.click('#adm-login button[type=submit]');
+  await expect(page.locator('#adm-tools')).toBeVisible();
+  // make an invite: code + link, and the library shows with its open invite
+  await page.fill('#adm-lib', 'Jones Library'); await page.click('#adm-invite');
+  await expect(page.locator('#adm-invite-out .wz-code')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  await expect(page.locator('#adm-link')).toHaveValue(/\?join=[A-Z0-9]{8}$/);
+  await expect(page.locator('#adm-list .sr-item', { hasText: 'Jones Library' })).toContainText('Open invite');
+  // a phone joins with it, shows up in the list, and is switched off from here
+  const code = (await page.locator('#adm-invite-out .wz-code').textContent()).replace('-', '');
+  const joined = await (await svc.worker.fetch(new Request(SERVER + '/join', { method: 'POST', body: JSON.stringify({ code, device: 'iPhone' }) }), svc.env, {})).json();
+  expect(joined.lib).toBe('Jones Library');
+  await page.click('#adm-refresh');
+  const item = page.locator('#adm-list .sr-item', { hasText: 'Jones Library' });
+  await expect(item).toContainText('1 phone');
+  await item.locator('.adm-off').click();
+  await expect(item).toContainText('0 phones');
+  const res = await svc.worker.fetch(new Request(SERVER + '/whoami', { method: 'POST', headers: { Authorization: 'Bearer ' + joined.token } }), svc.env, {});
+  expect(res.status).toBe(401);
+  // the secret stays on this device until forgotten
+  await page.reload(); await epilogue(page, 'data'); await page.click('#adm-card summary');
+  await expect(page.locator('#adm-tools')).toBeVisible();
+  await page.click('#adm-forget');
+  await expect(page.locator('#adm-login')).toBeVisible();
 });

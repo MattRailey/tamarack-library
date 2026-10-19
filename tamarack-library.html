@@ -27,14 +27,15 @@
 <script src="js/shelves.js" defer></script>
 <script src="js/import.js" defer></script>
 <script src="js/series.js" defer></script>
-<script src="js/sell.js" defer></script>
 <script src="js/data.js" defer></script>
 <script src="js/collections.js" defer></script>
 <script src="js/scanner.js" defer></script>
 <script src="js/mystery.js" defer></script>
 <script src="js/photos.js" defer></script>
+<script src="js/recheck.js" defer></script>
 <script src="js/settings.js" defer></script>
 <script src="js/wizard.js" defer></script>
+<script src="js/admin.js" defer></script>
 <script src="js/app.js" defer></script>
 </head>
 <body>
@@ -48,7 +49,7 @@
       <span class="sync-dot" id="sync-dot"></span>
     </button>
     <div class="menu-pop" id="menu-pop">
-      <button data-go="import"><b>Import &amp; Export</b><span>Build a library from photos, mystery books, selling</span></button>
+      <button data-go="import"><b>Import &amp; Export</b><span>Photos, mystery books, duplicates, series, recheck</span></button>
       <button data-go="data"><b>Data &amp; Sync</b><span id="sync-text">Local only</span></button>
       <button data-go="help"><b>How it works</b><span>A short guide to the library</span></button>
       <div class="menu-foot" id="lookup-hdr"></div>
@@ -128,8 +129,6 @@
           <div class="row">
             <button class="secondary" id="btn-reset">Clear filters</button>
             <button class="secondary" id="btn-select">Select multiple…</button>
-            <button class="secondary" id="btn-series">Series split up…</button>
-            <button class="secondary" id="btn-dups">Duplicates…</button>
           </div>
         </div>
         </div>
@@ -170,8 +169,8 @@
       <button class="back-link" data-go="library">&larr; Library</button>
       <div class="appx-tabs"><button type="button" data-go="import" class="on"><small>Appendix A</small>Import &amp; Export</button><button type="button" data-go="data"><small>Appendix B</small>Data &amp; Sync</button><button type="button" data-go="help"><small>Appendix C</small>How it works</button></div>
       <h2>Import &amp; Export</h2>
-      <p class="sub">Bring books in from shelf photos or spreadsheets, and review, price, and list books you want to sell. Nothing on this tab shows up in the main library.</p>
-      <div class="seg" id="ie-seg" style="margin-bottom:16px;"><button data-ie="unid">Unidentified</button><button data-ie="sell" class="active">Sell &amp; value</button><button data-ie="import">From photos</button></div>
+      <p class="sub">Build the library from shelf photos, then tidy it: books that couldn’t be read, extra copies, series spread around the house, and shelves that have moved.</p>
+      <div class="seg ie-tabs" id="ie-seg"><button data-ie="import" class="active">From photos</button><button data-ie="unid">Unidentified</button><button data-ie="dups">Duplicates</button><button data-ie="series">Series</button><button data-ie="recheck">Recheck shelves</button></div>
       <div id="ie-unid" class="hide">
         <div class="card">
           <div class="row" style="justify-content:space-between;align-items:flex-start;">
@@ -188,40 +187,51 @@
         </div>
         <div id="un-list"></div>
       </div>
-      <div id="ie-sell">
+      <div id="ie-dups" class="hide">
         <div class="card">
-          <div class="row" style="justify-content:space-between;align-items:flex-start;">
-            <div><h3 style="margin-bottom:2px;">Sell &amp; value</h3><div class="note" id="sl-summary" style="margin-top:0;"></div></div>
-            <button class="secondary" id="sl-settings-btn">Listing settings</button>
-          </div>
-          <div class="search-row">
-            <div class="seg" id="sl-view">
-              <button data-v="dups" class="active">Duplicates</button><button data-v="selling">To sell</button><button data-v="listed">Listed</button><button data-v="sold">Sold</button><button data-v="all">All books</button>
-            </div>
-          </div>
-          <div class="search-wrap" style="margin-top:10px;"><input type="search" id="sl-q" placeholder="Find a book to price or sell…" autocomplete="off"></div>
-          <div class="row" style="margin-top:10px;">
-            <button id="sl-export-ebay">Export eBay listings (.csv)</button>
-            <button id="sl-export-etsy">Export Etsy listings (.csv)</button>
-          </div>
-          <p class="note">Set a book to <b>Sell on eBay</b> or <b>Sell on Etsy</b>, give it a condition and price, then export. eBay: upload the file in Seller Hub → Reports → Uploads. Etsy has no built-in upload, so use the <b>Copy for Etsy</b> button on each book to paste into a new listing, or give the file to a bulk-listing tool. After listing, set the status to <b>Listed</b>; when it sells, <b>Sold</b> removes it from the main library (it stays here for your records).</p>
+          <h3 style="margin-bottom:2px;">Duplicates</h3>
+          <p class="note" style="margin-top:0;">Books you have more than one copy of (same title and author), with where each copy sits. Tap a copy to open it — handy for deciding what to give away, or for marking one “second copy” in its notes.</p>
         </div>
-        <div class="card hide" id="sl-settings">
-          <h3>Listing settings</h3>
-          <p class="note" style="margin-top:0;">Used in the eBay file. The policy names must match the business policies in your eBay account exactly (Account → Business policies).</p>
-          <div class="grid">
-            <div><label>eBay shipping policy name</label><input id="st-ship"></div>
-            <div><label>eBay return policy name</label><input id="st-return"></div>
-            <div><label>eBay payment policy name</label><input id="st-pay"></div>
-            <div><label>Default condition</label><select id="st-cond"><option>Very Good</option><option>Good</option><option>Like New</option><option>Acceptable</option></select></div>
-            <div style="grid-column:1/-1;"><label>Line added to every description</label><input id="st-footer" placeholder="e.g. Ships within 2 business days, carefully packed."></div>
-          </div>
-          <div class="row" style="margin-top:10px;"><button id="st-save">Save settings</button></div>
-        </div>
-        <div id="sl-list"></div>
-        <div class="more-wrap hide" id="sl-more-wrap"><button class="secondary" id="sl-more">Show more</button></div>
+        <div id="dp-list"></div>
       </div>
-      <div id="ie-import" class="hide">
+      <div id="ie-series" class="hide">
+        <div class="card">
+          <h3 style="margin-bottom:2px;">Series split up</h3>
+          <p class="note" style="margin-top:0;">Sets and series with books in more than one place, and where every one of them is. A book counts as part of a series from its <b>Series</b> field, or from titles like “…, Vol. 3”. Tap a book to open it.</p>
+          <div class="search-row">
+            <select id="sr-room" class="genre-main"><option value="">Anywhere in the house</option></select>
+            <label class="check"><input type="checkbox" id="sr-byshelf"> Count different shelves of one bookcase as split</label>
+          </div>
+        </div>
+        <div id="sr-list"></div>
+      </div>
+      <div id="ie-recheck" class="hide">
+        <div class="card photo-start">
+          <h3>Recheck shelves</h3>
+          <p class="note" style="margin-top:0;">Books wander. Every so often, photograph a bookcase again and Claude moves each book to the spot it’s in now.</p>
+          <ol class="steps">
+            <li><b>Pick the bookcase</b> below (or tap one in the list), and photograph it top shelf to bottom, the same way as the first time.</li>
+            <li><b>Claude matches every spine to a book already in the library</b> and updates its shelf and spot. It never adds a second copy of a book you already have.</li>
+            <li><b>A book that isn’t in the library at all</b> is added where it was seen, marked “needs review” so you can check it.</li>
+            <li><b>A book the library places here that isn’t in the photos</b> isn’t deleted: it’s marked “needs review — not seen at recheck” so you can find it.</li>
+          </ol>
+          <div class="grid" style="margin-top:10px;">
+            <div><label>Room</label><input id="rc-room" list="dl-room"></div>
+            <div><label>Bookcase or bay</label><input id="rc-case" list="dl-case" placeholder="e.g. N1"></div>
+            <div><label>Shelf (optional)</label><input id="rc-shelf" list="dl-shelf" placeholder="blank = the whole bookcase"></div>
+          </div>
+          <div class="row" style="margin-top:12px;"><button id="rc-take">Take recheck photos</button></div>
+          <input type="file" id="rc-file" accept="image/*" multiple class="hide">
+          <div id="rc-status" class="note"></div>
+          <div id="rc-sent"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:2px;">Bookcases</h3>
+          <p class="note" style="margin-top:0;">When each one was last photographed. The oldest are the likeliest to have drifted.</p>
+          <div id="rc-list"></div>
+        </div>
+      </div>
+      <div id="ie-import">
       <div class="card photo-start">
         <h3>Build a library from photos</h3>
         <p class="note" style="margin-top:0;">The quickest way to catalog a whole house — or start a brand-new library. Claude reads the spines and fills in every book with its room, bookcase, shelf and spot.</p>
@@ -307,6 +317,12 @@
         <p>Open it and tap <b>Edit details</b> to change anything: where it lives, read status, rating, notes, who it’s loaned to, or which collections it’s in.</p>
         <h3>Mystery books</h3>
         <p>Some spines couldn’t be read from photos. <b>Epilogue → Import &amp; Export → Unidentified</b> lists them. <b>Start the walk-through</b>, pick a shelf, and it takes you book by book: scan the barcode, type the title, or snap the title page.</p>
+        <h3>Tidying up</h3>
+        <ul>
+          <li><b>Duplicates</b> lists books you have more than one copy of, and where each copy is.</li>
+          <li><b>Series</b> lists sets and series spread over more than one place, with where every book is.</li>
+          <li><b>Recheck shelves</b>: when books have moved around, photograph a bookcase again. Claude moves each book to its new spot and never adds a second copy.</li>
+        </ul>
         <h3>Phones, computers and no signal</h3>
         <ul>
           <li>Everything saves on the device right away and syncs through Dropbox, so the phone and computer match. Each device connects once under <b>Epilogue → Data &amp; Sync</b>.</li>
@@ -317,7 +333,7 @@
         <h3>Starting your own library</h3>
         <p>Each library is its own folder in someone’s Dropbox, and libraries never mix. To start one, open <b>Epilogue → Data &amp; Sync → Library settings</b>, type a new folder name (and your library’s name), then connect your Dropbox. To fill it, use <b>Epilogue → Import &amp; Export → From photos</b>.</p>
         <h3>Behind the scenes</h3>
-        <p>The catalog is one file, <b>tamarack-library.json</b>, in the <b class="cfg-folder">Railey Library</b> folder in Dropbox — neatly laid out, so it can be opened and read. The app itself lives on <a href="https://github.com/MattRailey/tamarack-library" target="_blank" rel="noopener">GitHub</a>, with a setup guide and developer notes. Selling duplicates, imports and backups are under <b>Epilogue → Import &amp; Export</b> and <b>Data &amp; Sync</b>.</p>
+        <p>The catalog is one file, <b>tamarack-library.json</b>, in the <b class="cfg-folder">Railey Library</b> folder in Dropbox — neatly laid out, so it can be opened and read. The app itself lives on <a href="https://github.com/MattRailey/tamarack-library" target="_blank" rel="noopener">GitHub</a>, with a setup guide and developer notes. Photos, imports and tidying up are under <b>Epilogue → Import &amp; Export</b>; backups under <b>Data &amp; Sync</b>.</p>
       </div>
     </section>
     <section class="panel" id="data">
@@ -347,6 +363,28 @@
         <p class="note own-dbx">The library has its own Dropbox connection, separate from your other apps. The catalog lives in <b>Dropbox<span class="cfg-path">/Railey Library</span>/tamarack-library.json</b>. Connect once on each phone or computer. Changes from two devices are merged book by book, so editing on your phone and desktop never wipes out the other's changes.</p>
         <p class="note own-dbx">Redirect URI for the Dropbox app settings: <code id="dbx-redirect"></code></p>
       </div>
+      <details class="card adm-card hide" id="adm-card">
+        <summary><h3>Invite a friend</h3><span class="note">Friends’ libraries in your Dropbox: make invites, see their phones, switch one off.</span></summary>
+        <form id="adm-login" autocomplete="on" style="margin-top:10px;">
+          <p class="note" style="margin-top:0;">Paste the <b>admin secret</b> once on this device (from your password manager). It stays in this browser only, and can make invites and switch phones off, but can’t read anyone’s books.</p>
+          <input type="text" name="username" value="admin" autocomplete="username" class="hide" readonly>
+          <label for="adm-secret">Admin secret</label>
+          <input type="password" id="adm-secret" name="password" autocomplete="current-password" spellcheck="false">
+          <div class="row" style="margin-top:8px;"><button type="submit">Save on this device</button></div>
+        </form>
+        <div id="adm-tools" class="hide" style="margin-top:10px;">
+          <div class="grid" style="max-width:560px;">
+            <div><label for="adm-lib">Library name (their folder)</label><input id="adm-lib" placeholder="e.g. Smith Library" autocomplete="off"></div>
+            <div><label for="adm-title">Title shown in the app (optional)</label><input id="adm-title" placeholder="e.g. The Smith Library" autocomplete="off"></div>
+          </div>
+          <div class="row" style="margin-top:8px;"><button id="adm-invite">Make invite</button></div>
+          <div id="adm-invite-out" style="margin-top:8px;"></div>
+          <h4 style="margin:16px 0 6px;">Libraries and phones</h4>
+          <div id="adm-list"></div>
+          <div class="row" style="margin-top:10px;"><button class="secondary" id="adm-refresh">Refresh</button><button class="secondary" id="adm-forget">Forget admin secret on this device</button></div>
+        </div>
+        <p class="note" id="adm-msg"></p>
+      </details>
       <div class="card">
         <h3>At a glance</h3>
         <div class="stat-grid" id="stats"></div>
@@ -438,26 +476,7 @@
   </div>
 </div>
 
-<!-- duplicates modal -->
-<div class="modal-bg" id="dups-bg">
-  <div class="modal" style="max-width:680px;">
-    <button class="modal-close" id="dp-close" aria-label="Close">&times;</button>
-    <h3>Duplicate books</h3>
-    <p class="note" style="margin-top:0;">Books you have more than one copy of (same title and author). Tap a copy to open it — handy for deciding what to give away, or for marking one "second copy" in its notes.</p>
-    <div id="dp-list" style="margin-top:10px;"></div>
-  </div>
-</div>
 
-<!-- split-series modal -->
-<div class="modal-bg" id="series-bg">
-  <div class="modal" style="max-width:680px;">
-    <button class="modal-close" id="sr-close" aria-label="Close">&times;</button>
-    <h3>Series split across locations</h3>
-    <p class="note" style="margin-top:0;">Sets and series with volumes on more than one bookcase. A book counts as part of a series from its Series field, or from titles like “…, Vol. 3” and set names in its notes. Tap a location to see those books.</p>
-    <label class="check" style="margin:8px 0 4px;"><input type="checkbox" id="sr-byshelf"> Also count different shelves of the same bookcase as split</label>
-    <div id="sr-list" style="margin-top:10px;"></div>
-  </div>
-</div>
 
 <!-- batch edit modal -->
 <div class="modal-bg" id="batch-bg">
@@ -517,7 +536,7 @@
       <div><label>Room</label><input id="ph-room" list="dl-room"></div>
       <div><label>Bookcase or bay</label><input id="ph-case" list="dl-case" placeholder="e.g. Tall oak · N1"></div>
       <div><label>Shelf (optional)</label><input id="ph-shelf" list="dl-shelf"></div>
-      <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
+      <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="recheck">Recheck (books already in the library)</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
       <div style="grid-column:1/-1;"><label>Note for Claude (optional)</label><input id="ph-note" placeholder="e.g. left half of shelf 2 · these are new from the thrift store"></div>
     </div>
     <div class="row" style="margin-top:12px;"><button id="ph-take">Take or choose photos</button></div>

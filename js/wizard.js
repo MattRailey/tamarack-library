@@ -4,7 +4,8 @@
      • Invite code (friends): the library lives in Matt's Dropbox behind the friends service (worker/).
      • Own Dropbox: the library lives in this person's Dropbox, signed in on this device.
      • Just this device: nothing is synced (can be set up later).
-   Then: how to photograph shelves, and how to put the app on the home screen.
+   Then straight into photographing the shelves (build-library mode), how the walk-through finds the books Claude
+   couldn't read, and how to put the app on the home screen.
    Can be run again from Data & Sync. "Add another phone" (friends) also lives here.
    Part of the app's shared script scope: see DEVELOPER.md. */
 'use strict';
@@ -35,8 +36,8 @@ function closeWizard(done){
 $('wz-close').onclick=()=>closeWizard(true);   // closing it is fine: it won't keep coming back, and Data & Sync can run it again
 $('btn-wizard').onclick=()=>openWizard('welcome');
 
-const WZ_ORDER=['welcome','connect','tips','home'];
-function wzStepOf(s){ return { welcome:0, code:1, own:1, 'own-connect':1, joined:1, tips:2, home:3 }[s] ?? 0; }
+const WZ_ORDER=['welcome','connect','photos','unread','home'];
+function wzStepOf(s){ return { welcome:0, code:1, own:1, 'own-connect':1, joined:1, photos:2, unread:3, home:4 }[s] ?? 0; }
 function wzDraw(){
   const n=wzStepOf(wz.step);
   $('wz-dots').innerHTML=WZ_ORDER.map((_,i)=>'<i class="'+(i<n?'done':i===n?'on':'')+'"></i>').join('');
@@ -45,7 +46,7 @@ function wzDraw(){
   f.wire && f.wire(body);
   const first=body.querySelector('input:not([type=hidden])'); if(first && !first.value) setTimeout(()=>first.focus(), 50);
 }
-function wzGo(step){ wz.step=step; if(['tips','home','own-connect'].includes(step)) wzSave({ step }); wzDraw(); }
+function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect'].includes(step)) wzSave({ step }); wzDraw(); }
 function wzDevice(){
   const u=navigator.userAgent;
   return /iPhone/.test(u)?'iPhone':/iPad/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)?'iPad':/Android/.test(u)?'Android phone':'Computer';
@@ -103,8 +104,8 @@ const WZ_STEPS={
       if(!lib.title && wz.title){ store.settings=Object.assign({}, store.settings, { library:{ title:wz.title, tag:'Our books at home' }, updatedAt:Date.now() }); commit(); }
       const n=allBooks().length;
       wz.joinedNote = n ? 'You’re in. '+libCfg().title+' has '+n.toLocaleString()+' book'+(n===1?'':'s')+', and anything you change shows up on the other phones too.'
-                        : 'You’re in. Your library is ready — next, how to fill it.';
-      wzGo('tips');
+                        : 'You’re in. Your library is ready — let’s fill it.';
+      wzGo('photos');
     },
   },
   own:{
@@ -140,24 +141,94 @@ const WZ_STEPS={
       await wzWaitForSync();
       const lib=(store.settings||{}).library||{};
       if(!lib.title && wz.title){ store.settings=Object.assign({}, store.settings, { library:{ title:wz.title, tag:'Our books at home' }, updatedAt:Date.now() }); commit(); }
-      wz.joinedNote='Dropbox is connected. '+(allBooks().length ? 'Your '+allBooks().length.toLocaleString()+' books are here.' : 'Your library is ready — next, how to fill it.');
-      wzGo('tips');
+      wz.joinedNote='Dropbox is connected. '+(allBooks().length ? 'Your '+allBooks().length.toLocaleString()+' books are here.' : 'Your library is ready — let’s fill it.');
+      wzGo('photos');
     },
   },
-  tips:{
-    html:()=>(wz.joinedNote?'<p class="wz-ok">'+esc(wz.joinedNote)+'</p>':'')
-      +'<h3>Adding books</h3>'
-      +'<p class="wz-lead">The fastest way is to photograph your shelves. Claude reads the spines and adds the books for you.</p>'
-      +'<ol class="wz-list">'
-      +'<li><b>Give each bookcase a short name</b> like <i>N1</i>, <i>N2</i>, <i>Den</i>. Put it on a sticky note and photograph the note first.</li>'
-      +'<li><b>Shoot top shelf to bottom</b>, two photos per shelf (left half, right half). Hold the phone level, square to the spines.</li>'
-      +'<li><b>Good, even light, no flash.</b> Turn on room lights; flash glares on glossy spines.</li>'
-      +'<li><b>Lying-down stacks, extra-tall books, and books two deep</b> each get their own photo.</li>'
-      +'<li>In the app tap <b>Send photos</b>, type the room and bookcase, choose the photos, and send. If the signal drops, they wait on the phone and send later.</li>'
-      +'</ol>'
-      +'<p class="note">Single books: the barcode button scans them one at a time.</p>'
-      +'<div class="row wz-nav"><button id="wz-next">Next</button></div>',
-    wire:()=>{ $('wz-next').onclick=()=>wzGo('home'); },
+  /* Build-library mode: photograph one bookcase at a time, right here; the photos go to the inbox for Claude.
+     Several batches per bookcase; then "Finished with N1" (next one, name counted up: N1 → N2) or "Finished adding to library". */
+  photos:{
+    html:()=>{
+      const done=wz.cases||[], cur=wz.bookcase||'', curN=(done.find(c=>c.room===wz.room && c.bookcase===cur)||{}).n||0;
+      return (wz.joinedNote?'<p class="wz-ok">'+esc(wz.joinedNote)+'</p>':'')
+      +'<h3>Photograph your shelves</h3>'
+      +'<p class="wz-lead">One bookcase at a time. Claude reads the spines and adds every book, with where it sits.</p>'
+      +'<ul class="wz-list wz-tight">'
+      +'<li><b>Name each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) and photograph a sticky note with the name first.</li>'
+      +'<li><b>Top shelf to bottom</b>, two photos per shelf (left half, right half), phone level and square to the spines.</li>'
+      +'<li><b>Good light, no flash.</b> Lying-down stacks and books two deep get their own photo.</li>'
+      +'</ul>'
+      +(done.length?'<div class="wz-done-list">'+done.map(c=>'<span>✓ '+esc(c.bookcase)+' · '+c.n+' photo'+(c.n===1?'':'s')+'</span>').join('')+'</div>':'')
+      +'<div class="grid wz-loc"><div><label for="wz-room">Room</label><input id="wz-room" list="dl-room" placeholder="e.g. Living room" value="'+esc(wz.room||'')+'"></div>'
+      +'<div><label for="wz-case">Bookcase or bay</label><input id="wz-case" list="dl-case" placeholder="e.g. N1" value="'+esc(cur)+'"></div></div>'
+      +'<button id="wz-shoot" class="wz-shoot">📷 '+(curN?'More photos of ':'Take photos of ')+(cur?esc(cur):'this bookcase')+'</button>'
+      +'<input type="file" id="wz-file" accept="image/*" multiple class="hide">'
+      +'<p class="note" style="margin-top:6px;">Take as many as the bookcase needs, in one go or several. You can also take them in the Camera app first and choose them here.</p>'
+      +'<p class="wz-err hide" id="wz-err"></p>'
+      +'<div id="wz-phstatus" class="note">'+(curN?'✓ '+curN+' photo'+(curN===1?'':'s')+' of '+esc(cur)+' sent.':'')+'</div><div id="wz-sent" class="wz-sent"></div>'
+      +'<div class="row wz-nav">'
+      +(done.length
+        ? '<button class="secondary" id="wz-nextcase"'+(curN?'':' disabled')+'>Finished with '+(curN?esc(cur):'this bookcase')+' →</button><button id="wz-photos-done">Finished adding to library</button>'
+        : '<button class="secondary" id="wz-photos-done">Later</button>')
+      +'</div>';
+    },
+    wire:()=>{
+      $('wz-photos-done').onclick=()=>wzGo('unread');
+      const label=()=>{ const c=$('wz-case').value.trim(), seen=(wz.cases||[]).some(x=>x.bookcase===c && x.room===$('wz-room').value.trim());
+        $('wz-shoot').textContent='📷 '+(seen?'More photos of ':'Take photos of ')+(c||'this bookcase'); };
+      $('wz-case').addEventListener('input', label); $('wz-room').addEventListener('input', label);
+      if($('wz-nextcase')) $('wz-nextcase').onclick=()=>{
+        // N1 → N2, D9 → D10; a name without a number is left blank to type
+        const m=String(wz.bookcase||'').match(/^(.*?)(\d+)$/);
+        wzSave({ bookcase: m ? m[1]+(+m[2]+1) : '' }); wzDraw();
+        const c=$('wz-case'); c.focus(); c.select();
+      };
+      $('wz-shoot').onclick=()=>{
+        const room=$('wz-room').value.trim(), bc=$('wz-case').value.trim();
+        if(!room || !bc){ wzErr('Type the room and the bookcase name first, so Claude knows where these books live.'); return; }
+        wzErr(''); $('wz-file').click();
+      };
+      $('wz-file').onchange=async e=>{
+        const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+        const loc={ room:$('wz-room').value.trim(), bookcase:$('wz-case').value.trim(), shelf:'', kind:'shelf' };
+        ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
+        $('wz-shoot').disabled=true;
+        const ok=await sendToInbox(files, loc, '', $('wz-phstatus'), $('wz-sent'));
+        $('wz-shoot').disabled=false;
+        if(ok){
+          const cases=(wz.cases||[]).slice(), c=cases.find(x=>x.room===loc.room && x.bookcase===loc.bookcase);
+          if(c) c.n+=ok; else cases.push({ room:loc.room, bookcase:loc.bookcase, n:ok });
+          wzSave({ room:loc.room, bookcase:loc.bookcase, cases });
+          const sent=$('wz-sent').innerHTML; wzDraw(); $('wz-sent').innerHTML=sent;
+          const n=cases.find(x=>x.room===loc.room && x.bookcase===loc.bookcase).n;
+          $('wz-phstatus').textContent='✓ '+ok+' photo'+(ok===1?'':'s')+' of '+loc.bookcase+' sent ('+n+' for this bookcase). More of it? Tap the button again. Otherwise: Finished with '+loc.bookcase+' (on to the next one), or Finished adding to library.';
+        }
+      };
+    },
+  },
+  /* How the books Claude couldn't read get identified: the walk-through, shown before they exist. */
+  unread:{
+    html:()=>{
+      const n=unidRows().filter(isUnid).length;
+      return '<h3>Books Claude can’t read</h3>'
+        +'<p class="wz-lead">Some spines are too worn, too thin or too dark. Claude still adds them, as <b>mystery books</b> in the right spot, so nothing is lost. Later, the walk-through takes you to each one:</p>'
+        +'<div class="wz-demo" aria-hidden="true">'
+        +'<div class="wz-demo-where">Living room · N1 · Shelf 3 · <b>#5 from left</b></div>'
+        +'<div class="wz-demo-row"><span>← <i>Little Women</i></span><span class="wz-demo-q">?</span><span><i>Heidi</i> →</span></div>'
+        +'<div class="wz-demo-btns"><span>Scan barcode</span><span>Type the title</span><span>📷 Title page</span></div>'
+        +'</div>'
+        +'<ol class="wz-list wz-tight">'
+        +'<li>It says <b>where the book is</b> and which books are on either side.</li>'
+        +'<li>Pull it out. <b>Scan its barcode</b>, <b>type the title</b>, or <b>photograph the title page</b> for Claude.</li>'
+        +'<li>It moves on to the next one, shelf by shelf. Skip any you can’t reach.</li>'
+        +'</ol>'
+        +'<p class="note">Find it any time under <b>Epilogue → Import &amp; Export → Unidentified → Start the walk-through</b>. The mystery books appear there once Claude has read your photos.</p>'
+        +'<div class="row wz-nav">'+(n?'<button class="secondary" id="wz-walk">Start it now ('+n+')</button>':'')+'<button id="wz-next">Next</button></div>';
+    },
+    wire:()=>{
+      $('wz-next').onclick=()=>wzGo('home');
+      if($('wz-walk')) $('wz-walk').onclick=()=>{ closeWizard(true); showPanel('import'); showIE('unid'); openWalk(); };
+    },
   },
   home:{
     html:()=>{

@@ -25,7 +25,7 @@ $('ph-file').onchange=async e=>{
 };
 /* Size and quality: whole-shelf and spine photos keep 3600 px on the long side at high quality, so a spine
    in a 20-book shot is still ~150–200 px wide and its small print stays readable. One book: 1800 px is plenty. */
-const PHOTO_SIZE={ shelf:[3600,0.9], spines:[3600,0.9], 'new-books':[3600,0.9], book:[1800,0.85], other:[2600,0.85] };
+const PHOTO_SIZE={ shelf:[3600,0.9], spines:[3600,0.9], recheck:[3600,0.9], 'new-books':[3600,0.9], book:[1800,0.85], other:[2600,0.85] };
 async function sendToInbox(files, loc, note, statusEl, listEl){
   if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return 0; }
   const slug=s=>String(s||'').replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,40);

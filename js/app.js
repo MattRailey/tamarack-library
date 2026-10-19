@@ -12,9 +12,9 @@ function showPanel(p){
   $('nav-epi').classList.toggle('active', p==='import'||p==='data'||p==='help');
   document.querySelectorAll('.panel').forEach(s=>s.classList.toggle('active', s.id===p));
   if(p==='shelves') renderShelves();
-  if(p==='data'){ renderData(); fillCfgForm(); }
+  if(p==='data'){ renderData(); fillCfgForm(); renderAdmin(); }
   if(p==='import'||p==='data'||p==='help') ui.appx=p;
-  if(p==='import'){ renderUndo(); showIE(ui.ie||'sell'); }
+  if(p==='import'){ renderUndo(); showIE(IE_TABS.includes(ui.ie)?ui.ie:'import'); }
   ui.panel=p; lsSet(UI_KEY, JSON.stringify(ui));
   window.scrollTo(0,0);
 }
@@ -25,10 +25,12 @@ $('nav-epi').appendChild($('sync-dot'));
 $('menu-btn').onclick=e=>{ e.stopPropagation(); $('menu-pop').classList.toggle('open'); };
 document.addEventListener('click', e=>{ if(!e.target.closest('#menu-pop')) $('menu-pop').classList.remove('open'); });
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ $('menu-pop').classList.remove('open'); showPanel(b.dataset.go); });
-// Import & Export has three parts: mystery books, selling, building a library from photos
+// Import & Export: building the library from photos, then tidying it (mystery books, duplicates, series, recheck)
+const IE_TABS=['import','unid','dups','series','recheck'];
+function renderIE(which){ if(which==='unid') renderUnid(); if(which==='dups') renderDups(); if(which==='series'){ fillSeriesRooms(); renderSplitSeries(); } if(which==='recheck') renderRecheck(); }
 function showIE(which){ document.querySelectorAll('#ie-seg button').forEach(y=>y.classList.toggle('active',y.dataset.ie===which));
-  ['unid','sell','import'].forEach(k=>$('ie-'+k).classList.toggle('hide', k!==which));
-  if(which==='sell') renderSell(); if(which==='unid') renderUnid(); ui.ie=which; lsSet(UI_KEY, JSON.stringify(ui)); }
+  IE_TABS.forEach(k=>$('ie-'+k).classList.toggle('hide', k!==which));
+  renderIE(which); ui.ie=which; lsSet(UI_KEY, JSON.stringify(ui)); }
 document.querySelectorAll('#ie-seg button').forEach(x=>x.onclick=()=>showIE(x.dataset.ie));
 function refreshAll(){
   applyCfg();
@@ -36,7 +38,7 @@ function refreshAll(){
   renderLibrary(false);
   if($('shelves').classList.contains('active')) renderShelves();
   if($('data').classList.contains('active')) renderData();
-  if($('import').classList.contains('active')){ renderUndo(); if(!$('ie-sell').classList.contains('hide')) renderSell(); if(!$('ie-unid').classList.contains('hide')) renderUnid(); }
+  if($('import').classList.contains('active')){ renderUndo(); renderIE(IE_TABS.find(k=>!$('ie-'+k).classList.contains('hide'))); }
 }
 
 

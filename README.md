@@ -17,7 +17,7 @@ A home book catalog: every book in the house, what it is, and exactly where it s
 - **"Do I own this?"** Check a barcode or a title at a bookstore or sale. It works offline too.
 - **Mystery books.** A shelf-by-shelf walk-through for books that couldn't be identified from photos. Scan them, type them, or snap the title page.
 - **Collections, loans, reading status and ratings.**
-- **Selling.** Mark books to sell, then export eBay and Etsy listing files.
+- **Tidying up.** Duplicates with where each copy is, series split across the house with where every book is, and recheck photos when books have drifted.
 - **Offline.** After the first visit the app opens with no signal. Changes sync when the phone is back online.
 
 ## Getting started
@@ -71,6 +71,8 @@ With that folder linked, ask Claude to *"check the photo inbox."* Claude then:
 - adds or corrects the books in `tamarack-library.json`;
 - logs the changes in `imports/`;
 - deletes the photos it has read.
+
+**Recheck shelves.** Books wander. Under *Epilogue → Import & Export → Recheck shelves*, photograph a bookcase again. Claude moves each book to the spot it's in now and never adds a second copy; books it doesn't see are flagged "not seen at recheck", never deleted.
 
 ## What's in the library folder
 

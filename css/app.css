@@ -525,3 +525,36 @@ button.wz-opt.quiet{ background:transparent; border-style:dashed; }
 .wz-invite{ background:#f4ecdd; border-radius:12px; padding:12px; }
 .wz-code{ font-family:var(--serif); font-size:1.8rem; letter-spacing:.08em; color:var(--navy); margin:6px 0; }
 #wz-code{ font-size:1.3rem; letter-spacing:.1em; text-transform:uppercase; }
+
+/* Import & Export tabs: five of them, so they wrap as separate pills on a phone */
+.ie-tabs{ display:flex; flex-wrap:wrap; gap:6px; border:none; border-radius:0; overflow:visible; margin-bottom:16px; }
+.ie-tabs button, .ie-tabs button:not(:last-child){ border:1px solid var(--line); border-radius:999px; padding:7px 14px; min-height:36px; }
+/* Series split up: one block per place, every book listed */
+.sr-place{ margin-top:8px; }
+.sr-where{ font-size:.8rem; font-weight:700; color:var(--navy); margin:0 0 2px 2px; }
+.sr-place .sr-loc{ margin-top:3px; }
+
+/* setup wizard: build-library photos and the walk-through preview */
+.wz-tight li{ margin-bottom:4px; }
+.wz-loc{ margin-top:10px; }
+.wz-shoot{ width:100%; margin-top:12px; min-height:48px; font-size:1rem; }
+.wz-sent{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.wz-sent .ph-item span{ display:none; }
+.wz-sent .ph-item img{ width:64px; height:64px; object-fit:cover; border-radius:6px; }
+.wz-demo{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin:10px 0; background:var(--card); font-size:.85rem; }
+.wz-demo-where{ color:var(--steel); margin-bottom:6px; }
+.wz-demo-row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.wz-demo-q{ font-family:var(--serif); font-size:1.6rem; font-weight:700; color:var(--navy); border:2px dashed var(--line); border-radius:6px; padding:0 14px; }
+.wz-demo-btns{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.wz-demo-btns span{ border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:.78rem; }
+.wz-done-list{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 0; }
+.wz-done-list span{ background:#e6efe6; color:var(--navy); border-radius:999px; padding:3px 10px; font-size:.78rem; }
+/* Invite a friend (Matt's devices): folded card */
+.adm-card summary{ cursor:pointer; list-style:none; }
+.adm-card summary::-webkit-details-marker{ display:none; }
+.adm-card summary h3{ display:inline; margin:0; }
+.adm-card summary h3::after{ content:' ▸'; color:var(--steel); font-size:.8em; }
+.adm-card[open] summary h3::after{ content:' ▾'; }
+.adm-card summary .note{ display:block; margin:2px 0 0; }
+.adm-row{ align-items:center; cursor:default; }
+.adm-row button{ padding:4px 10px; min-height:30px; font-size:.78rem; }

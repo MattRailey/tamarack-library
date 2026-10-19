@@ -14,6 +14,13 @@ friend's phone ──► friends service (Cloudflare, free) ──► Matt's Dro
 - **A household shares a library.** Each phone gets its own key, so a lost phone can be switched off alone.
 - **Matt and Claude work as usual.** Friends' folders sit in Matt's Dropbox on his PC. "Check the photo inbox for the Smith Library" works the same as for Railey Library.
 
+## Try it first, on this computer
+
+```
+npm run sandbox
+```
+Runs the real service code with a pretend Dropbox (`worker/.sandbox/Dropbox/Apps/Tamarack Friends/`, open it in Explorer) and pretend Cloudflare storage. No accounts needed, nothing leaves the PC. It prints an invite link for "Test Library"; open it in a browser (or on a phone on the same Wi-Fi). Type `invite "<Library>"`, `list`, `revoke <phone id>`, `down` / `up` (Dropbox fails / works again) or `reset` in its window. The sandbox has no offline copy (no service worker), and a phone over plain http can't use the live camera scanner; photo picking works.
+
 ## One-time setup (about 20 minutes)
 
 You need Node.js on your computer (nodejs.org, the LTS version) and a free Cloudflare account (dash.cloudflare.com/sign-up).
@@ -53,6 +60,10 @@ You need Node.js on your computer (nodejs.org, the LTS version) and a free Cloud
 7. **Build the address into the app.** In `js/core.js`, set `DEFAULT_FRIEND_SERVER` to that address, then commit and push. Until this is set, the wizard doesn't show the invite option.
 
 ## Inviting a friend
+
+**The easy way, in the app** (on your own phone or computer): *Epilogue → Data & Sync → Invite a friend*. Paste the admin secret once per device (Dashlane can save and fill it), type the library's name, tap **Make invite**, then **Share invite**. The same box lists every library's phones, with **Switch off** for a lost one. The box never shows on a friend's phone. *Forget admin secret on this device* removes it.
+
+**Or from a terminal:**
 
 Do this once per computer, in a terminal, then use `admin.mjs` from the `worker/` folder.
 

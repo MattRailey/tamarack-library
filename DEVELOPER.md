@@ -34,13 +34,14 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `lookup.js` | Open Library and Google Books search, title and author matching, automatic cover and detail lookups. |
 | `shelves.js` | The Shelves tab. |
 | `import.js` | Paste or upload CSV and JSON lists, preview, duplicate handling, undo of the last import. |
-| `series.js` | Series split across locations, and possible duplicates. |
-| `sell.js` | The Sell & value list, eBay and Etsy export. |
+| `series.js` | Duplicates and series split across locations (Epilogue tabs). |
 | `data.js` | Stats, CSV and JSON export, restore from a backup. |
 | `collections.js` | Collections bar, rename and remove, the chip editor in the book form. |
 | `scanner.js` | Camera barcode reading (the native `BarcodeDetector`, else ZXing from jsDelivr). Add, check ("Do I own this?") and fill modes. Offline save-for-later. |
 | `mystery.js` | The unidentified-books list and the shelf-by-shelf walk-through, including "add a book we missed". |
 | `photos.js` | Uploading shelf and title-page photos to the Dropbox photo inbox. |
+| `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones, switch off, through the service's `/admin/*` with the admin secret kept in this browser (`tamarack_library_admin`). |
+| `recheck.js` | Recheck shelves tab: bookcases by when they were last photographed, recheck photos. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |
 | `wizard.js` | First-run setup wizard (invite code, own Dropbox, or this device only; photo tips; home screen). "Add another phone" links. |
 | `app.js` | Panels (tabs), `refreshAll()`, start-up. |
@@ -65,7 +66,8 @@ A **book** has these fields. All are optional except `id`, and each is written i
 - **What it is:** `title`, `author`, `series`, `seriesNo`, `genre`, `format`, `isbn`, `year`, `publisher`, `pages`, `about`, `subjects`, `coverUrl`.
 - **Where it is:** `room`, `bookcase`, `shelf`, `position`. `position` is a number in left-to-right order, with an optional letter for a book squeezed in (`12a`). The app shows it as "#3 from left" or "#2 from right", counting only the books on that shelf, not sold ones.
 - **Its state:** `status` (`unread`, `reading` or `read`), `rating` (0–5), `loanedTo`, `loanedDate`, `collections` (an array of names), `notes`, `needsReview`.
-- **Selling:** `saleStatus` (`consider`, `ebay`, `etsy`, `listed`, `sold` or `keep`), `salePrice`, `saleCondition`, `saleListedAt`, `saleSoldPrice`, `saleSoldAt`, `saleEst`, `saleEstNote`, `saleCondNote`.
+- **Selling (no longer in the app; kept in old catalogs):** `saleStatus` `sold` still hides a book from the library. Other fields: `saleStatus` (`consider`, `ebay`, `etsy`, `listed`, `sold` or `keep`), `salePrice`, `saleCondition`, `saleListedAt`, `saleSoldPrice`, `saleSoldAt`, `saleEst`, `saleEstNote`, `saleCondNote`.
+- **Recheck:** `checkedAt` (`YYYY-MM-DD`) is the last day a recheck photo showed the book in its place. "Not seen at recheck YYYY-MM-DD" in `notes`, with `needsReview`, marks one a recheck missed.
 - **Bookkeeping:** `addedAt`, `updatedAt`, `ft` (per-field change times, below), `source`, `importBatch`, `lookupV`, `pendingIsbn`, `idPhoto`, `idPhotoAt`.
 
 A few conventions:
@@ -128,7 +130,7 @@ There are two ways a library can be kept, and nothing else in the app knows the 
 
 The app only uploads. Claude does the reading, with the library's Dropbox folder linked.
 
-- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`.
+- **Shelf photos** go to `photos/inbox/` as `YYYY-MM-DD HHMMSS <Room> <Bookcase> shelf-<n> <kind> [note] [NN].jpg`. `NN` is the order taken, zero-padded, when several photos are sent together. `kind` is `shelf`, `spines`, `recheck`, `new-books`, `book` or `other`. A note, if any, is also saved beside the photos as `… NOTE.txt`.
 - **Title-page photos** from the walk-through go to `photos/identify/` as `<Room> <Bookcase> shelf-<n> pos-<p> <bookId>.jpg`. That book gets `idPhoto` so the list shows 📷.
 - **After reading**, Claude does four things:
   - edits the catalog, matching books that have no location to the shelf they were seen on instead of adding duplicates;
@@ -137,6 +139,20 @@ The app only uploads. Claude does the reading, with the library's Dropbox folder
   - deletes the photos.
 
   It never force-overwrites the JSON. If the app synced in between, Claude reloads the file and applies its changes again.
+
+### Recheck photos (`kind` = `recheck`)
+
+Sent from **Epilogue → Import & Export → Recheck shelves** when books have drifted. The file name gives the room, the bookcase and, if typed, the shelf. A recheck only **moves** books; it must never create a second copy.
+
+1. Read the spines, shelf by shelf, top shelf = 1, spots counted from the left.
+2. Match each spine to a book **already in the catalog**, anywhere in the house: normalized title + author surname (as `dupGroups` in `series.js` does), series + volume for sets. Prefer a match on this bookcase, then this room, then anywhere. If the library has several copies, move the one closest to this place, and never the same book twice.
+3. Matched: set `room`, `bookcase`, `shelf`, `position` to where it is now, `checkedAt` = today (`YYYY-MM-DD`), `updatedAt` = now. Change nothing else.
+4. Not in the catalog at all: add it where it was seen, with `needsReview: true` and a note `Found at recheck YYYY-MM-DD`. A spine that can't be read becomes a mystery book only if no unread mystery book already sits on that shelf at that spot.
+5. In the catalog on this bookcase (or this shelf, if one was given) but not seen in the photos: leave its place, set `needsReview: true` and add to its notes `Not seen at recheck YYYY-MM-DD`. Never delete it.
+6. A book that later turns up in a recheck clears that note and the flag (if nothing else set it).
+7. The change log in `imports/` lists moved / added / not seen, with counts.
+
+The Recheck tab lists bookcases by the latest `checkedAt` (or `addedAt`), oldest first, and counts the "not seen" ones.
 
 ## Offline
 

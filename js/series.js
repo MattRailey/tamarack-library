@@ -1,5 +1,5 @@
 /* Railey Library — series.js
-   Series split across locations, and possible duplicates.
+   Series split across locations, and duplicates (Epilogue → Import & Export tabs).
    Part of the app's shared script scope: see DEVELOPER.md. */
 'use strict';
 
@@ -23,8 +23,7 @@ function seriesKey(b){
   for(const k of SET_NOTES){ if(n.toLowerCase().includes(k.toLowerCase()) && !/second copy/i.test(n) && k!=='boxed set' && k!=='Schaum\'s Outline') return k; }
   return '';
 }
-function renderSplitSeries(){
-  const byShelf = $('sr-byshelf').checked;
+function seriesGroups(){
   const groups = new Map();
   for(const b of live()){
     const k = seriesKey(b); if(!k) continue;
@@ -32,31 +31,40 @@ function renderSplitSeries(){
     if(!groups.has(key)) groups.set(key, {name:k, books:[]});
     groups.get(key).books.push(b);
   }
+  return [...groups.values()].filter(g=>g.books.length>1);
+}
+// Volume number or name, for sorting a series and labelling its books ("3", "IV", "Book 2").
+function volOf(b){
+  if(b.seriesNo!=null && String(b.seriesNo).trim()) return String(b.seriesNo).trim();
+  const m=String(b.title).match(/(?:Vol\.?|Volume|Vols\.?|Book|Number|No\.)\s+([\w&, ]+?)(?:[:(]|$)/i); return m?m[1].trim():'';
+}
+function renderSplitSeries(){
+  const byShelf = $('sr-byshelf').checked, room = $('sr-room').value;
+  const where = b=>[b.room||'(no room)', b.bookcase||'(no bookcase)'].concat(byShelf?[b.shelf?'Shelf '+b.shelf:'(no shelf)']:[]).join(' → ');
   const out = [];
-  for(const g of groups.values()){
-    if(g.books.length < 2) continue;
+  for(const g of seriesGroups()){
+    if(room && !g.books.some(b=>b.room===room)) continue;
     const locs = new Map();
-    for(const b of g.books){
-      const loc = [b.room||'(no room)', b.bookcase||'(no bookcase)'].concat(byShelf?[b.shelf?'Shelf '+b.shelf:'(no shelf)']:[]).join(' → ');
-      if(!locs.has(loc)) locs.set(loc, []);
-      locs.get(loc).push(b);
-    }
-    if(locs.size > 1) out.push({ name:g.name, count:g.books.length, locs:[...locs.entries()].sort((a,b)=>b[1].length-a[1].length) });
+    for(const b of g.books){ const l=where(b); if(!locs.has(l)) locs.set(l, []); locs.get(l).push(b); }
+    if(locs.size < 2) continue;
+    const vol = b=>volOf(b)||'￿'+normKey(b.title);
+    for(const bs of locs.values()) bs.sort((a,b)=>natCmp(vol(a),vol(b)));
+    // the place with the most books first: that's where the rest probably belong
+    out.push({ name:g.name, count:g.books.length, ids:g.books.slice().sort((a,b)=>natCmp(vol(a),vol(b))).map(b=>b.id), locs:[...locs.entries()].sort((a,b)=>b[1].length-a[1].length || natCmp(a[0],b[0])) });
   }
   out.sort((a,b)=>b.count-a.count || natCmp(a.name,b.name));
-  if(!out.length){ $('sr-list').innerHTML = '<div class="empty">Every series is together in one place.</div>'; return; }
-  const volOf = b=>{ const m=String(b.title).match(/(?:Vol\.?|Volume|Vols\.?|Book|Number|No\.)\s+([\w&, ]+?)(?:[:(]|$)/i); return m?m[1].trim():''; };
+  if(!out.length){ $('sr-list').innerHTML = '<div class="card empty">'+(room?'Every series with books in '+esc(room)+' is together in one place.':'Every series is together in one place.')+'</div>'; return; }
   $('sr-list').innerHTML = '<p class="summary" style="margin:0 0 8px;">'+out.length+' series split up</p>' + out.map((g,gi)=>
     '<div class="sr-item"><h4>'+esc(g.name)+' <span class="note" style="font-weight:400;">· '+g.count+' books in '+g.locs.length+' places</span></h4>'+
-    g.locs.map(([loc,bs],li)=>{ const vols = bs.map(volOf).filter(Boolean);
-      return '<div class="sr-loc" data-g="'+gi+'" data-l="'+li+'"><span>'+esc(loc)+'</span><span class="v">'+bs.length+(vols.length?' · '+esc(vols.slice(0,8).join(', '))+(vols.length>8?'…':''):'')+'</span></div>'; }).join('')+
-    '</div>').join('');
-  $('sr-list').onclick = e=>{
-    const el = e.target.closest('.sr-loc'); if(!el) return;
-    const bs = out[+el.dataset.g].locs[+el.dataset.l][1];
-    $('series-bg').classList.remove('open');
-    openBook(bs[0].id, out[+el.dataset.g].locs.flatMap(x=>x[1]).map(b=>b.id));
-  };
+    g.locs.map(([loc,bs],li)=>'<div class="sr-place"><div class="sr-where">'+esc(loc)+(li===0?' <span class="note">· most of the series</span>':'')+'</div>'+
+      bs.map(b=>{ const v=volOf(b), sh=byShelf?'':(b.shelf?'shelf '+b.shelf:''), spot=b.position?'#'+b.position:'';
+        return '<div class="sr-loc" data-g="'+gi+'" data-id="'+b.id+'"><span>'+(v?'<b>'+esc(v)+'</b> · ':'')+esc(b.title)+'</span><span class="v">'+esc([sh,spot].filter(Boolean).join(' '))+'</span></div>'; }).join('')+
+    '</div>').join('')+'</div>').join('');
+  $('sr-list').onclick = e=>{ const el=e.target.closest('.sr-loc'); if(!el) return; openBook(el.dataset.id, out[+el.dataset.g].ids); };
+}
+function fillSeriesRooms(){
+  const cur=$('sr-room').value, rooms=[...new Set(live().map(b=>b.room).filter(Boolean))].sort(natCmp);
+  $('sr-room').innerHTML='<option value="">Anywhere in the house</option>'+rooms.map(r=>'<option'+(r===cur?' selected':'')+'>'+esc(r)+'</option>').join('');
 }
 function dupGroups(){
   const g=new Map();
@@ -71,18 +79,14 @@ function dupGroups(){
 }
 function renderDups(){
   const gs=dupGroups();
-  if(!gs.length){ $('dp-list').innerHTML='<div class="empty">No duplicates found.</div>'; return; }
+  if(!gs.length){ $('dp-list').innerHTML='<div class="card empty">No duplicates found.</div>'; return; }
   const extra=gs.reduce((s,x)=>s+x.length-1,0);
   $('dp-list').innerHTML='<p class="summary" style="margin:0 0 8px;">'+gs.length+' titles with more than one copy ('+extra+' extra copies)</p>'+gs.map((x,gi)=>
     '<div class="sr-item"><h4>'+esc(x[0].title)+' <span class="note" style="font-weight:400;">· '+esc(x[0].author||'')+' · '+x.length+' copies</span></h4>'+
     x.map((b,bi)=>'<div class="sr-loc" data-g="'+gi+'" data-b="'+bi+'"><span>'+esc(locText(b))+'</span><span class="v">'+esc(b.notes||'')+'</span></div>').join('')+'</div>').join('');
   $('dp-list').onclick=e=>{ const el=e.target.closest('.sr-loc'); if(!el) return; const x=gs[+el.dataset.g];
-    $('dups-bg').classList.remove('open'); openBook(x[+el.dataset.b].id, x.map(b=>b.id)); };
+    openBook(x[+el.dataset.b].id, x.map(b=>b.id)); };
 }
-$('btn-dups').onclick = ()=>{ renderDups(); $('dups-bg').classList.add('open'); lockPage(); };
-$('dp-close').onclick = ()=>{ $('dups-bg').classList.remove('open'); unlockPage(); };
-$('dups-bg').addEventListener('click', e=>{ if(e.target===$('dups-bg')) $('dp-close').onclick(); });
-$('btn-series').onclick = ()=>{ renderSplitSeries(); $('series-bg').classList.add('open'); };
+$('dp-list').onclick=null;
 $('sr-byshelf').onchange = renderSplitSeries;
-$('sr-close').onclick = ()=>$('series-bg').classList.remove('open');
-$('series-bg').addEventListener('click', e=>{ if(e.target===$('series-bg')) $('series-bg').classList.remove('open'); });
+$('sr-room').onchange = renderSplitSeries;
