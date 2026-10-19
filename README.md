@@ -60,9 +60,8 @@ Each person still signs in to their own Dropbox. The app key only lets the app i
 ## Claude and the photo inbox
 
 **Photo tips.**
-- Lots of bookcases that look alike? Label each shelf too (a piece of tape or a printed label) and photograph the label first.
-- Label each bookcase or bay (*N1*, *N2*…). Type it in **Bookcase or bay**, and put the code on the bookcase (e.g. a piece of tape or a printed label). Photograph the label first.
-- Shoot top to bottom, two photos per shelf, in good, even light, with no flash.
+- Label each bookcase or bay (*N1*, *N2*…) with a piece of tape or a printed label, where it shows in the photos, and type the same name in **Bookcase or bay**. Lots of bookcases that look alike? Label each shelf too.
+- One photo per shelf, top to bottom, phone turned sideways with the whole shelf in the picture (two halves only for a very wide shelf or tiny print), in good, even light, with no flash. A photo of the whole bookcase is fine as an overview, but too small to read the spines on its own.
 - Photos are numbered `01`, `02`… in the order taken. If one doesn't go through, it waits on the phone and sends by itself when the signal is back (or tap *Send them now*), under the same name, so nothing is sent twice.
 
 The app sends shelf photos to `photos/inbox/` in the library's Dropbox folder. Title-page photos from the mystery-book walk-through go to `photos/identify/`. File names say where each photo was taken.

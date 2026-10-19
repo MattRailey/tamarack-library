@@ -226,9 +226,8 @@ const WZ_STEPS={
       +'<h3>Photograph your shelves</h3>'
       +'<p class="wz-lead">One bookcase at a time. Claude reads the spines and adds every book, with where it sits.</p>'
       +'<ul class="wz-list wz-tight">'
-      +'<li><b>Lots of bookcases that look alike?</b> It helps to label each shelf too (a piece of tape or a printed label) and photograph the label first.</li>'
-      +'<li><b>Name each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) and put it on the bookcase, e.g. a piece of tape or a printed label. Photograph the label first.</li>'
-      +'<li><b>Top shelf to bottom</b>, two photos per shelf (left half, right half), phone level and square to the spines.</li>'
+      +'<li><b>Label each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) with a piece of tape or a printed label, where it shows in the photos. Lots of bookcases that look alike? Label each shelf too.</li>'
+      +'<li><b>One photo per shelf</b>, top shelf to bottom: phone turned sideways, level and square to the spines, the whole shelf in the picture. A very wide shelf or tiny print: take it in two halves.</li>'
       +'<li><b>Good light, no flash.</b> Lying-down stacks and books two deep get their own photo.</li>'
       +'</ul>'
       +(done.length?'<div class="wz-done-list">'+done.map(c=>'<span>✓ '+esc(c.bookcase)+' · '+c.n+' photo'+(c.n===1?'':'s')+'</span>').join('')+'</div>':'')

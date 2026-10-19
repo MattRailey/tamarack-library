@@ -8,7 +8,7 @@
 - **Add another phone.** A one-time link brings a second phone in the household into the same library.
 - **iPhone: one code, entered once.** An invite opened in iPhone Safari no longer uses the code there: it shows "First, put the library on your Home Screen" with the code and **Copy the code**; the Home Screen icon asks for it once (**Paste** button), and the invite drops by exactly one use.
 - **Camera: which bookcase is a heading, not a box.** "Photographing: Living room · N1" with **Change**; **Finished with N1 →** asks for the next name in a small pop-up (N2 filled in, room changeable), then goes straight back to the camera. Same in setup, Send photos and Recheck shelves.
-- **Tip:** with lots of look-alike bookcases, label each shelf too.
+- **Tips:** label each bookcase (tape or a printed label) where it shows in the photos; look-alike bookcases, label each shelf too. One photo per shelf, phone sideways (two halves only for a very wide shelf or tiny print).
 - **A friend's phone** shows the Invite-a-friend card with one line: inviting is done by the admin; use Add another phone for the household.
 - **Edit name / Remove library** in the Invite-a-friend box. Remove switches off the library's phones, cancels its codes and moves its folder to `_removed` (nothing is deleted).
 - **Codes are 5 digits** (number keypad), not 8 letters. Guessing is held back by expiry, 10 tries a minute per address, and a 10-minute pause on joining when many wrong codes come in.
