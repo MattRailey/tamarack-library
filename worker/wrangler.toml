@@ -1,0 +1,20 @@
+# Tamarack Library friends service — Cloudflare Worker settings. Setup steps: worker/README.md
+name = "tamarack-friends"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+# Invite codes and device keys. Create once with: npx wrangler kv namespace create LIBS
+# then paste the id it prints here.
+[[kv_namespaces]]
+binding = "LIBS"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+[vars]
+ALLOWED_ORIGINS = "https://mattrailey.github.io"
+APP_URL = "https://mattrailey.github.io/tamarack-library/tamarack-library"
+DBX_ROOT = ""            # "" = the Dropbox app folder itself (Dropbox/Apps/<your app name>/)
+ALLOW_LOCALHOST = "0"    # "1" while testing the app on your own computer
+
+# Secrets (never in this file): npx wrangler secret put DBX_APP_KEY
+#                               npx wrangler secret put DBX_REFRESH_TOKEN
+#                               npx wrangler secret put ADMIN_SECRET

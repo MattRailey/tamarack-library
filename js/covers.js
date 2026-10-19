@@ -14,12 +14,11 @@ function initials(t){ return normKey(t).split(' ').filter(Boolean).slice(0,2).ma
 const coverBlobs=new Map(), coverLoading=new Set();
 async function saveCoverFile(blob, id){
   try{
-    const t=await dbxToken(); if(!t) return null;
+    if(!cloudOn()) return null;
     const path=dbxFolder()+'/covers/'+String(id).replace(/[^\w-]/g,'')+'-'+Date.now().toString(36)+'.jpg';
-    const r=await fetch('https://content.dropboxapi.com/2/files/upload',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Content-Type':'application/octet-stream',
-      'Dropbox-API-Arg':dbxArg({ path, mode:'add', autorename:true, mute:true }) }, body:blob });
+    const r=await cloudPut(path, blob, { autorename:true });
     if(!r.ok) return null;
-    const j=await r.json(); const saved=j.path_display||path;
+    const saved=r.path||path;
     coverBlobs.set(saved, URL.createObjectURL(blob)); try{ await idbPut('cover:'+saved, blob); }catch(e){}
     return saved;
   }catch(e){ return null; }
@@ -29,14 +28,14 @@ async function loadCover(path){
   coverLoading.add(path);
   try{
     let blob=null; try{ blob=await idbGet('cover:'+path); }catch(e){}
-    if(!blob){ const t=await dbxToken(); if(t){ const r=await fetch('https://content.dropboxapi.com/2/files/download',{ method:'POST', headers:{ 'Authorization':'Bearer '+t.access_token, 'Dropbox-API-Arg':dbxArg({path}) } }); if(r.ok){ blob=await r.blob(); try{ await idbPut('cover:'+path, blob); }catch(e){} } } }
+    if(!blob && cloudOn()){ try{ const g=await cloudGet(path); if(g.ok){ blob=await g.res.blob(); try{ await idbPut('cover:'+path, blob); }catch(e){} } }catch(e){} }
     if(blob){ const u=URL.createObjectURL(blob); coverBlobs.set(path,u); document.querySelectorAll('img[data-dbx]').forEach(im=>{ if(im.dataset.dbx===path) im.src=u; }); }
   }finally{ coverLoading.delete(path); }
 }
 // photos taken before this change were stored inside the catalog — move them out when Dropbox is connected
 let _coverMigrating=false;
 async function migrateCovers(){
-  if(_coverMigrating || !dbxTokens()) return; _coverMigrating=true;
+  if(_coverMigrating || !cloudOn()) return; _coverMigrating=true;
   try{
     let n=0;
     for(const b of store.books.filter(x=>!x.deleted && String(x.coverUrl||'').startsWith('data:')).slice(0,40)){

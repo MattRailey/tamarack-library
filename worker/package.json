@@ -1,0 +1,6 @@
+{
+  "name": "tamarack-friends-service",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/worker.test.mjs", "deploy": "npx wrangler deploy" }
+}

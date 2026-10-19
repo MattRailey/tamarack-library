@@ -5,13 +5,13 @@
    served from the device. Dropbox, book-lookup and cover requests are never touched here.
 
    When you add, rename or remove an app file, update APP_FILES and bump VERSION. */
-const VERSION = 'railey-library-v5';
+const VERSION = 'railey-library-v6';
 const APP_FILES = [
   'tamarack-library.html',
   'css/app.css',
   'js/core.js', 'js/dropbox.js', 'js/covers.js', 'js/search.js', 'js/library.js', 'js/book.js',
   'js/lookup.js', 'js/shelves.js', 'js/import.js', 'js/series.js', 'js/sell.js', 'js/data.js',
-  'js/collections.js', 'js/scanner.js', 'js/mystery.js', 'js/photos.js', 'js/settings.js', 'js/app.js',
+  'js/collections.js', 'js/scanner.js', 'js/mystery.js', 'js/photos.js', 'js/settings.js', 'js/wizard.js', 'js/app.js',
   'icons/icon-32.png', 'icons/icon-180.png', 'icons/icon-192.png', 'manifest.webmanifest',
 ];
 const PAGE = 'tamarack-library.html';

@@ -34,6 +34,7 @@
 <script src="js/mystery.js" defer></script>
 <script src="js/photos.js" defer></script>
 <script src="js/settings.js" defer></script>
+<script src="js/wizard.js" defer></script>
 <script src="js/app.js" defer></script>
 </head>
 <body>
@@ -326,23 +327,25 @@
       <p class="sub">Your catalog saves on this device as you go and syncs to Dropbox so it's the same on your phone and desktop.</p>
       <div class="card">
         <h3>Library settings</h3>
-        <p class="note" style="margin-top:0;">Each library is one folder in someone’s Dropbox. Libraries never connect: each has its own books, its own Dropbox login and its own settings, even on a shared phone. Name and tagline travel with the library; typing a different folder opens (or starts) a different library on this device.</p>
+        <p class="note own-dbx" style="margin-top:0;">Each library is one folder in someone’s Dropbox. Libraries never connect: each has its own books, its own Dropbox login and its own settings, even on a shared phone. Name and tagline travel with the library; typing a different folder opens (or starts) a different library on this device.</p>
         <div class="grid" style="max-width:560px;">
           <div><label>Library name</label><input id="cfg-title" placeholder="Railey Library"></div>
           <div><label>Tagline</label><input id="cfg-tag" placeholder="Our books at home"></div>
-          <div style="grid-column:1/-1;"><label>Dropbox folder for this library</label><input id="cfg-folder" placeholder="/Railey Library" spellcheck="false"></div>
+          <div style="grid-column:1/-1;" class="own-dbx"><label>Dropbox folder for this library</label><input id="cfg-folder" placeholder="/Railey Library" spellcheck="false"></div>
         </div>
         <div class="row hide" id="cfg-switch-row" style="margin-top:10px;"><select id="cfg-libs" class="genre-main" style="flex:1;"></select><button class="secondary" id="cfg-switch">Open this library</button></div>
-        <div class="row" style="margin-top:10px;"><button id="cfg-save">Save settings</button><button class="secondary" id="cfg-link">Copy set-up link</button></div>
-        <p class="note"><b>Copy set-up link</b> makes a link that opens the library on another phone or computer. For your family, use it as is. For someone else’s own library, first type a new folder name above (for example <i>/Smith Library</i>), then copy the link — it opens a brand-new, empty library that lives in <i>their</i> Dropbox once they connect.</p>
+        <div class="row" style="margin-top:10px;"><button id="cfg-save">Save settings</button><button class="secondary own-dbx" id="cfg-link">Copy set-up link</button><button class="secondary" id="btn-wizard">Run setup again</button></div>
+        <p class="note own-dbx"><b>Copy set-up link</b> makes a link that opens the library on another phone or computer. For your family, use it as is. For someone else’s own library, first type a new folder name above (for example <i>/Smith Library</i>), then copy the link — it opens a brand-new, empty library that lives in <i>their</i> Dropbox once they connect.</p>
       </div>
       <div class="card">
-        <h3>Dropbox</h3>
+        <h3 id="dbx-title">Dropbox</h3>
         <p class="note" style="margin-top:0;" id="dbx-status">Checking…</p>
         <div id="dbx-appkey-row" style="margin-top:8px;max-width:420px;"><label>Dropbox App key (from your library’s app in the Dropbox App Console)</label><input id="dbx-appkey" autocomplete="off" spellcheck="false"></div>
-        <div class="row" style="margin-top:8px;"><button id="btn-connect">Connect Dropbox</button><button id="btn-sync">Sync now</button><button class="secondary" id="btn-disconnect">Disconnect</button></div>
-        <p class="note">The library has its own Dropbox connection, separate from your other apps. The catalog lives in <b>Dropbox<span class="cfg-path">/Railey Library</span>/tamarack-library.json</b>. Connect once on each phone or computer. Changes from two devices are merged book by book, so editing on your phone and desktop never wipes out the other's changes.</p>
-        <p class="note">Redirect URI for the Dropbox app settings: <code id="dbx-redirect"></code></p>
+        <div class="row" style="margin-top:8px;"><button id="btn-connect">Connect Dropbox</button><button id="btn-sync">Sync now</button><button class="secondary hide" id="btn-addphone">Add another phone</button><button class="secondary" id="btn-disconnect">Disconnect</button></div>
+        <div id="addphone-box" class="hide" style="margin-top:10px;"></div>
+        <p class="note friend-only hide">Your library is kept safe in Matt’s library service and syncs to every phone in your household. Each phone has its own key: if one is lost, ask Matt to switch just that one off. Books edited on two phones at once are merged book by book, so nothing is lost.</p>
+        <p class="note own-dbx">The library has its own Dropbox connection, separate from your other apps. The catalog lives in <b>Dropbox<span class="cfg-path">/Railey Library</span>/tamarack-library.json</b>. Connect once on each phone or computer. Changes from two devices are merged book by book, so editing on your phone and desktop never wipes out the other's changes.</p>
+        <p class="note own-dbx">Redirect URI for the Dropbox app settings: <code id="dbx-redirect"></code></p>
       </div>
       <div class="card">
         <h3>At a glance</h3>
@@ -512,7 +515,7 @@
     <p class="note" style="margin-top:0;">Snap a whole shelf, a close-up of spines, or a book’s title page. The photos go to <b>photos/inbox</b> in the <span class="cfg-folder">Railey Library</span> Dropbox folder, labeled with where they were taken — next time you chat, say “check the photo inbox” and Claude adds or fixes the books.</p>
     <div class="grid">
       <div><label>Room</label><input id="ph-room" list="dl-room"></div>
-      <div><label>Bookcase</label><input id="ph-case" list="dl-case"></div>
+      <div><label>Bookcase or bay</label><input id="ph-case" list="dl-case" placeholder="e.g. Tall oak · N1"></div>
       <div><label>Shelf (optional)</label><input id="ph-shelf" list="dl-shelf"></div>
       <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
       <div style="grid-column:1/-1;"><label>Note for Claude (optional)</label><input id="ph-note" placeholder="e.g. left half of shelf 2 · these are new from the thrift store"></div>
@@ -520,6 +523,7 @@
     <div class="row" style="margin-top:12px;"><button id="ph-take">Take or choose photos</button></div>
     <input type="file" id="ph-file" accept="image/*" multiple class="hide">
     <div id="ph-status" class="note"></div>
+    <div id="ph-retry" class="row hide" style="margin-top:8px;align-items:center;"><span id="ph-retry-n" class="note" style="margin:0;flex:1;"></span><button class="secondary" id="ph-retry-btn">Send them now</button></div>
     <div id="ph-sent"></div>
   </div>
 </div>
@@ -536,6 +540,15 @@
 </div>
 <datalist id="dl-coll"></datalist><datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
 <datalist id="dl-author"></datalist><datalist id="dl-series"></datalist><datalist id="dl-genre"></datalist><datalist id="dl-loan"></datalist>
+<!-- first-run setup -->
+<div class="modal-bg" id="wz-bg">
+  <div class="modal wz-modal" role="dialog" aria-modal="true" aria-labelledby="wz-body">
+    <button class="modal-close" id="wz-close" aria-label="Close setup">&times;</button>
+    <div class="wz-dots" id="wz-dots" aria-hidden="true"></div>
+    <div id="wz-body"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 </body>

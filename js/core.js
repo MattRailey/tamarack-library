@@ -27,6 +27,11 @@ const KNOWN_KEY  = 'tamarack_library_known';           // per device: libraries 
   q.delete('folder'); q.delete('appkey'); history.replaceState(null,'', location.pathname+(q.toString()?'?'+q:'')+location.hash);
   window.__libSetup=f;
 })();
+(function(){ // invite link from the friends service: ?join=ABCD-EFGH — the setup wizard takes it from here
+  const q=new URLSearchParams(location.search); if(!q.has('join')) return;
+  window.__join={ code:q.get('join').trim() };   // the service address is built in (never taken from a link)
+  q.delete('join'); history.replaceState(null,'', location.pathname+(q.toString()?'?'+q:'')+location.hash);
+})();
 const LIB_NS     = dbxFolder()==='/Railey Library' ? '' : '@'+dbxFolder();
 const STORE_KEY  = 'tamarack_library_store_v1'+LIB_NS;
 const PREV_KEY   = 'tamarack_library_store_prev'+LIB_NS;   // previous save, one step back, just in case
@@ -37,6 +42,10 @@ const DEFAULT_DBX_APP_KEY = '';   // a fork can build its own app key in here so
 const DBX_APPKEY_KEY  = 'tamarack_library_dropbox_appkey'+LIB_NS;
 const DBX_TOKENS_KEY  = 'tamarack_library_dropbox_tokens'+LIB_NS;    // this library's own Dropbox login
 const DBX_VERIFIER_KEY= 'tamarack_library_dropbox_pkce'+LIB_NS;
+// Friends' libraries live in Matt's Dropbox behind a small service (worker/): this phone holds a device key for one library.
+const DEFAULT_FRIEND_SERVER = '';   // the service's address once deployed, e.g. https://tamarack-friends.<you>.workers.dev
+function friendServer(){ return (DEFAULT_FRIEND_SERVER || lsGet('tamarack_library_friend_server') || '').trim(); }   // the second is for testing only
+const FRIEND_KEY      = 'tamarack_library_friend'+LIB_NS;              // { server, token, lib, device }
 function dbxFolder(){ let f=String(lsGet(FOLDER_KEY)||'/Railey Library').trim().replace(/\\/g,'/').replace(/\/+$/,''); if(!f.startsWith('/')) f='/'+f; return f||'/Railey Library'; }
 function dbxArg(o){ return JSON.stringify(o).replace(/[\u007f-\uffff]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4)); }
 function dbxPath(){ return dbxFolder()+'/tamarack-library.json'; }
@@ -116,7 +125,7 @@ async function saveLocalNow(){
   }catch(e){}
   if(lsSet(STORE_KEY, json)) return;       // fallback for browsers without IndexedDB
   if(_warned) return; _warned=true;        // say it once, not on every save
-  toast(dbxTokens() ? 'This device could not keep an offline copy, but your changes are still saving to Dropbox.'
+  toast(cloudOn() ? 'This device could not keep an offline copy, but your changes are still saving to Dropbox.'
                     : 'Could not save on this device — download a backup from Data & Sync.');
 }
 // Snapshot of each book as last saved, used to stamp which fields an edit changed (b.ft = {field: time}).
