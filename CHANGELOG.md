@@ -6,6 +6,10 @@
 - **Setup wizard.** It opens by itself the first time the app runs on a phone. You pick one of three ways in (invite code, your own Dropbox, or just this device), then get shelf-photo tips and how to add the app to the home screen. Run it again from Data & Sync.
 - **Friends' libraries.** Friends can keep their library in Matt's Dropbox through a small service (`worker/`), with no Dropbox account of their own. Each phone's key opens only its own library.
 - **Add another phone.** A one-time link brings a second phone in the household into the same library.
+- **iPhone: one code, entered once.** An invite opened in iPhone Safari no longer uses the code there: it shows "First, put the library on your Home Screen" with the code and **Copy the code**; the Home Screen icon asks for it once (**Paste** button), and the invite drops by exactly one use.
+- **Camera: which bookcase is a heading, not a box.** "Photographing: Living room · N1" with **Change**; **Finished with N1 →** asks for the next name in a small pop-up (N2 filled in, room changeable), then goes straight back to the camera. Same in setup, Send photos and Recheck shelves.
+- **Tip:** with lots of look-alike bookcases, label each shelf too.
+- **A friend's phone** shows the Invite-a-friend card with one line: inviting is done by the admin; use Add another phone for the household.
 - **Edit name / Remove library** in the Invite-a-friend box. Remove switches off the library's phones, cancels its codes and moves its folder to `_removed` (nothing is deleted).
 - **Codes are 5 digits** (number keypad), not 8 letters. Guessing is held back by expiry, 10 tries a minute per address, and a 10-minute pause on joining when many wrong codes come in.
 - **Taking a break from photos.** *Send photos* now opens on the bookcase the camera got to (after *Finished with N3 →*, that's N4) and lists what this phone has already sent ("Den N1 · 12, Den N2 · 9"), with the date of the last one.

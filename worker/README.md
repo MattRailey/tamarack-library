@@ -130,7 +130,7 @@ On their phone, **Epilogue → Data & Sync → Remove this phone** also switches
 
 ## iPhone notes
 
-On iPhone, Safari and a Home Screen icon keep separate storage, and Safari may clear a page's storage after about a week unused. So after joining in Safari the app asks to **put it on the Home Screen first** and shows a one-time code; the icon's app joins with that code and the Safari copy steps aside (it then says the library opens from the Home Screen icon). A reminder bar shows in Safari until it's on the Home Screen. **Not yet tried on a real iPhone.**
+On iPhone, Safari and a Home Screen icon keep separate storage, and Safari may clear a page's storage after about a week unused. So on iPhone the **code is used once, in the Home Screen icon**: an invite opened in Safari shows "First, put the library on your Home Screen" with the code and a **Copy the code** button, and doesn't use the code there. The icon's app asks for the code (with **Paste**); if iOS keeps the page address for the icon, the code is already filled in. One invite use per phone. (A friend can still choose to stay in Safari; an older Safari copy that already joined gets a hand-over code from the reminder bar instead.) **Not yet tried on a real iPhone.**
 
 ## Costs and limits
 

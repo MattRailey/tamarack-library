@@ -103,6 +103,12 @@ test('a friend taps an invite link: joins, the library is named, and books sync 
   await expect(page.locator('#wz-shoot')).toContainText('More photos of N1');
   await expect(page.locator('#wz-nextcase')).toHaveText('Finished with N1 →');
   await page.click('#wz-nextcase');
+  // a small pop-up asks for the next name, counted up; Start goes to it
+  await expect(page.locator('#cam-ask')).toBeVisible();
+  await expect(page.locator('#ca-title')).toHaveText('Name of the next bookcase');
+  await expect(page.locator('#ca-case')).toHaveValue('N2');
+  await page.click('#ca-start');
+  await expect(page.locator('#cam-ask')).toBeHidden();
   await expect(page.locator('#wz-case')).toHaveValue('N2');
   await expect(page.locator('#wz-room')).toHaveValue('Den');
   await expect(page.locator('.wz-done-list')).toContainText('N1 · 2 photos');
@@ -120,7 +126,12 @@ test('a friend taps an invite link: joins, the library is named, and books sync 
   await expect(page.locator('#btn-addphone')).toBeVisible();
   await expect(page.locator('#dbx-appkey-row')).toBeHidden();
   await expect(page.locator('#cfg-folder')).toBeHidden();
-  await expect(page.locator('#adm-card')).toBeHidden();
+  // the Invite-a-friend card on a friend's phone: one plain line, no password, no list
+  await expect(page.locator('#adm-card')).toBeVisible();
+  await page.click('#adm-card summary');
+  await expect(page.locator('#adm-friend-note')).toContainText('Inviting people is done by the admin');
+  await expect(page.locator('#adm-secret')).toBeHidden();
+  await expect(page.locator('#adm-tools')).toBeHidden();
 });
 
 test('husband and wife: "Add another phone" brings the second phone into the same library', async ({ browser }) => {
@@ -216,26 +227,46 @@ test('Invite a friend (Matt’s devices): secret saved once, invite made, phones
 
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
-test('iPhone Safari: after joining, Home Screen first with a code; the icon joins with it and Safari steps aside', async ({ browser }) => {
+test('iPhone: one code, entered once: Safari shows it for the Home Screen; the icon uses it (invite count drops by 1)', async ({ browser }) => {
   const svc = await startService();
   const safari = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(safari, svc);
-  const inv = await svc.invite('Lee Library', 'The Lee Library');
-  await freshPhone(safari, '?join=' + inv.code.replace('-', ''));
+  const inv = await svc.invite('Lee Library', 'The Lee Library');   // good for 2 phones
+  const uses = () => JSON.parse(svc.kv.get('code:' + inv.code.replace('-', '')) || '{"uses":0}').uses;
+  await freshPhone(safari, '?join=' + inv.code);
+  await expect(safari.locator('#wz-body')).toContainText('First, put the library on your Home Screen', { timeout: 20000 });
+  await expect(safari.locator('#wz-fcode')).toHaveText(inv.code);
   await expect(safari.locator('#wz-body')).toContainText('Good to know');
-  await safari.click('#wz-join');
-  await expect(safari.locator('#wz-body')).toContainText('First, put it on your Home Screen', { timeout: 20000 });
-  await expect(safari.locator('#wz-hcode')).toHaveText(/^\d{5}$/, { timeout: 10000 });
-  const code = (await safari.locator('#wz-hcode').textContent()).replace('-', '');
-  // the Home Screen copy (its own storage): types the code and lands in the same library
-  const icon = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(icon, svc);
+  expect(safari.url()).toContain('?join=' + inv.code);   // in case iOS keeps the address for the icon
+  expect(uses()).toBe(2);                                  // nothing used in Safari
+  // the Home Screen icon: its own storage, standalone
+  const iconCtx = await browser.newContext({ userAgent: IPHONE_UA });
+  await iconCtx.addInitScript(() => Object.defineProperty(navigator, 'standalone', { get: () => true }));
+  const icon = await iconCtx.newPage(); await connect(icon, svc);
   await freshPhone(icon);
   await icon.click('#wz-body [data-go="code"]');
-  await icon.fill('#wz-code', code); await icon.click('#wz-join');
-  await expect(icon.locator('#wz-body')).toContainText(/Home Screen|Photograph your shelves/, { timeout: 20000 });
+  await icon.fill('#wz-code', inv.code); await icon.click('#wz-join');
+  await expect(icon.locator('#wz-body')).toContainText('Photograph your shelves', { timeout: 20000 });
   await expect(icon.locator('#lib-name')).toHaveText('The Lee Library');
-  // the Safari copy is told where the library lives now
-  await safari.evaluate(() => syncNow());
-  await expect(safari.locator('#sync-text')).toContainText('icon on your Home Screen', { timeout: 10000 });
+  expect(uses()).toBe(1);                                  // exactly one use
+  // if iOS carried the address, the icon opens with the code already filled in
+  const icon2Ctx = await browser.newContext({ userAgent: IPHONE_UA });
+  await icon2Ctx.addInitScript(() => Object.defineProperty(navigator, 'standalone', { get: () => true }));
+  const icon2 = await icon2Ctx.newPage(); await connect(icon2, svc);
+  await freshPhone(icon2, '?join=' + inv.code);
+  await expect(icon2.locator('#wz-code')).toHaveValue(inv.code);
+});
+
+test('iPhone Safari can still choose to stay in Safari', async ({ browser }) => {
+  const svc = await startService();
+  const safari = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(safari, svc);
+  const inv = await svc.invite('Ray Library', 'Ray Library');
+  await freshPhone(safari, '?join=' + inv.code);
+  await expect(safari.locator('#wz-body')).toContainText('First, put the library on your Home Screen', { timeout: 20000 });
+  await safari.click('#wz-safari');
+  await expect(safari.locator('#wz-code')).toHaveValue(inv.code);
+  await safari.click('#wz-join');
+  await expect(safari.locator('#wz-body')).toContainText(/Home Screen|Photograph your shelves/, { timeout: 20000 });
+  await expect(safari.locator('#lib-name')).toHaveText('Ray Library');
 });
 
 test('Remove this phone switches its key off at the service', async ({ page }) => {

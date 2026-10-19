@@ -28,9 +28,13 @@ function adminFail(e){
 }
 // Shown on devices with their own Dropbox (Matt's), never on a friend's phone; folded away until opened.
 function renderAdmin(){
-  const show=!!friendServer() && !friendCfg();
+  const show=!!friendServer(), friend=!!friendCfg();
   $('adm-card').classList.toggle('hide', !show);
   if(!show) return;
+  // a friend's phone: one plain line, no password box, no list, no buttons
+  $('adm-friend-note').classList.toggle('hide', !friend);
+  $('adm-sum').classList.toggle('hide', friend);
+  if(friend){ $('adm-login').classList.add('hide'); $('adm-tools').classList.add('hide'); return; }
   const has=!!adminSecret();
   $('adm-login').classList.toggle('hide', has);
   $('adm-tools').classList.toggle('hide', !has);

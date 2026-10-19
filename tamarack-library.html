@@ -377,7 +377,8 @@
         <p class="note own-dbx">Redirect URI for the Dropbox app settings: <code id="dbx-redirect"></code></p>
       </div>
       <details class="card adm-card hide" id="adm-card">
-        <summary><h3>Invite a friend</h3><span class="note">Friends’ libraries in your Dropbox: make invites, see their phones, switch one off.</span></summary>
+        <summary><h3>Invite a friend</h3><span class="note" id="adm-sum">Friends’ libraries in your Dropbox: make invites, see their phones, switch one off.</span></summary>
+        <p class="note hide" id="adm-friend-note" style="margin-top:10px;">Inviting people is done by the admin. To put this library on another phone in your household, use <b>Add another phone</b> in the card above.</p>
         <form id="adm-login" autocomplete="on" style="margin-top:10px;">
           <p class="note" style="margin-top:0;">Type the <b>password</b> (Dashlane can fill it). It’s kept only until you close the app. Keep it private: it can make invites, switch phones off, and get into any friend’s library.</p>
           <input type="text" name="username" value="admin" autocomplete="username" class="hide" readonly>
@@ -576,8 +577,8 @@
 <!-- shelf camera: stays open, one tap = one photo -->
 <div class="cam-bg" id="cam-bg">
   <div class="cam-top">
-    <input id="cam-room" list="dl-room" placeholder="Room" aria-label="Room" autocomplete="off">
-    <input id="cam-case" list="dl-case" placeholder="Bookcase" aria-label="Bookcase or bay" autocomplete="off">
+    <input type="hidden" id="cam-room"><input type="hidden" id="cam-case">
+    <div class="cam-where"><span>Photographing:</span> <b id="cam-where-txt"></b> <button type="button" class="cam-change" id="cam-change">Change</button></div>
     <button class="cam-x" id="cam-close" aria-label="Close camera">&times;</button>
   </div>
   <div class="cam-view"><video id="cam-video" muted playsinline></video><div class="cam-flash" id="cam-flash"></div></div>
@@ -586,6 +587,16 @@
     <div class="cam-left"><button class="cam-redo" id="cam-redo" disabled>↺ Redo last</button><div class="cam-thumbs" id="cam-thumbs"></div></div>
     <button class="cam-shutter" id="cam-shutter" aria-label="Take photo"></button>
     <div class="cam-acts"><button class="secondary" id="cam-next">Finished with this bookcase →</button><button id="cam-finish">Done</button></div>
+  </div>
+</div>
+<!-- which bookcase: asked before the first photo, for the next bookcase, or to change it -->
+<div class="cam-ask hide" id="cam-ask" role="dialog" aria-modal="true" aria-labelledby="ca-title">
+  <div class="cam-ask-box">
+    <h3 id="ca-title">Name of the next bookcase</h3>
+    <label for="ca-room">Room</label><input id="ca-room" list="dl-room" autocomplete="off">
+    <label for="ca-case" style="margin-top:10px;">Bookcase or bay</label><input id="ca-case" list="dl-case" autocomplete="off" placeholder="e.g. N2">
+    <p class="wz-err hide" id="ca-err"></p>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="ca-cancel">Cancel</button><button id="ca-start">Start</button></div>
   </div>
 </div>
 <!-- first-run setup -->

@@ -19,7 +19,7 @@ function wzSave(o){ wz=Object.assign({}, wz, o); lsSet(WZ_KEY, JSON.stringify(Ob
 function wzClear(){ try{ localStorage.removeItem(WZ_KEY); }catch(e){} }
 
 function wizardBoot(){
-  if(window.__join) return openWizard('code', { code:window.__join.code });
+  if(window.__join) return openWizard(needsHomeScreen() ? 'install-first' : 'code', { code:window.__join.code });
   const st=wzState(); if(st) return openWizard(st.step, st);
   if(window.__libSetup) return;   // a set-up link already chose the library; the Data & Sync page takes it from there
   if(!cloudOn() && !allBooks().length && !lsGet(WZ_DONE_KEY)) openWizard('welcome');
@@ -37,7 +37,7 @@ $('wz-close').onclick=()=>closeWizard(true);   // closing it is fine: it won't k
 $('btn-wizard').onclick=()=>openWizard('welcome');
 
 const WZ_ORDER=['welcome','connect','photos','unread','home'];
-function wzStepOf(s){ return { welcome:0, lost:0, code:1, own:1, 'own-connect':1, joined:1, install:1, photos:2, unread:3, home:4 }[s] ?? 0; }
+function wzStepOf(s){ return { welcome:0, lost:0, code:1, 'install-first':1, own:1, 'own-connect':1, joined:1, install:1, photos:2, unread:3, home:4 }[s] ?? 0; }
 function wzDraw(){
   const n=wzStepOf(wz.step);
   $('wz-dots').innerHTML=WZ_ORDER.map((_,i)=>'<i class="'+(i<n?'done':i===n?'on':'')+'"></i>').join('');
@@ -46,7 +46,7 @@ function wzDraw(){
   f.wire && f.wire(body);
   const first=body.querySelector('input:not([type=hidden])'); if(first && !first.value) setTimeout(()=>first.focus(), 50);
 }
-function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect','install'].includes(step)) wzSave({ step }); wzDraw(); }
+function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect','install','install-first'].includes(step)) wzSave({ step }); wzDraw(); }
 /* iPhone / iPad: Safari and a Home Screen icon keep separate storage, and Safari can clear a page's storage after
    about a week unused. So on iOS the library goes on the Home Screen first; the Safari copy hands its place to the
    icon with a one-time code (the service's /invite with handoff). */
@@ -76,14 +76,21 @@ const WZ_STEPS={
   code:{
     html:()=>'<h3>Enter your code</h3>'
       +'<p class="wz-lead">It’s a 5-digit number, like <b>48213</b>. If you tapped an invite link, it’s already filled in.</p>'
-      +'<label for="wz-code">Code</label><input id="wz-code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" maxlength="12" value="'+esc(wz.code||'')+'">'
+      +'<label for="wz-code">Code</label><div class="wz-coderow"><input id="wz-code" inputmode="numeric" autocomplete="one-time-code" spellcheck="false" maxlength="12" value="'+esc(wz.code||'')+'">'
+      +(navigator.clipboard && navigator.clipboard.readText ? '<button type="button" class="secondary" id="wz-paste">Paste</button>' : '')+'</div>'
       +'<p class="wz-err hide" id="wz-err"></p>'
       +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<div class="row wz-nav"><button class="secondary" data-back>Back</button><button id="wz-join">Join the library</button></div>',
     wire:b=>{
       b.querySelector('[data-back]').onclick=()=>wzGo('welcome');
+      if($('wz-paste')) $('wz-paste').onclick=async()=>{
+        try{ const t=await navigator.clipboard.readText(); const m=String(t||'').match(/\b\d{5}\b/) || String(t||'').toUpperCase().match(/\b[A-Z0-9]{4}-?[A-Z0-9]{4}\b/);
+          if(m){ $('wz-code').value=m[0]; wzErr(''); } else wzErr('Nothing that looks like a code was copied. Type it instead.'); }
+        catch(e){ wzErr('The phone didn’t allow pasting here. Type the code instead.'); }
+      };
       const go=async()=>{
         const code=$('wz-code').value.trim(); if(!code){ wzErr('Type the code first.'); return; }
+        if(needsHomeScreen() && !wz.safariOk){ wzSave({ code }); wzGo('install-first'); return; }
         const btn=$('wz-join'); btn.disabled=true; btn.textContent='Joining…'; wzErr('');
         try{
           const r=await fetch(friendServer().replace(/\/+$/,'')+'/join', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ code, device:wzDevice()+(isIOS()&&isStandalone()?' (Home Screen)':''), nonce:joinNonce(code) }) });
@@ -177,6 +184,28 @@ const WZ_STEPS={
       }catch(e){ $('wz-hcode').textContent='—'; wzErr('Couldn’t make the code. Check your connection, then close and reopen this page.'); }
     },
   },
+  /* iPhone Safari with an invite: put the library on the Home Screen FIRST; the code is used once, in the icon.
+     The page address carries the code too (?join=…), in case iOS keeps it for the icon. */
+  'install-first':{
+    html:()=>'<h3>First, put the library on your Home Screen</h3>'
+      +'<p class="wz-lead">On iPhone the library lives on your Home Screen. Your code is used there, once.</p>'
+      +'<div class="wz-code" id="wz-fcode">'+esc(wz.code||'')+'</div>'
+      +'<div class="row" style="justify-content:center;margin:6px 0 10px;"><button id="wz-copy">Copy the code</button></div>'
+      +'<ol class="wz-list wz-tight"><li>Tap <b>Copy the code</b> above.</li>'
+      +'<li>Tap the <b>Share</b> button at the bottom of Safari (the square with an arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
+      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, then <b>Paste</b> (or type it).</li></ol>'
+      +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
+      +'<p class="note"><a href="#" id="wz-safari">Can’t add it right now? Use it in Safari instead</a> (Safari may forget it after a week unused).</p>',
+    wire:()=>{
+      try{ if(wz.code) history.replaceState(null,'', location.pathname+'?join='+encodeURIComponent(String(wz.code).replace(/[^A-Za-z0-9]/g,''))); }catch(e){}
+      $('wz-copy').onclick=async()=>{
+        const c=String(wz.code||'');
+        try{ await navigator.clipboard.writeText(c); toast('Code copied'); $('wz-copy').textContent='Copied ✓'; }
+        catch(e){ const r=document.createRange(); r.selectNodeContents($('wz-fcode')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('Press and hold the code to copy it'); }
+      };
+      $('wz-safari').onclick=e=>{ e.preventDefault(); wz.safariOk=true; try{ history.replaceState(null,'', location.pathname); }catch(x){} wzGo('code'); };
+    },
+  },
   /* Lost your place: the app is empty, but the library still exists */
   lost:{
     html:()=>'<h3>Get back into your library</h3>'
@@ -196,6 +225,7 @@ const WZ_STEPS={
       +'<h3>Photograph your shelves</h3>'
       +'<p class="wz-lead">One bookcase at a time. Claude reads the spines and adds every book, with where it sits.</p>'
       +'<ul class="wz-list wz-tight">'
+      +'<li><b>Lots of bookcases that look alike?</b> It helps to label each shelf too (a piece of tape or a printed label) and photograph the label first.</li>'
       +'<li><b>Name each bookcase</b> (<i>N1</i>, <i>N2</i>, <i>Den</i>…) and put it on the bookcase, e.g. a piece of tape or a printed label. Photograph the label first.</li>'
       +'<li><b>Top shelf to bottom</b>, two photos per shelf (left half, right half), phone level and square to the spines.</li>'
       +'<li><b>Good light, no flash.</b> Lying-down stacks and books two deep get their own photo.</li>'
@@ -219,11 +249,11 @@ const WZ_STEPS={
       const label=()=>{ const c=$('wz-case').value.trim(), seen=(wz.cases||[]).some(x=>x.bookcase===c && x.room===$('wz-room').value.trim());
         $('wz-shoot').textContent='📷 '+(seen?'More photos of ':'Take photos of ')+(c||'this bookcase'); };
       $('wz-case').addEventListener('input', label); $('wz-room').addEventListener('input', label);
-      if($('wz-nextcase')) $('wz-nextcase').onclick=()=>{
-        // N1 → N2, D9 → D10; a name without a number is left blank to type
-        const m=String(wz.bookcase||'').match(/^(.*?)(\d+)$/);
-        wzSave({ bookcase: m ? m[1]+(+m[2]+1) : '' }); wzDraw();
-        const c=$('wz-case'); c.focus(); c.select();
+      if($('wz-nextcase')) $('wz-nextcase').onclick=async()=>{
+        const p=await camAsk('Name of the next bookcase', wz.room, nextCaseName(wz.bookcase));
+        if(!p) return;
+        wzSave({ room:p.room, bookcase:p.bookcase }); wzDraw();
+        $('wz-shoot').click();
       };
       $('wz-shoot').onclick=()=>{
         const room=$('wz-room').value.trim(), bc=$('wz-case').value.trim();

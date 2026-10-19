@@ -31,8 +31,14 @@ test('tap, tap, tap: photos go in order; redo replaces the last; next bookcase s
   await expect(page.locator('#cam-redo')).toHaveText('↺ Redo last');
   // finished with N1: on to N2, new count from 001
   await expect(page.locator('#cam-next')).toHaveText('Finished with N1 →');
+  // the heading says where; "Finished with N1 →" asks for the next name in a pop-up (counted up), Start goes to it
+  await expect(page.locator('#cam-where-txt')).toHaveText('Den · N1');
   await page.click('#cam-next');
-  await expect(page.locator('#cam-case')).toHaveValue('N2');
+  await expect(page.locator('#ca-case')).toHaveValue('N2');
+  await expect(page.locator('#ca-room')).toHaveValue('Den');
+  await page.click('#ca-start');
+  await expect(page.locator('#cam-where-txt')).toHaveText('Den · N2');
+  await expect(page.locator('#cam-redo')).toBeDisabled();
   await page.click('#cam-shutter');
   await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(5);
   expect(inbox()[4].path).toMatch(/ Den N2 shelf 001\.jpg$/);
@@ -44,4 +50,23 @@ test('tap, tap, tap: photos go in order; redo replaces the last; next bookcase s
   await expect(page.locator('#ph-case')).toHaveValue('N2');
   await expect(page.locator('#ph-done')).toContainText('Den N1 · 3');
   await expect(page.locator('#ph-done')).toContainText('Den N2 · 1');
+});
+
+test('Change opens the same pop-up; Cancel leaves it as it was; a camera opened with no bookcase asks first', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await click(page, '#btn-photos'); await page.waitForSelector('#ph-bg.open');
+  await page.fill('#ph-room', 'Den'); await page.fill('#ph-case', '');
+  await click(page, '#ph-cam');
+  await expect(page.locator('#cam-ask')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#ca-title')).toHaveText('Which bookcase are you photographing?');
+  await page.fill('#ca-case', 'Tall oak'); await page.click('#ca-start');
+  await expect(page.locator('#cam-where-txt')).toHaveText('Den · Tall oak');
+  await page.click('#cam-change');
+  await expect(page.locator('#ca-title')).toHaveText('Change room or bookcase');
+  await page.fill('#ca-case', 'Something else'); await page.click('#ca-cancel');
+  await expect(page.locator('#cam-where-txt')).toHaveText('Den · Tall oak');
+  // a name with no number: the next one is typed fresh
+  await page.click('#cam-next');
+  await expect(page.locator('#ca-case')).toHaveValue('');
+  await page.click('#ca-cancel');
 });
