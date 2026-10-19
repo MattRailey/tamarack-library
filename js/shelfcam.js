@@ -43,6 +43,8 @@ function camNoCamera(e){
 function camStop(){ if(cam && cam.stream){ cam.stream.getTracks().forEach(t=>t.stop()); cam.stream=null; } const v=$('cam-video'); if(v) v.srcObject=null; }
 // finished: "Finished adding to library" / "Done"; otherwise just closed (×)
 function closeShelfCam(silent, finished){
+  // remember where the camera got to (after "Finished with N3 →" that's N4), for Send photos next time
+  if(cam && cam.opts.kind!=='recheck'){ ui.phLoc=Object.assign({}, ui.phLoc, { room:$('cam-room').value.trim(), bookcase:$('cam-case').value.trim() }); lsSet(UI_KEY, JSON.stringify(ui)); }
   camStop(); $('cam-bg').classList.remove('open'); unlockPage();
   const c=cam; cam=null;
   if(!silent && c && c.opts.onFinish) c.opts.onFinish(c.cases, !!finished);
@@ -76,7 +78,7 @@ async function camShoot(){
   if(!cam.session || cam.session.key!==key) cam.session={ key, base:camBase(loc), n:0 };
   const n=++cam.session.n, path=dbxFolder()+'/photos/inbox/'+cam.session.base+' '+String(n).padStart(3,'0')+'.jpg';
   let c=cam.cases.find(x=>x.room===loc.room && x.bookcase===loc.bookcase); if(!c){ c={ room:loc.room, bookcase:loc.bookcase, n:0 }; cam.cases.push(c); }
-  c.n++;
+  c.n++; logSent(loc, 1);
   const url=URL.createObjectURL(blob);
   $('cam-thumbs').insertAdjacentHTML('afterbegin','<div class="cam-th sending"><img src="'+url+'" alt=""></div>');
   const th=$('cam-thumbs').firstElementChild; while($('cam-thumbs').children.length>6) $('cam-thumbs').lastElementChild.remove();

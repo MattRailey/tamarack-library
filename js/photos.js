@@ -7,11 +7,28 @@
    Photos for Claude — shelf / spine / title-page pictures go to
    <library folder>/photos/inbox/, labeled with where they were taken.
    ============================================================ */
+/* What this phone has sent, per bookcase, so a break is easy to come back from ("N1 · 12, N2 · 9").
+   Kept on the phone for this library only; Clear empties it. */
+const SENT_KEY='tamarack_library_sentlog'+LIB_NS;
+function sentLog(){ try{ return JSON.parse(lsGet(SENT_KEY)||'[]'); }catch(e){ return []; } }
+function logSent(loc, n){
+  if(!n || !['shelf','spines','recheck'].includes(loc.kind)) return;
+  const L=sentLog(), k=c=>c.room+'|'+c.bookcase+'|'+(c.kind==='recheck'?'r':'');
+  let c=L.find(x=>k(x)===k(loc)); if(!c){ c={ room:loc.room, bookcase:loc.bookcase, kind:loc.kind==='recheck'?'recheck':'shelf', n:0 }; L.push(c); }
+  c.n+=n; c.at=Date.now(); lsSet(SENT_KEY, JSON.stringify(L.slice(-60)));
+}
+function renderSentLog(){
+  const L=sentLog(); $('ph-done').classList.toggle('hide', !L.length); if(!L.length) return;
+  const last=L.reduce((a,b)=>b.at>a.at?b:a);
+  $('ph-done').innerHTML='<b>Already sent from this phone:</b> '+L.map(c=>esc([c.room,c.bookcase].filter(Boolean).join(' '))+' · '+c.n+(c.kind==='recheck'?' (recheck)':'')).join(', ')
+    +'. <span class="note">Last: '+esc([last.room,last.bookcase].filter(Boolean).join(' '))+', '+new Date(last.at).toLocaleDateString(undefined,{ month:'short', day:'numeric' })+'.</span> <a href="#" id="ph-done-clear">Clear list</a>';
+  $('ph-done-clear').onclick=e=>{ e.preventDefault(); if(confirm('Clear this list? (It only clears the list on this phone; the photos stay sent.)')){ try{ localStorage.removeItem(SENT_KEY); }catch(x){} renderSentLog(); } };
+}
 function openPhotos(){
   const L=ui.phLoc||{};
   $('ph-room').value=L.room||roomPick(); $('ph-case').value=L.bookcase||$('f-case').value||''; $('ph-shelf').value=L.shelf||'';
   $('ph-kind').value=L.kind||'shelf'; $('ph-note').value=''; $('ph-status').textContent='';
-  $('ph-bg').classList.add('open'); lockPage(); renderRetry();
+  $('ph-bg').classList.add('open'); lockPage(); renderRetry(); renderSentLog();
 }
 $('btn-photos').onclick=openPhotos;
 $('ph-close').onclick=()=>{ $('ph-bg').classList.remove('open'); unlockPage(); };
@@ -19,7 +36,9 @@ $('ph-cam').onclick=()=>{
   const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
   ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
   openShelfCam(Object.assign({}, loc, { build:true, finishLabel:'Done', fallback:()=>$('ph-file').click(),
-    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent. They’re waiting for Claude to read them; the books show up here once that’s done.'; renderRetry(); } }));
+    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent. They’re waiting for Claude to read them; the books show up here once that’s done.';
+      // pick up where the camera left off next time
+      const L=ui.phLoc||{}; $('ph-room').value=L.room||''; $('ph-case').value=L.bookcase||''; renderRetry(); renderSentLog(); } }));
 };
 $('ph-take').onclick=async()=>{ if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; } $('ph-file').click(); };
 $('ph-file').onchange=async e=>{
@@ -48,7 +67,7 @@ async function sendToInbox(files, loc, note, statusEl, listEl){
     try{
       blob=await shrinkPhoto(files[i], max, q);
       if(!(await putPhoto(path, blob, true))) throw new Error('upload failed');
-      ok++;
+      ok++; logSent(loc, 1);
       const url=URL.createObjectURL(blob);
       listEl && listEl.insertAdjacentHTML('afterbegin','<div class="ph-item"><img src="'+url+'" alt=""><span>✓ '+esc([loc.room,loc.bookcase,loc.shelf?'Shelf '+loc.shelf:''].filter(Boolean).join(' · ')||'Sent')+(note?' — '+esc(note):'')+'</span></div>');
     }catch(err){ fail++; if(blob) await queuePhoto(path, blob); }

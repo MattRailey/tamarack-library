@@ -39,4 +39,9 @@ test('tap, tap, tap: photos go in order; redo replaces the last; next bookcase s
   await page.click('#cam-finish');
   await expect(page.locator('#cam-bg')).not.toHaveClass(/open/);
   await expect(page.locator('#ph-status')).toContainText('4 photos sent');
+  // a break: next time Send photos opens on N2 (where the camera got to) and lists what was sent
+  await click(page, '#ph-close'); await click(page, '#btn-photos');
+  await expect(page.locator('#ph-case')).toHaveValue('N2');
+  await expect(page.locator('#ph-done')).toContainText('Den N1 · 3');
+  await expect(page.locator('#ph-done')).toContainText('Den N2 · 1');
 });
