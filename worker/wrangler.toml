@@ -16,7 +16,21 @@ ALLOWED_ORIGINS = "https://mattrailey.github.io"
 APP_URL = "https://mattrailey.github.io/tamarack-library/tamarack-library"
 DBX_ROOT = ""            # "" = the Dropbox app folder itself (Dropbox/Apps/<your app name>/)
 ALLOW_LOCALHOST = "0"    # "1" while testing the app on your own computer
+PAUSED = "0"             # "1" = phones get "paused for a little while"; admin still works (then: npx wrangler deploy)
 
 # Secrets (never in this file): npx wrangler secret put DBX_APP_KEY
 #                               npx wrangler secret put DBX_REFRESH_TOKEN
 #                               npx wrangler secret put ADMIN_SECRET
+
+# Logs and request metrics in the Cloudflare dashboard (Workers -> tamarack-friends -> Observability)
+[observability]
+enabled = true
+
+# /join: at most 10 tries a minute from one address, so junk traffic can't use up the free plan's daily requests
+[[ratelimits]]
+name = "JOIN_LIMIT"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

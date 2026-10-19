@@ -29,6 +29,14 @@ async function dbxToken(){
 function friendCfg(){ try{ const r=lsGet(FRIEND_KEY); const f=r?JSON.parse(r):null; return f && f.token && f.server ? f : null; }catch(e){ return null; } }
 function cloudOn(){ return !!(friendCfg() || dbxTokens()); }
 function cloudName(){ return friendCfg() ? 'the library' : 'Dropbox'; }
+// The service's trouble in plain words: a 5xx means the service (or its Dropbox sign-in) is down, not the phone.
+async function friendErr(r){
+  let j={}; try{ j=await r.json(); }catch(e){}
+  const msg = r.status===503 && j.error ? j.error
+    : r.status>=500 ? 'The library service is having trouble. Your books are safe on this phone.'
+    : (j.error || 'Something went wrong (code '+r.status+').');
+  return Object.assign(new Error(msg), { friendly:true, status:r.status });
+}
 async function friendCall(ep, headers, body){
   const f=friendCfg();
   return fetch(f.server.replace(/\/+$/,'')+ep, { method:'POST', headers:Object.assign({ Authorization:'Bearer '+f.token }, headers||{}), body });
@@ -38,8 +46,8 @@ async function cloudGet(path){
   if(friendCfg()){
     const r=await friendCall('/files/download', { 'X-Path':encodeURIComponent(path) });
     if(r.status===404) return { missing:true };
-    if(r.status===401) return { signedOut:true, expired:true, revoked:true };
-    if(!r.ok) throw new Error('download failed (HTTP '+r.status+')');
+    if(r.status===401){ let j={}; try{ j=await r.json(); }catch(e){} return { signedOut:true, expired:true, revoked:true, msg:j.error||'' }; }
+    if(!r.ok) throw await friendErr(r);
     return { ok:true, res:r, rev:r.headers.get('X-Rev')||null };
   }
   const t=await dbxToken(); if(!t) return { signedOut:true };
@@ -60,7 +68,7 @@ async function cloudPut(path, body, opts){
       'X-Mode':opts.rev?'update:'+opts.rev:'add', 'X-Autorename':opts.autorename?'1':'0' }, body);
     if(r.status===409) return { conflict:true };
     if(r.status===401) return { signedOut:true, revoked:true };
-    if(!r.ok) throw new Error('upload failed (HTTP '+r.status+')');
+    if(!r.ok) throw await friendErr(r);
     const j=await r.json(); return { ok:true, path:j.path||path, rev:j.rev||null };
   }
   const t=await dbxToken(); if(!t) return { signedOut:true };
@@ -77,7 +85,7 @@ async function cloudPut(path, body, opts){
 
 async function dbxDownload(){
   const g=await cloudGet(dbxPath());
-  if(g.signedOut) return { connected:false, expired:!!g.expired, revoked:!!g.revoked };
+  if(g.signedOut) return { connected:false, expired:!!g.expired, revoked:!!g.revoked, msg:g.msg||'' };
   if(g.missing) return { connected:true, data:null, rev:null };   // no file yet
   const data = JSON.parse(await g.res.text());
   if(!validStore(data)) throw new Error('the Dropbox file isn\'t a library file — not touching it');
@@ -126,10 +134,13 @@ async function dbxHandleRedirect(){
     toast('Dropbox connected');
   }catch(e){ toast('Dropbox connection failed: '+e.message); }
 }
-function dbxDisconnect(){
+async function dbxDisconnect(){
   if(friendCfg()){
     if(!confirm('Take this phone out of the library? Your books stay saved in the library for your other phones. To get back in you’ll need a new invite.')) return;
+    // switch this phone's key off at the service too, so it can't be used again
+    let off=false; try{ const r=await friendCall('/leave'); off=r.ok || r.status===401; }catch(e){}
     try{ localStorage.removeItem(FRIEND_KEY); }catch(e){}
+    if(!off) toast('Taken off this phone. The library service couldn’t be reached, so ask Matt to switch this phone off too.');
   } else {
     if(!confirm('Disconnect Dropbox on this device? Your books stay saved here and in Dropbox.')) return;
     try{ localStorage.removeItem(DBX_TOKENS_KEY); }catch(e){}
@@ -168,7 +179,7 @@ async function syncNow(){
     let done=false;
     for(let attempt=0; attempt<4 && !done; attempt++){
       const remote = await dbxDownload();
-      if(!remote.connected){ setSync('err', remote.revoked ? 'This phone was taken out of the library — ask for a new invite' : remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
+      if(!remote.connected){ setSync('err', remote.revoked ? (remote.msg && !/^no device key$/.test(remote.msg) ? remote.msg : 'This phone was taken out of the library — ask for a new invite') : remote.expired ? 'Dropbox sign-in expired — reconnect on Data & Sync' : 'Dropbox not connected'); return; }
       const merged = remote.data ? mergeStores(store, remote.data) : store;
       if(sig(merged)!==sig(store)){ stampFields(); store = merged; snapAll(); writeLocal(); refreshAll(); }
       if(remote.data && sig(merged)===sig(remote.data)){ done=true; break; }
@@ -182,7 +193,7 @@ async function syncNow(){
       setSync('ok','Synced ' + new Date(lastSyncAt).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
       setTimeout(migrateCovers, 3000); setTimeout(fillPendingIsbns, 1500);
     } else setSync('err','Sync kept conflicting — try again');
-  }catch(e){ if(navigator.onLine===false) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); else setSync('err','Sync failed: '+e.message); }
+  }catch(e){ if(navigator.onLine===false) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); else setSync('err', e.friendly ? e.message : 'Sync failed: '+e.message); }
   finally{
     syncing=false;
     if(syncAgain){ syncAgain=false; syncNow(); }

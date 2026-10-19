@@ -19,7 +19,7 @@ $('ph-cam').onclick=()=>{
   const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
   ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
   openShelfCam(Object.assign({}, loc, { build:true, finishLabel:'Done', fallback:()=>$('ph-file').click(),
-    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent to the inbox.'; renderRetry(); } }));
+    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent. They’re waiting for Claude to read them; the books show up here once that’s done.'; renderRetry(); } }));
 };
 $('ph-take').onclick=async()=>{ if(!cloudOn()){ toast('Connect Dropbox first (Epilogue → Data & Sync) so photos can reach the folder'); return; } $('ph-file').click(); };
 $('ph-file').onchange=async e=>{
@@ -59,7 +59,7 @@ async function sendToInbox(files, loc, note, statusEl, listEl){
     try{ if(!(await putPhoto(np, nb, true))) await queuePhoto(np, nb); }catch(e){ await queuePhoto(np, nb); }
   }
   statusEl.textContent = fail ? ok+' sent. '+fail+' didn’t go through — they’re saved on this phone and will send on their own when the signal is back, or tap “Send them now”.'
-                              : ok+' photo'+(ok===1?'':'s')+' sent to the inbox. Add more, or close when you’re done.';
+                              : ok+' photo'+(ok===1?'':'s')+' sent to the inbox. They’re waiting for Claude to read them; the books show up here once that’s done.';
   renderRetry();
   return ok;
 }

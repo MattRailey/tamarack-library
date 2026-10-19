@@ -2,6 +2,7 @@
   "name": "Railey Library",
   "short_name": "Library",
   "start_url": "tamarack-library.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f7f1e6",
   "theme_color": "#2e4a3b",

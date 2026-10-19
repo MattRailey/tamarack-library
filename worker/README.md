@@ -61,7 +61,7 @@ You need Node.js on your computer (nodejs.org, the LTS version) and a free Cloud
 
 ## Inviting a friend
 
-**The easy way, in the app** (on your own phone or computer): *Epilogue → Data & Sync → Invite a friend*. Type the password once per device (Dashlane can save and fill it; it's the ADMIN_SECRET you stored), type the library's name, tap **Make invite**, then **Share invite**. The same box lists every library's phones, with **Switch off** for a lost one. The box never shows on a friend's phone. *Forget password on this device* removes it.
+**The easy way, in the app** (on your own phone or computer): *Epilogue → Data & Sync → Invite a friend*. Type the password once per device (Dashlane can save and fill it; it's the ADMIN_SECRET you stored), type the library's name, tap **Make invite**, then **Share invite**. The same box lists every library's phones, with **Switch off** for a lost one. The box never shows on a friend's phone. The password is kept only until you close the app (your other Pages apps share the website, so nothing is left saved there). **Keep it private:** besides invites and switching phones off, it can get into any friend's library (by inviting yourself to it). *Forget password on this device* removes it.
 
 **Or from a terminal:**
 
@@ -94,6 +94,41 @@ Other commands:
 ## Reading a friend's shelf photos
 
 Their photos land in `Dropbox/Apps/Tamarack Friends/<Library>/photos/inbox/`. Link that folder (or `Tamarack Friends`) in a Claude session and say *"check the photo inbox for the Smith Library."* It's the same workflow as Railey Library: read the photos, update `tamarack-library.json`, log to `imports/`, delete the photos.
+
+## Getting a notice when photos arrive (optional, 5 minutes)
+
+The service can ping your phone when a friend's photos start arriving (at most once an hour per library), and right away if its Dropbox sign-in stops working.
+1. Install the free **ntfy** app on your phone and subscribe to a topic name only you know, e.g. `tamarack-` plus 20 random letters (anyone who knows the name can read the notices).
+2. In `worker/`: `npx wrangler secret put NTFY_TOPIC` and paste the same name.
+The admin box (Invite a friend) also shows when each library last sent photos and when each phone was last used.
+
+## What the service checks (so a lost or misused phone can't do harm)
+
+- **File names**: letters, numbers, spaces, `_ . -` only (they sync to your Windows PC). Only `.jpg .jpeg .png .heic` pictures, checked by their first bytes, not just the name; plus a small `NOTE.txt` beside photos.
+- **Sizes**: a photo up to 8 MB (the app sends 2–4 MB), a cover photo up to 1.5 MB, the catalog up to 25 MB.
+- **About 600 photos or covers a day per library.** Counted in the service's memory, so it's rough: it resets when Cloudflare restarts the service, and retries count too.
+- **`/join`**: at most 10 tries a minute from one address (the `[[ratelimits]]` block in `wrangler.toml`). If Cloudflare ever refuses that block on the free plan, delete those five lines and redeploy; the service works without it.
+- **Daily catalog backup**: before the first save each day, the service copies the catalog to `<Library>/backups/tamarack-library-slot-NN.json` (14 slots, overwritten in turn, so the last two weeks are kept). Phones can't reach `backups/`. No extra Dropbox permission is needed.
+- **Logs**: `[observability]` is on, so Cloudflare's dashboard shows each request (Workers → tamarack-friends → Observability).
+
+## Runbook
+
+- **Pause everything** (phones keep their books, nothing syncs): set `PAUSED = "1"` in `wrangler.toml`, `npx wrangler deploy`. Phones see "paused for a little while". Set it back to `"0"` and deploy to resume. Admin commands keep working while paused.
+- **Change the password** (`ADMIN_SECRET`): make a new one in Dashlane, `npx wrangler secret put ADMIN_SECRET`, paste. Works within seconds; invite codes already made still work.
+- **Dropbox sign-in failed** (phones say "The library service is having trouble"; ntfy tells you): `node get-token.mjs <app key>`, then `npx wrangler secret put DBX_REFRESH_TOKEN`.
+- **Stop the service completely**: dropbox.com → Settings → Connected apps → remove **Tamarack Friends** (the service can then reach nothing), and/or `npx wrangler delete`.
+- **Restore a library from a backup**: in `Dropbox\Apps\Tamarack Friends\<Library>\backups\`, pick the slot with the right date (Dropbox shows when each was saved). Pause the service, rename the current `tamarack-library.json` to keep it, copy the backup in as `tamarack-library.json`, resume. Phones merge it in book by book on their next sync (they keep their own newer edits).
+
+## When a friend leaves (offboarding)
+
+1. Admin box → **Switch off every phone** for that library (or `node admin.mjs revoke-library "Smith Library"`).
+2. If they want their list: send them `tamarack-library.json` from `Dropbox\Apps\Tamarack Friends\<Library>\` (it opens as text; the app's *Merge a backup file* reads it too).
+3. Move the library's folder out of `Apps\Tamarack Friends` into an archive folder of yours, or delete it.
+On their phone, **Epilogue → Data & Sync → Remove this phone** also switches that phone off at the service.
+
+## iPhone notes
+
+On iPhone, Safari and a Home Screen icon keep separate storage, and Safari may clear a page's storage after about a week unused. So after joining in Safari the app asks to **put it on the Home Screen first** and shows a one-time code; the icon's app joins with that code and the Safari copy steps aside (it then says the library opens from the Home Screen icon). A reminder bar shows in Safari until it's on the Home Screen. **Not yet tried on a real iPhone.**
 
 ## Costs and limits
 

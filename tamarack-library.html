@@ -40,6 +40,7 @@
 <script src="js/app.js" defer></script>
 </head>
 <body>
+<button type="button" class="home-banner hide" id="home-banner">📲 Add the library to your Home Screen so this phone keeps it. <u>How?</u></button>
 <div class="book"><div class="page">
 <header>
   <h1><img src="icons/icon-180.png" alt=""><span><b id="lib-name" style="font-weight:inherit">Railey Library</b><small id="lib-tag">Our books at home</small></span></h1>
@@ -148,7 +149,7 @@
         </div>
       </div>
 
-      <div class="card" style="padding:10px 16px;"><div class="summary" id="summary"></div></div>
+      <div class="card" style="padding:10px 16px;"><div class="summary" id="summary"></div><div class="note latest-import hide" id="latest-import"></div></div>
       <div id="results"></div>
       <div class="more-wrap hide" id="more-wrap"><button class="secondary" id="btn-more">Show more</button></div>
     </section>
@@ -378,7 +379,7 @@
       <details class="card adm-card hide" id="adm-card">
         <summary><h3>Invite a friend</h3><span class="note">Friends’ libraries in your Dropbox: make invites, see their phones, switch one off.</span></summary>
         <form id="adm-login" autocomplete="on" style="margin-top:10px;">
-          <p class="note" style="margin-top:0;">Type the <b>password</b> once on this device (Dashlane can fill it). It stays in this browser only, and can make invites and switch phones off, but can’t read anyone’s books.</p>
+          <p class="note" style="margin-top:0;">Type the <b>password</b> (Dashlane can fill it). It’s kept only until you close the app. Keep it private: it can make invites, switch phones off, and get into any friend’s library.</p>
           <input type="text" name="username" value="admin" autocomplete="username" class="hide" readonly>
           <label for="adm-secret">Password</label>
           <input type="password" id="adm-secret" name="password" autocomplete="current-password" spellcheck="false">
@@ -393,7 +394,7 @@
           <div id="adm-invite-out" style="margin-top:8px;"></div>
           <h4 style="margin:16px 0 6px;">Libraries and phones</h4>
           <div id="adm-list"></div>
-          <div class="row" style="margin-top:10px;"><button class="secondary" id="adm-refresh">Refresh</button><button class="secondary" id="adm-forget">Forget password on this device</button></div>
+          <div class="row" style="margin-top:10px;"><button class="secondary" id="adm-refresh">Refresh</button><button class="secondary" id="adm-forget">Lock</button></div>
         </div>
         <p class="note" id="adm-msg"></p>
       </details>

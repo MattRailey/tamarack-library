@@ -50,7 +50,7 @@ refreshLists();
 renderLibrary(true);
 showPanel(ui.panel || 'library');
 renderDbxCard();
-loadFromIdb().then(()=>dbxHandleRedirect()).then(()=>{ if(lsGet(STORE_KEY)) writeLocal(); renderDbxCard(); setSync('', cloudOn() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); wizardBoot(); setTimeout(()=>retryPhotos(true), 4000); });
+loadFromIdb().then(()=>dbxHandleRedirect()).then(()=>{ if(lsGet(STORE_KEY)) writeLocal(); renderDbxCard(); setSync('', cloudOn() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); wizardBoot(); renderHomeBanner(); setTimeout(()=>retryPhotos(true), 4000); });
 window.addEventListener('online', ()=>{ syncNow(); setTimeout(fillPendingIsbns, 1000); if($('scan-bg').classList.contains('open')) syncScanMode(); });
 window.addEventListener('offline', ()=>{ if(cloudOn()) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); if($('scan-bg').classList.contains('open')) syncScanMode(); });
 // works with no signal: a small service worker keeps a copy of the app (and the barcode reader) on the phone

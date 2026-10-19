@@ -37,7 +37,7 @@ $('wz-close').onclick=()=>closeWizard(true);   // closing it is fine: it won't k
 $('btn-wizard').onclick=()=>openWizard('welcome');
 
 const WZ_ORDER=['welcome','connect','photos','unread','home'];
-function wzStepOf(s){ return { welcome:0, code:1, own:1, 'own-connect':1, joined:1, photos:2, unread:3, home:4 }[s] ?? 0; }
+function wzStepOf(s){ return { welcome:0, lost:0, code:1, own:1, 'own-connect':1, joined:1, install:1, photos:2, unread:3, home:4 }[s] ?? 0; }
 function wzDraw(){
   const n=wzStepOf(wz.step);
   $('wz-dots').innerHTML=WZ_ORDER.map((_,i)=>'<i class="'+(i<n?'done':i===n?'on':'')+'"></i>').join('');
@@ -46,7 +46,13 @@ function wzDraw(){
   f.wire && f.wire(body);
   const first=body.querySelector('input:not([type=hidden])'); if(first && !first.value) setTimeout(()=>first.focus(), 50);
 }
-function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect'].includes(step)) wzSave({ step }); wzDraw(); }
+function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect','install'].includes(step)) wzSave({ step }); wzDraw(); }
+/* iPhone / iPad: Safari and a Home Screen icon keep separate storage, and Safari can clear a page's storage after
+   about a week unused. So on iOS the library goes on the Home Screen first; the Safari copy hands its place to the
+   icon with a one-time code (the service's /invite with handoff). */
+function isIOS(){ const u=navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints>1); }
+function isStandalone(){ return navigator.standalone===true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
+function needsHomeScreen(){ return isIOS() && !isStandalone(); }
 function wzDevice(){
   const u=navigator.userAgent;
   return /iPhone/.test(u)?'iPhone':/iPad/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)?'iPad':/Android/.test(u)?'Android phone':'Computer';
@@ -59,10 +65,11 @@ const WZ_STEPS={
   welcome:{
     html:()=>'<h3>Welcome to your library</h3>'
       +'<p class="wz-lead">Let’s set it up. It takes about two minutes, and you only do it once on this phone.</p>'
-      +(friendServer() ? '<button class="wz-opt" data-go="code"><b>I have an invite code</b><span>From Matt, or from someone in your household who already uses the app.</span></button>' : '')
+      +(friendServer() ? '<button class="wz-opt" data-go="code"><b>I have a code</b><span>'+(isIOS()&&isStandalone() ? 'The code Safari showed you, or an invite from Matt or your household.' : 'From Matt, or from someone in your household who already uses the app.')+'</span></button>' : '')
       +'<button class="wz-opt" data-go="own"><b>Use my own Dropbox</b><span>The library lives in a folder in your Dropbox.</span></button>'
-      +'<button class="wz-opt quiet" data-go="local"><b>Just try it on this device</b><span>Nothing is synced. You can set up syncing later.</span></button>',
-    wire:b=>b.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>{
+      +'<button class="wz-opt quiet" data-go="local"><b>Just try it on this device</b><span>Nothing is synced. You can set up syncing later.</span></button>'
+      +(friendServer() ? '<p class="note" style="margin-top:10px;"><a href="#" data-go="lost">Lost your place?</a> Joined before, but the app is empty now?</p>' : ''),
+    wire:b=>b.querySelectorAll('[data-go]').forEach(x=>x.onclick=e=>{ e.preventDefault();
       if(x.dataset.go==='local'){ closeWizard(true); toast('Saved on this device only — run setup again any time from Data & Sync'); return; }
       wzGo(x.dataset.go); }),
   },
@@ -71,6 +78,7 @@ const WZ_STEPS={
       +'<p class="wz-lead">It looks like <b>ABCD-EFGH</b>. If you tapped an invite link, it’s already filled in.</p>'
       +'<label for="wz-code">Invite code</label><input id="wz-code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="'+esc(wz.code||'')+'">'
       +'<p class="wz-err hide" id="wz-err"></p>'
+      +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<div class="row wz-nav"><button class="secondary" data-back>Back</button><button id="wz-join">Join the library</button></div>',
     wire:b=>{
       b.querySelector('[data-back]').onclick=()=>wzGo('welcome');
@@ -78,7 +86,7 @@ const WZ_STEPS={
         const code=$('wz-code').value.trim(); if(!code){ wzErr('Type the code first.'); return; }
         const btn=$('wz-join'); btn.disabled=true; btn.textContent='Joining…'; wzErr('');
         try{
-          const r=await fetch(friendServer().replace(/\/+$/,'')+'/join', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ code, device:wzDevice() }) });
+          const r=await fetch(friendServer().replace(/\/+$/,'')+'/join', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ code, device:wzDevice()+(isIOS()&&isStandalone()?' (Home Screen)':''), nonce:joinNonce(code) }) });
           const j=await r.json().catch(()=>({}));
           if(!r.ok || !j.token) throw new Error(j.error || 'That code didn’t work. Check it, or ask for a new one.');
           const folder='/'+j.lib, ns=nsFor(folder);
@@ -105,7 +113,7 @@ const WZ_STEPS={
       const n=allBooks().length;
       wz.joinedNote = n ? 'You’re in. '+libCfg().title+' has '+n.toLocaleString()+' book'+(n===1?'':'s')+', and anything you change shows up on the other phones too.'
                         : 'You’re in. Your library is ready — let’s fill it.';
-      wzGo('photos');
+      wzGo(needsHomeScreen() ? 'install' : 'photos');
     },
   },
   own:{
@@ -144,6 +152,40 @@ const WZ_STEPS={
       wz.joinedNote='Dropbox is connected. '+(allBooks().length ? 'Your '+allBooks().length.toLocaleString()+' books are here.' : 'Your library is ready — let’s fill it.');
       wzGo('photos');
     },
+  },
+  /* iPhone Safari: put the library on the Home Screen, then type the code shown here in the icon's app. */
+  install:{
+    html:()=>(wz.joinedNote?'<p class="wz-ok">'+esc(wz.joinedNote)+'</p>':'')
+      +'<h3>First, put it on your Home Screen</h3>'
+      +'<p class="wz-lead">On iPhone the library must live on your Home Screen, or Safari can forget it after a week.</p>'
+      +'<ol class="wz-list wz-tight"><li>Tap the <b>Share</b> button below (the square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
+      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, and type:</li></ol>'
+      +(friendCfg() ? '<div class="wz-code" id="wz-hcode">…</div><p class="note" id="wz-hnote">Good for 2 days. Once the icon has it, this Safari page steps aside.</p>'
+                    : '<p class="note">Then connect your Dropbox again in the icon’s app.</p>')
+      +'<p class="wz-err hide" id="wz-err"></p>'
+      +'<div class="row wz-nav"><button class="secondary" id="wz-skip-install">Not now</button></div>',
+    wire:async()=>{
+      $('wz-skip-install').onclick=()=>{ toast('Remember to add it to your Home Screen soon'); wzGo('photos'); };
+      if(!friendCfg()) return;
+      try{
+        if(!wz.hcode){
+          const r=await friendCall('/invite', { 'Content-Type':'application/json' }, JSON.stringify({ handoff:true }));
+          const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||'');
+          wzSave({ hcode:j.code });
+        }
+        $('wz-hcode').textContent=wz.hcode;
+      }catch(e){ $('wz-hcode').textContent='—'; wzErr('Couldn’t make the code. Check your connection, then close and reopen this page.'); }
+    },
+  },
+  /* Lost your place: the app is empty, but the library still exists */
+  lost:{
+    html:()=>'<h3>Get back into your library</h3>'
+      +'<p class="wz-lead">Your books are safe: they’re kept in the library, not just on this phone.</p>'
+      +'<ul class="wz-list wz-tight"><li><b>Someone in your household still has it?</b> On their phone: <b>Epilogue → Data &amp; Sync → Add another phone</b>. Open that link here.</li>'
+      +'<li><b>Have the library in Safari but not on the Home Screen icon?</b> Open it in Safari: it shows a code to type here.</li>'
+      +'<li><b>Otherwise</b>, ask Matt for a new link.</li></ul>'
+      +'<div class="row wz-nav"><button class="secondary" data-back>Back</button>'+(friendServer()?'<button data-code>I have a code</button>':'')+'</div>',
+    wire:b=>{ b.querySelector('[data-back]').onclick=()=>wzGo('welcome'); const c=b.querySelector('[data-code]'); if(c) c.onclick=()=>wzGo('code'); },
   },
   /* Build-library mode: photograph one bookcase at a time, right here; the photos go to the inbox for Claude.
      Several batches per bookcase; then "Finished with N1" (next one, name counted up: N1 → N2) or "Finished adding to library". */
@@ -257,6 +299,19 @@ const WZ_STEPS={
     wire:()=>{ $('wz-done').onclick=()=>{ closeWizard(true); showPanel('library'); }; },
   },
 };
+// One random id per code, kept for this visit: a join tried again after a lost answer gets the same answer.
+function joinNonce(code){
+  const k='tamarack_library_join_nonce:'+String(code).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  try{ let n=sessionStorage.getItem(k); if(!n){ n=Array.from(crypto.getRandomValues(new Uint8Array(12)), b=>b.toString(16).padStart(2,'0')).join(''); sessionStorage.setItem(k, n); } return n; }catch(e){ return ''; }
+}
+// Ask the browser to keep this site's storage (device key, waiting photos) even when space runs low.
+if(navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p=>{ if(!p) navigator.storage.persist().catch(()=>{}); }).catch(()=>{});
+// iPhone Safari with a library: a reminder bar until it's on the Home Screen
+function renderHomeBanner(){
+  const show=needsHomeScreen() && (!!friendCfg() || allBooks().length>0);
+  $('home-banner').classList.toggle('hide', !show);
+}
+$('home-banner').onclick=()=>openWizard('install', {});
 // Wait for the first sync after joining or connecting (up to ~20 s; works offline too, just with nothing new).
 async function wzWaitForSync(){
   for(let i=0;i<40;i++){ if(lastSyncAt || $('sync-dot').classList.contains('err') || navigator.onLine===false) break; await new Promise(r=>setTimeout(r,500)); }

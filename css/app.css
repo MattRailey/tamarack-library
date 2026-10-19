@@ -597,3 +597,6 @@ select.filter-on, button.filter-on{ background:#fbe3a8 !important; border-color:
 .ln-row{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
 .ln-who{ text-align:right; flex:none; display:flex; flex-direction:column; max-width:45%; }
 .ln-who .note{ margin:2px 0 0; }
+.latest-import{ margin:4px 0 0; }
+.home-banner{ display:block; width:100%; border:none; border-radius:0; background:#fff4d6; color:#5a3b00; font-size:.85rem; padding:8px 14px; text-align:left; min-height:0; }
+.wz-disclose{ font-size:.78rem; margin-top:10px; }

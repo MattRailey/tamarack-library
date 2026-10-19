@@ -101,6 +101,11 @@ function renderLibrary(resetPaging){
   updateBatchBar();
   syncMoreBtn();
   syncFilterFlags();
+  // the newest batch Claude added (photos or an import), for a month
+  const li=[...(store.imports||[])].reverse().find(i=>i.added && !i.undone);
+  const showLi=li && Date.now()-li.at < 30*864e5;
+  $('latest-import').classList.toggle('hide', !showLi);
+  if(showLi) $('latest-import').textContent='Latest: '+li.added+' book'+(li.added===1?'':'s')+' added '+new Date(li.at).toLocaleDateString(undefined,{ month:'short', day:'numeric' })+(li.label?' ('+li.label+')':'')+'.';
 }
 $('results').addEventListener('click', e=>{
   const el = e.target.closest('[data-id]'); if(!el) return;

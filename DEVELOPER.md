@@ -40,7 +40,7 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `scanner.js` | Camera barcode reading (the native `BarcodeDetector`, else ZXing from jsDelivr). Add, check ("Do I own this?") and fill modes. Offline save-for-later. |
 | `mystery.js` | The unidentified-books list and the shelf-by-shelf walk-through, including "add a book we missed". |
 | `photos.js` | Uploading shelf and title-page photos to the Dropbox photo inbox. |
-| `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones, switch off, through the service's `/admin/*` with the admin secret kept in this browser (`tamarack_library_admin`). |
+| `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones (last used), last photos per library, switch off, through the service's `/admin/*`. The password (ADMIN_SECRET) is kept in sessionStorage only (`tamarack_library_admin`): the github.io origin is shared with Matt's other apps, and the password can get into any library. |
 | `shelfcam.js` | The shelf camera: stays open, one tap per photo, sends in the background, Redo last, next bookcase. |
 | `recheck.js` | Recheck shelves tab: bookcases by when they were last photographed, recheck photos. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |

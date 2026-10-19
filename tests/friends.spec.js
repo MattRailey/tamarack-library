@@ -66,7 +66,7 @@ test('a brand-new phone gets the setup wizard; an existing library does not', as
   const svc = await startService(); await connect(page, svc);
   await freshPhone(page);
   await expect(page.locator('#wz-bg')).toHaveClass(/open/);
-  await expect(page.locator('#wz-body')).toContainText('I have an invite code');
+  await expect(page.locator('#wz-body')).toContainText('I have a code');
   await expect(page.locator('#wz-body')).toContainText('Use my own Dropbox');
   // "just try it" closes it for good on this device
   await page.click('[data-go="local"]');
@@ -205,4 +205,53 @@ test('Invite a friend (Matt’s devices): secret saved once, invite made, phones
   await expect(page.locator('#adm-tools')).toBeVisible();
   await page.click('#adm-forget');
   await expect(page.locator('#adm-login')).toBeVisible();
+});
+
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+
+test('iPhone Safari: after joining, Home Screen first with a code; the icon joins with it and Safari steps aside', async ({ browser }) => {
+  const svc = await startService();
+  const safari = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(safari, svc);
+  const inv = await svc.invite('Lee Library', 'The Lee Library');
+  await freshPhone(safari, '?join=' + inv.code.replace('-', ''));
+  await expect(safari.locator('#wz-body')).toContainText('Good to know');
+  await safari.click('#wz-join');
+  await expect(safari.locator('#wz-body')).toContainText('First, put it on your Home Screen', { timeout: 20000 });
+  await expect(safari.locator('#wz-hcode')).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/, { timeout: 10000 });
+  const code = (await safari.locator('#wz-hcode').textContent()).replace('-', '');
+  // the Home Screen copy (its own storage): types the code and lands in the same library
+  const icon = await (await browser.newContext({ userAgent: IPHONE_UA })).newPage(); await connect(icon, svc);
+  await freshPhone(icon);
+  await icon.click('#wz-body [data-go="code"]');
+  await icon.fill('#wz-code', code); await icon.click('#wz-join');
+  await expect(icon.locator('#wz-body')).toContainText(/Home Screen|Photograph your shelves/, { timeout: 20000 });
+  await expect(icon.locator('#lib-name')).toHaveText('The Lee Library');
+  // the Safari copy is told where the library lives now
+  await safari.evaluate(() => syncNow());
+  await expect(safari.locator('#sync-text')).toContainText('icon on your Home Screen', { timeout: 10000 });
+});
+
+test('Remove this phone switches its key off at the service', async ({ page }) => {
+  const svc = await startService(); await connect(page, svc);
+  page.on('dialog', d => d.accept());
+  const inv = await svc.invite('Park Library', 'Park Library');
+  await freshPhone(page, '?join=' + inv.code.replace('-', ''));
+  await page.click('#wz-join'); await finishWizard(page);
+  const devs = () => [...svc.kv.keys()].filter(k => k.startsWith('dev:')).length;
+  expect(devs()).toBe(1);
+  await epilogue(page, 'data');
+  await click(page, '#btn-disconnect');
+  await expect.poll(devs, { timeout: 10000 }).toBe(0);
+});
+
+test('when the service is down, the phone says so in plain words', async ({ page }) => {
+  const svc = await startService(); await connect(page, svc);
+  const inv = await svc.invite('Fox Library', 'Fox Library');
+  await freshPhone(page, '?join=' + inv.code.replace('-', ''));
+  await page.click('#wz-join'); await finishWizard(page);
+  svc.env.PAUSED = '1';
+  await page.evaluate(() => { store.books.push({ id: 'f1', title: 'Paused Book', updatedAt: Date.now() }); commit(); syncNow(); });
+  await expect(page.locator('#sync-text')).toContainText('paused', { timeout: 10000 });
+  await expect(page.locator('#sync-text')).not.toContainText('HTTP');
+  svc.env.PAUSED = '0';
 });
