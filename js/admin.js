@@ -24,7 +24,12 @@ async function adminCall(ep, body){
 function adminMsg(t){ $('adm-msg').textContent=t||''; }
 function adminFail(e){
   if(e.badSecret){ adminSet(''); renderAdmin(); }
-  adminMsg(e instanceof TypeError ? 'Couldn’t reach the library service. Check the connection and try again.' : e.message);
+  let m=e instanceof TypeError ? 'Couldn’t reach the library service. Check the connection and try again.' : e.message;
+  // an older service doesn't know a newer button yet
+  if(/^not found$/i.test(m)) m='The library service needs updating for this (run npx wrangler deploy in the worker folder).';
+  adminMsg(m);
+  // also where it can't be missed: the message line is at the bottom of a long card
+  alert(m);
 }
 // Shown on devices with their own Dropbox (Matt's), never on a friend's phone; folded away until opened.
 function renderAdmin(){
