@@ -24,6 +24,7 @@ function fillForm(b){
   $('modal').classList.toggle('viewing', !isNew);
   $('lookup-res').innerHTML = '';
   $('btn-returned').classList.toggle('hide', !b.loanedTo);
+  $('btn-loan').classList.toggle('hide', !!b.loanedTo || isNew); $('btn-loan-back').classList.toggle('hide', !b.loanedTo || isNew);
   $('btn-delete').classList.toggle('hide', isNew);
   editColls=collsOf(b).slice(); drawCollEditor(); $('e-coll-in').value='';
 }
@@ -41,10 +42,16 @@ function viewFill(el, b){
   f('Genre', esc(b.genre||'')); f('Series', b.series?esc(b.series)+(b.seriesNo?' #'+esc(b.seriesNo):''):'');
   f('First published', esc(b.year||'')); f('Status', b.status==='read'?'Read':b.status==='reading'?'Reading':'');
   f('Rating', +b.rating?'<span style="color:var(--gold)">'+'★'.repeat(+b.rating)+'</span>':'');
-  f('Loaned to', b.loanedTo?esc(b.loanedTo)+(b.loanedDate?' ('+esc(fmtLocalDate(b.loanedDate))+')':''):'');
   f('Publisher', esc(b.publisher||'')); f('Pages', esc(b.pages||''));
   f('Keywords', esc(b.subjects||''), 1); f('Notes', esc(b.notes||''), 1);
-  el.view.innerHTML = facts.length ? '<dl>'+facts.join('')+'</dl>' : '';
+  // a book that's out: who has it, since when, how long, and the note — at the top, hard to miss
+  let loan='';
+  if(b.loanedTo){
+    const d=b.loanedDate ? Math.max(0, Math.floor((new Date().setHours(0,0,0,0)-new Date(b.loanedDate+'T00:00:00').getTime())/864e5)) : null;
+    loan='<div class="loan-banner">Loaned to <b>'+esc(b.loanedTo)+'</b>'+(b.loanedDate?' since '+esc(fmtLocalDate(b.loanedDate))+' · '+(d===0?'today':d===1?'1 day':d+' days'):'')
+      +(b.loanNote?'<div class="loan-note">'+esc(b.loanNote)+'</div>':'')+'</div>';
+  }
+  el.view.innerHTML = loan + (facts.length ? '<dl>'+facts.join('')+'</dl>' : '');
   el.cover.innerHTML = coverHTML(b, 'M');
 }
 function formData(){
@@ -257,6 +264,29 @@ $('modal-bg').addEventListener('click', e=>{ if(e.target===$('modal-bg')) $('m-c
 $('btn-save').onclick=()=>{ if(saveBook()) closeModal(); };
 $('btn-edit').onclick=()=>{ dropPeek(); $('modal').classList.remove('viewing'); $('modal').scrollTop=0; };
 $('btn-view-close').onclick=()=>closeModal();
+/* Loan out / Returned, right from the book window */
+$('btn-loan').onclick=()=>{
+  const b=byId(editId); if(!b) return;
+  $('la-book').textContent=b.title+(b.author?' — '+b.author:'');
+  $('la-who').value=''; $('la-date').value=todayLocal(); $('la-note').value=''; $('la-err').classList.add('hide');
+  $('loan-ask').classList.remove('hide'); setTimeout(()=>$('la-who').focus(), 50);
+};
+$('la-cancel').onclick=()=>$('loan-ask').classList.add('hide');
+$('la-save').onclick=()=>{
+  const b=byId(editId), who=$('la-who').value.trim(); if(!b) return;
+  if(!who){ $('la-err').textContent='Type who’s borrowing it.'; $('la-err').classList.remove('hide'); return; }
+  b.loanedTo=who; b.loanedDate=$('la-date').value||todayLocal();
+  const n=$('la-note').value.trim(); if(n) b.loanNote=n; else delete b.loanNote;
+  b.updatedAt=Date.now(); commit();
+  $('loan-ask').classList.add('hide'); toast('Loaned to '+who); openBook(b.id, navList);
+};
+$('la-who').onkeydown=e=>{ if(e.key==='Enter') $('la-save').onclick(); };
+$('btn-loan-back').onclick=()=>{
+  const b=byId(editId); if(!b || !b.loanedTo) return;
+  if(!confirm('Mark “'+b.title+'” as returned by '+b.loanedTo+'?')) return;
+  const who=b.loanedTo; b.loanedTo=''; b.loanedDate=''; delete b.loanNote;
+  b.updatedAt=Date.now(); commit(); toast('Back from '+who); openBook(b.id, navList);
+};
 $('btn-delete').onclick=()=>{
   const b=byId(editId); if(!b) return;
   if(!confirm('Delete "'+(b.title||'this book')+'"?')) return;

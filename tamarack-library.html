@@ -440,7 +440,7 @@
       </div>
     </div>
     <div class="m-view" id="m-view"></div>
-    <div class="row m-viewbar"><button id="btn-edit">Edit details</button><button class="secondary" id="btn-view-close">Close</button></div>
+    <div class="row m-viewbar"><button id="btn-edit">Edit details</button><button class="secondary" id="btn-loan">Loan out</button><button class="secondary hide" id="btn-loan-back">Returned</button><button class="secondary" id="btn-view-close">Close</button></div>
     <div class="m-form">
     <div class="grid">
       <div style="grid-column:1/-1;"><label>Title</label><input id="e-title"></div>
@@ -597,6 +597,18 @@
     <label for="ca-case" style="margin-top:10px;">Bookcase or bay</label><input id="ca-case" list="dl-case" autocomplete="off" placeholder="e.g. N2">
     <p class="wz-err hide" id="ca-err"></p>
     <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="ca-cancel">Cancel</button><button id="ca-start">Start</button></div>
+  </div>
+</div>
+<!-- loan a book out -->
+<div class="cam-ask hide" id="loan-ask" role="dialog" aria-modal="true" aria-labelledby="la-title">
+  <div class="cam-ask-box">
+    <h3 id="la-title">Loan out</h3>
+    <p class="note" id="la-book" style="margin-top:-6px;"></p>
+    <label for="la-who">Who’s borrowing it?</label><input id="la-who" list="dl-loan" autocomplete="off" placeholder="e.g. Aunt Jo">
+    <label for="la-date" style="margin-top:10px;">Date</label><input id="la-date" type="date">
+    <label for="la-note" style="margin-top:10px;">Note (optional)</label><input id="la-note" autocomplete="off" placeholder="e.g. back by Christmas">
+    <p class="wz-err hide" id="la-err"></p>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="la-cancel">Cancel</button><button id="la-save">Loan it out</button></div>
   </div>
 </div>
 <!-- first-run setup -->

@@ -98,7 +98,7 @@ function loanDays(b){ const t=Date.parse(b.loanedDate||''); return isNaN(t) ? nu
 function renderLoans(){
   const all=live().filter(b=>String(b.loanedTo||'').trim());
   const q=norm($('ln-q').value).trim().split(/\s+/).filter(Boolean);
-  const L=all.filter(b=>{ const hay=norm([b.title, b.author, b.loanedTo].join(' ')); return q.every(w=>hay.includes(w)); })
+  const L=all.filter(b=>{ const hay=norm([b.title, b.author, b.loanedTo, b.loanNote].join(' ')); return q.every(w=>hay.includes(w)); })
     .sort((a,b)=>(Date.parse(a.loanedDate||'')||Infinity)-(Date.parse(b.loanedDate||'')||Infinity) || natCmp(a.loanedTo,b.loanedTo));
   const people=new Set(all.map(b=>normKey(b.loanedTo)));
   $('ln-summary').textContent = all.length ? all.length+' book'+(all.length===1?'':'s')+' out with '+people.size+' '+(people.size===1?'person':'people')+'.' : '';
@@ -107,7 +107,7 @@ function renderLoans(){
   $('ln-list').innerHTML = !all.length ? '<div class="card empty">No books are loaned out.</div>'
     : !L.length ? '<div class="card empty">No loaned books match “'+esc($('ln-q').value)+'”.</div>'
     : L.map(b=>'<div class="sr-item ln-item" data-id="'+b.id+'"><div class="ln-row"><div style="min-width:0;"><b>'+esc(b.title)+'</b>'+(b.author?' <span class="note">· '+esc(b.author)+'</span>':'')
-      +'<div class="note" style="margin:2px 0 0;">Lives at '+esc(locText(b))+'</div></div><div class="ln-who"><b>'+esc(b.loanedTo)+'</b><span class="note">'+esc(day(b))+'</span></div></div></div>').join('');
+      +'<div class="note" style="margin:2px 0 0;">Lives at '+esc(locText(b))+(b.loanNote?' · '+esc(b.loanNote):'')+'</div></div><div class="ln-who"><b>'+esc(b.loanedTo)+'</b><span class="note">'+esc(day(b))+'</span></div></div></div>').join('');
   $('ln-list').onclick=e=>{ const el=e.target.closest('.ln-item'); if(el) openBook(el.dataset.id, L.map(b=>b.id)); };
 }
 $('ln-q').addEventListener('input', ()=>{ clearTimeout(renderLoans._t); renderLoans._t=setTimeout(renderLoans, 120); });

@@ -93,7 +93,7 @@ async function dbxDownload(){
   return { connected:true, data, rev:g.rev };
 }
 // The Dropbox copy is written neatly (indented, title and author first in each book) so a person can open it and read it.
-const KEY_ORDER=['id','title','author','series','seriesNo','genre','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','collections','isbn','year','publisher','pages','format','about','subjects','notes','needsReview','coverUrl'];
+const KEY_ORDER=['id','title','author','series','seriesNo','genre','room','bookcase','shelf','position','status','rating','loanedTo','loanedDate','loanNote','collections','isbn','year','publisher','pages','format','about','subjects','notes','needsReview','coverUrl'];
 function readableJSON(s){
   const tidy=b=>{ if(b.deleted) return b; const o={}; for(const k of KEY_ORDER) if(k in b) o[k]=b[k]; for(const k in b) if(!(k in o)) o[k]=b[k]; return o; };
   return JSON.stringify(Object.assign({}, s, { books:s.books.map(tidy) }), null, 2);

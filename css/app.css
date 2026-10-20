@@ -613,3 +613,5 @@ select.filter-on, button.filter-on{ background:#fbe3a8 !important; border-color:
 .cam-ask-box input{ width:100%; font-size:16px; }
 .wz-coderow{ display:flex; gap:8px; }
 .wz-coderow input{ flex:1; min-width:0; }
+.loan-banner{ background:#fbe7dc; border:1px solid #e3b39a; color:#7a2e10; border-radius:12px; padding:10px 12px; margin:0 0 12px; font-size:.92rem; }
+.loan-banner .loan-note{ color:#5a3b2a; font-size:.85rem; margin-top:4px; font-style:italic; }

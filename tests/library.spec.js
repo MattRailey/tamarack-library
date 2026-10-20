@@ -161,3 +161,23 @@ test('a filter that is on stands out, is listed above the books, and Clear filte
   await expect(page.locator('#f-genre')).toHaveValue('');
   await expect(page.locator('#f-genre')).not.toHaveClass(/filter-on/);
 });
+
+test('Loan out from the book window: who, when, a note; shown at the top and in the Loaned tab; Returned clears it', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  page.on('dialog', d => d.accept());
+  await openFirstResult(page);
+  await expect(page.locator('#btn-loan')).toBeVisible();
+  await page.click('#btn-loan');
+  await page.fill('#la-who', 'Aunt Jo'); await page.fill('#la-note', 'back by Christmas');
+  await page.click('#la-save');
+  await expect(page.locator('#m-view .loan-banner')).toContainText('Loaned to Aunt Jo');
+  await expect(page.locator('#m-view .loan-banner')).toContainText('today');
+  await expect(page.locator('#m-view .loan-banner')).toContainText('back by Christmas');
+  await expect(page.locator('#btn-loan')).toBeHidden();
+  await expect(page.locator('#btn-loan-back')).toBeVisible();
+  const title = await page.locator('#m-title').textContent();
+  await page.click('#btn-loan-back');
+  await expect(page.locator('#m-view .loan-banner')).toHaveCount(0);
+  await expect(page.locator('#btn-loan')).toBeVisible();
+  expect(await page.evaluate(t => { const b = store.books.find(x => x.title === t); return [b.loanedTo, b.loanNote]; }, title)).toEqual(['', undefined]);
+});
