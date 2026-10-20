@@ -133,7 +133,7 @@ $('f-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(
 }));
 $('btn-reset').onclick = ()=>{ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); syncClearBtn && setTimeout(syncClearBtn); ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); };
 document.querySelectorAll('#view-seg button').forEach(b=>b.onclick=()=>{ ui.view=b.dataset.view; lsSet(UI_KEY, JSON.stringify(ui)); syncViewSeg(); renderLibrary(false); });
-const SCOPE_PH = { all:'Search title, author, keyword…', title:'Search titles (and series)…', author:'Search authors…' };
+const SCOPE_PH = { all:'Search books…', title:'Search titles…', author:'Search authors…' };
 function syncScope(){ document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.toggle('active', b.dataset.scope===(ui.scope||'all'))); $('f-q').placeholder = SCOPE_PH[ui.scope||'all']; }
 document.querySelectorAll('#scope-seg button').forEach(b=>b.onclick=()=>{ ui.scope=b.dataset.scope; lsSet(UI_KEY, JSON.stringify(ui)); syncScope(); renderLibrary(true); $('f-q').focus(); });
 /* Filters that are on, so a forgotten one is easy to see: highlighted on the page, listed above the books. */

@@ -615,3 +615,30 @@ select.filter-on, button.filter-on{ background:#fbe3a8 !important; border-color:
 .wz-coderow input{ flex:1; min-width:0; }
 .loan-banner{ background:#fbe7dc; border:1px solid #e3b39a; color:#7a2e10; border-radius:12px; padding:10px 12px; margin:0 0 12px; font-size:.92rem; }
 .loan-banner .loan-note{ color:#5a3b2a; font-size:.85rem; margin-top:4px; font-style:italic; }
+/* iPhone: keep clear of the status bar / notch when opened from the Home Screen (viewport-fit=cover) */
+body{ padding-top:calc(10px + env(safe-area-inset-top)) !important; padding-left:max(6px, env(safe-area-inset-left)); padding-right:max(6px, env(safe-area-inset-right)); }
+.home-banner{ margin-top:calc(-10px - env(safe-area-inset-top)); padding-top:calc(8px + env(safe-area-inset-top)); }
+/* narrow phones (and phones set to Display Zoom / large text): tighter page, everything stays on screen */
+@media (max-width:430px){
+  body{ padding-left:max(3px, env(safe-area-inset-left)); padding-right:max(3px, env(safe-area-inset-right)); }
+  .book{ padding:5px 5px 5px 7px; }
+  .page::before{ width:12px; }
+  main{ padding:6px 10px 10px 12px !important; }
+  .card{ padding:12px; }
+  nav{ right:6px !important; gap:4px !important; }
+  nav button{ width:62px; font-size:.68rem !important; letter-spacing:0 !important; }
+  header{ padding-left:8px !important; padding-right:8px !important; }
+  .search-row{ gap:8px; }
+  .genre-acts{ gap:6px; flex-basis:100%; }
+  .genre-main{ padding:8px 24px 8px 12px; font-size:15px; min-width:96px; }
+  .genre-acts .genre-main{ min-width:96px; }
+  .add-round{ width:40px; height:40px; }
+  .search-row .seg button, #view-seg button{ padding:8px 10px; }
+  #btn-more-filters{ padding:8px 12px; flex:none; }
+  .search-row.nowrap{ gap:6px; }
+  .coll-bar{ margin-right:-10px; padding-right:10px; }
+}
+@media (max-width:350px){
+  #scope-seg button, #view-seg button{ padding:8px 8px; font-size:.9rem; }
+  .add-round{ width:38px; height:38px; }
+}
