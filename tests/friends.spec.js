@@ -236,7 +236,8 @@ test('iPhone: one code, entered once: Safari shows it for the Home Screen; the i
   await expect(safari.locator('#wz-body')).toContainText('First, put the library on your Home Screen', { timeout: 20000 });
   await expect(safari.locator('#wz-fcode')).toHaveText(inv.code);
   await expect(safari.locator('#wz-body')).toContainText('Good to know');
-  expect(safari.url()).toContain('?join=' + inv.code);   // in case iOS keeps the address for the icon
+  expect(safari.url()).toContain('?join=' + inv.code);   // the icon keeps this address...
+  await expect(safari.locator('link[rel="manifest"]')).toHaveCount(0);   // ...because no manifest start_url replaces it
   expect(uses()).toBe(2);                                  // nothing used in Safari
   // the Home Screen icon: its own storage, standalone
   const iconCtx = await browser.newContext({ userAgent: IPHONE_UA });
@@ -248,12 +249,17 @@ test('iPhone: one code, entered once: Safari shows it for the Home Screen; the i
   await expect(icon.locator('#wz-body')).toContainText('Photograph your shelves', { timeout: 20000 });
   await expect(icon.locator('#lib-name')).toHaveText('The Lee Library');
   expect(uses()).toBe(1);                                  // exactly one use
-  // if iOS carried the address, the icon opens with the code already filled in
+  // the icon carried the address: it joins by itself, nothing to type
   const icon2Ctx = await browser.newContext({ userAgent: IPHONE_UA });
   await icon2Ctx.addInitScript(() => Object.defineProperty(navigator, 'standalone', { get: () => true }));
   const icon2 = await icon2Ctx.newPage(); await connect(icon2, svc);
   await freshPhone(icon2, '?join=' + inv.code);
-  await expect(icon2.locator('#wz-code')).toHaveValue(inv.code);
+  await expect(icon2.locator('#wz-body')).toContainText('Photograph your shelves', { timeout: 20000 });
+  expect(uses()).toBe(0);
+  // and the last step doesn't ask for the Home Screen again
+  await icon2.click('#wz-photos-done'); await icon2.click('#wz-next');
+  await expect(icon2.locator('#wz-body')).toContainText('You’re all set');
+  await expect(icon2.locator('#wz-body')).not.toContainText('Add to Home Screen');
 });
 
 test('iPhone Safari with only the number: no code box in Safari, just "Home Screen first, type it in the icon"', async ({ browser }) => {

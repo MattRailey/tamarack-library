@@ -19,7 +19,8 @@ function wzSave(o){ wz=Object.assign({}, wz, o); lsSet(WZ_KEY, JSON.stringify(Ob
 function wzClear(){ try{ localStorage.removeItem(WZ_KEY); }catch(e){} }
 
 function wizardBoot(){
-  if(window.__join) return openWizard(needsHomeScreen() ? 'install-first' : 'code', { code:window.__join.code });
+  // The Home Screen icon opened with the code Safari put in the address: join straight away, nothing to type.
+  if(window.__join) return openWizard(needsHomeScreen() ? 'install-first' : 'code', { code:window.__join.code, autoJoin:isIOS() && isStandalone() });
   const st=wzState(); if(st) return openWizard(st.step, st);
   if(window.__libSetup) return;   // a set-up link already chose the library; the Data & Sync page takes it from there
   if(!cloudOn() && !allBooks().length && !lsGet(WZ_DONE_KEY)) openWizard('welcome');
@@ -53,6 +54,15 @@ function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect','i
 function isIOS(){ const u=navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints>1); }
 function isStandalone(){ return navigator.standalone===true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 function needsHomeScreen(){ return isIOS() && !isStandalone(); }
+/* Let the icon carry the code: the address gets ?join=<code>, and the manifest link goes, because its start_url
+   would otherwise replace that address with the bare page (the icon's name and picture come from the apple- tags). */
+function wzIconCarries(code){
+  try{
+    const c=String(code||'').replace(/[^A-Za-z0-9]/g,''); if(!c) return;
+    history.replaceState(null,'', location.pathname+'?join='+encodeURIComponent(c));
+    const m=document.querySelector('link[rel="manifest"]'); if(m) m.remove();
+  }catch(e){}
+}
 function wzDevice(){
   const u=navigator.userAgent;
   return /iPhone/.test(u)?'iPhone':/iPad/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)?'iPad':/Android/.test(u)?'Android phone':'Computer';
@@ -110,6 +120,7 @@ const WZ_STEPS={
         }
       };
       $('wz-join').onclick=go; $('wz-code').onkeydown=e=>{ if(e.key==='Enter') go(); };
+      if(wz.autoJoin && wz.code){ wz.autoJoin=false; go(); }
     },
   },
   joined:{
@@ -167,7 +178,7 @@ const WZ_STEPS={
       +'<h3>First, put it on your Home Screen</h3>'
       +'<p class="wz-lead">On iPhone the library must live on your Home Screen, or Safari can forget it after a week.</p>'
       +'<ol class="wz-list wz-tight"><li>Tap the <b>Share</b> button below (the square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
-      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, and type:</li></ol>'
+      +'<li>Open the new <b>Library</b> icon. It should open your library by itself. If it asks, tap <b>I have a code</b> and type:</li></ol>'
       +(friendCfg() ? '<div class="wz-code" id="wz-hcode">…</div><p class="note" id="wz-hnote">Good for 2 days. Once the icon has it, this Safari page steps aside.</p>'
                     : '<p class="note">Then connect your Dropbox again in the icon’s app.</p>')
       +'<p class="wz-err hide" id="wz-err"></p>'
@@ -181,7 +192,7 @@ const WZ_STEPS={
           const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||'');
           wzSave({ hcode:j.code });
         }
-        $('wz-hcode').textContent=wz.hcode;
+        $('wz-hcode').textContent=wz.hcode; wzIconCarries(wz.hcode);
       }catch(e){ $('wz-hcode').textContent='—'; wzErr('Couldn’t make the code. Check your connection, then close and reopen this page.'); }
     },
   },
@@ -194,11 +205,11 @@ const WZ_STEPS={
         +'<div class="row" style="justify-content:center;margin:6px 0 10px;"><button id="wz-copy">Copy the code</button></div>' : '')
       +'<ol class="wz-list wz-tight">'+(wz.code?'<li>Tap <b>Copy the code</b> above.</li>':'')
       +'<li>Tap the <b>Share</b> button at the bottom of Safari (the square with an arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
-      +'<li>Open the new <b>Library</b> icon, tap <b>I have a code</b>, then '+(wz.code?'<b>Paste</b> (or type it).':'type your code.')+'</li></ol>'
+      +'<li>Open the new <b>Library</b> icon. '+(wz.code?'It should join by itself. If it asks, tap <b>I have a code</b>, then <b>Paste</b> (or type it).':'Tap <b>I have a code</b> and type your code.')+'</li></ol>'
       +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<p class="note"><a href="#" id="wz-safari">Can’t add it right now? Use it in Safari instead</a> (Safari may forget it after a week unused).</p>',
     wire:()=>{
-      try{ if(wz.code) history.replaceState(null,'', location.pathname+'?join='+encodeURIComponent(String(wz.code).replace(/[^A-Za-z0-9]/g,''))); }catch(e){}
+      if(wz.code) wzIconCarries(wz.code);
       if($('wz-copy')) $('wz-copy').onclick=async()=>{
         const c=String(wz.code||'');
         try{ await navigator.clipboard.writeText(c); toast('Code copied'); $('wz-copy').textContent='Copied ✓'; }
@@ -316,6 +327,11 @@ const WZ_STEPS={
   },
   home:{
     html:()=>{
+      // Already opened from the Home Screen icon (iPhone setup asked first): don't ask again.
+      if(isStandalone()) return '<h3>You’re all set</h3>'
+        +'<p class="wz-lead">The library is on your home screen. It opens like an app, and works with no signal too.</p>'
+        +(friendCfg() ? '<p class="note">Someone else in your household want it on their phone? In the app go to <b>Epilogue → Data &amp; Sync → Add another phone</b> and send them the link.</p>' : '')
+        +'<div class="row wz-nav"><button id="wz-done">Start using the library</button></div>';
       const d=wzDevice();
       const how = d==='iPhone'||d==='iPad'
         ? 'In Safari, tap the <b>Share</b> button (the square with an arrow), then <b>Add to Home Screen</b>.'
