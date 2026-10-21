@@ -336,3 +336,21 @@ test('Invite a friend: Edit name changes what the phones show; Remove library sw
   const who = await svc.worker.fetch(new Request(SERVER + '/whoami', { method: 'POST', headers: { Authorization: 'Bearer ' + joined.token } }), svc.env, {});
   expect(who.status).toBe(401);
 });
+
+test('invites read step by step; a fresh phone says "Your Library"; a link opened inside another app says to open Safari', async ({ browser }) => {
+  const svc = await startService();
+  const page = await (await browser.newContext()).newPage(); await connect(page, svc);
+  await freshPhone(page);
+  await expect(page.locator('#lib-name')).toHaveText('Your Library');
+  const t = await page.evaluate(() => inviteText('The Smith Library', '48213'));
+  for (const s of ['The Smith Library', 'open in Safari', 'Add to Home Screen', '•••', 'I have a code', '48213', 'Android'])
+    expect(t).toContain(s);
+  // the shared page's own title and preview are generic
+  expect(await page.evaluate(() => document.querySelector('meta[property="og:title"]').content)).toContain('Tamarack Library');
+  // iPhone, link opened in Chrome / Facebook etc.: say to open it in Safari first
+  const inApp = await (await browser.newContext({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1' })).newPage(); await connect(inApp, svc);
+  const inv = await svc.invite('Ash Library', 'Ash Library');
+  await freshPhone(inApp, '?join=' + inv.code);
+  await expect(inApp.locator('.wz-warn')).toContainText('Open this page in Safari first', { timeout: 20000 });
+  await expect(inApp.locator('#wz-copylink')).toBeVisible();
+});

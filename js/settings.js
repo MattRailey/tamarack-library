@@ -9,7 +9,8 @@
    app key — those are how a device finds the catalog in the first place.
    A set-up link (?folder=…&appkey=…) configures a new device in one tap.
    ============================================================ */
-function libCfg(){ const s=((store.settings||{}).library)||{}; const dflt=LIB_NS ? (dbxFolder().split('/').filter(Boolean).pop()||'Our Library') : 'Railey Library'; return { title:(s.title||'').trim()||dflt, tag: s.tag!=null ? s.tag : 'Our books at home' }; }
+function libCfg(){ const s=((store.settings||{}).library)||{}; // the original library keeps its name; a phone with no library yet (a friend before joining) says "Your Library"
+  const dflt=LIB_NS ? (dbxFolder().split('/').filter(Boolean).pop()||'Our Library') : (cloudOn() || store.books.length ? 'Railey Library' : 'Your Library'); return { title:(s.title||'').trim()||dflt, tag: s.tag!=null ? s.tag : 'Our books at home' }; }
 function applyCfg(){
   const c=libCfg(), folderName=dbxFolder().split('/').filter(Boolean).pop()||dbxFolder();
   $('lib-name').textContent=c.title; $('lib-tag').textContent=c.tag; $('lib-tag').style.display=c.tag?'':'none';

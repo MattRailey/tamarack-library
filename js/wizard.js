@@ -51,6 +51,7 @@ function wzGo(step){ wz.step=step; if(['photos','unread','home','own-connect','i
 /* iPhone / iPad: Safari and a Home Screen icon keep separate storage, and Safari can clear a page's storage after
    about a week unused. So on iOS the library goes on the Home Screen first; the Safari copy hands its place to the
    icon with a one-time code (the service's /invite with handoff). */
+const SHARE_ICON='<svg class="wz-share-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>';
 function isIOS(){ const u=navigator.userAgent; return /iPhone|iPad|iPod/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints>1); }
 function isStandalone(){ return navigator.standalone===true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 function needsHomeScreen(){ return isIOS() && !isStandalone(); }
@@ -177,7 +178,7 @@ const WZ_STEPS={
     html:()=>(wz.joinedNote?'<p class="wz-ok">'+esc(wz.joinedNote)+'</p>':'')
       +'<h3>First, put it on your Home Screen</h3>'
       +'<p class="wz-lead">On iPhone the library must live on your Home Screen, or Safari can forget it after a week.</p>'
-      +'<ol class="wz-list wz-tight"><li>Tap the <b>Share</b> button below (the square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
+      +'<ol class="wz-list wz-tight"><li>Tap <b>Share</b> '+SHARE_ICON+' at the bottom of Safari (on newer iPhones, inside the <b>•••</b> menu).</li><li>Tap <b>Add to Home Screen</b> (leave <b>Open as Web App</b> on), then <b>Add</b>.</li>'
       +'<li>Open the new <b>Library</b> icon. It should open your library by itself. If it asks, tap <b>I have a code</b> and type:</li></ol>'
       +(friendCfg() ? '<div class="wz-code" id="wz-hcode">…</div><p class="note" id="wz-hnote">Good for 2 days. Once the icon has it, this Safari page steps aside.</p>'
                     : '<p class="note">Then connect your Dropbox again in the icon’s app.</p>')
@@ -199,17 +200,22 @@ const WZ_STEPS={
   /* iPhone Safari with an invite: put the library on the Home Screen FIRST; the code is used once, in the icon.
      The page address carries the code too (?join=…), in case iOS keeps it for the icon. */
   'install-first':{
-    html:()=>'<h3>First, put the library on your Home Screen</h3>'
+    html:()=>(inAppBrowser()
+        ? '<div class="wz-warn"><b>Open this page in Safari first.</b> It opened inside another app, which can’t put it on your Home Screen. Tap <b>•••</b> (or the compass) and choose <b>Open in Safari</b>, or copy the link and paste it into Safari.'
+          +'<div class="row" style="margin-top:8px;"><button class="secondary" id="wz-copylink">Copy the link</button></div></div>' : '')
+      +'<h3>First, put the library on your Home Screen</h3>'
       +'<p class="wz-lead">On iPhone the library lives on your Home Screen. Your code goes in there, once.'+(wz.code?'':' Don’t type it here.')+'</p>'
       +(wz.code ? '<div class="wz-code" id="wz-fcode">'+esc(wz.code)+'</div>'
         +'<div class="row" style="justify-content:center;margin:6px 0 10px;"><button id="wz-copy">Copy the code</button></div>' : '')
       +'<ol class="wz-list wz-tight">'+(wz.code?'<li>Tap <b>Copy the code</b> above.</li>':'')
-      +'<li>Tap the <b>Share</b> button at the bottom of Safari (the square with an arrow), then <b>Add to Home Screen</b>, then <b>Add</b>.</li>'
+      +'<li>Tap <b>Share</b> '+SHARE_ICON+' at the bottom of Safari. On newer iPhones it’s inside the <b>•••</b> menu at the bottom right.</li>'
+      +'<li>Scroll down and tap <b>Add to Home Screen</b>. If you see <b>Open as Web App</b>, leave it on. Tap <b>Add</b>.</li>'
       +'<li>Open the new <b>Library</b> icon. '+(wz.code?'It should join by itself. If it asks, tap <b>I have a code</b>, then <b>Paste</b> (or type it).':'Tap <b>I have a code</b> and type your code.')+'</li></ol>'
       +'<p class="note wz-disclose">Good to know: your library is kept in Matt’s Dropbox. Matt can see your book list and the photos you send, and Claude (an AI assistant) reads the shelf photos to add your books. To leave any time: <b>Epilogue → Data &amp; Sync → Remove this phone</b>.</p>'
       +'<p class="note"><a href="#" id="wz-safari">Can’t add it right now? Use it in Safari instead</a> (Safari may forget it after a week unused).</p>',
     wire:()=>{
       if(wz.code) wzIconCarries(wz.code);
+      if($('wz-copylink')) $('wz-copylink').onclick=async()=>{ try{ await navigator.clipboard.writeText(location.href); toast('Link copied: paste it into Safari'); }catch(e){ prompt('Copy this link, then paste it into Safari:', location.href); } };
       if($('wz-copy')) $('wz-copy').onclick=async()=>{
         const c=String(wz.code||'');
         try{ await navigator.clipboard.writeText(c); toast('Code copied'); $('wz-copy').textContent='Copied ✓'; }
@@ -345,6 +351,17 @@ const WZ_STEPS={
     wire:()=>{ $('wz-done').onclick=()=>{ closeWizard(true); showPanel('library'); }; },
   },
 };
+// The words sent with an invite link (Messages adds the link after them): exactly how to install it, then the code.
+function inviteText(title, code){
+  return 'You’re invited to '+title+', a catalog of the books at home.\n\n'
+    +'On iPhone:\n'
+    +'1. Tap the link below. It should open in Safari. (If it opens inside another app, tap ••• or the compass and choose Open in Safari.)\n'
+    +'2. In Safari, tap Share (the square with an arrow; on newer iPhones it’s in the ••• menu at the bottom right), then Add to Home Screen, then Add.\n'
+    +'3. Open the new Library icon on your Home Screen. It should open your library by itself. If it asks for a code, tap I have a code and enter: '+code+'\n\n'
+    +'On Android: open the link in Chrome, tap Install app (or ⋮ → Add to Home screen), open it, and enter the code.\n';
+}
+// iPhone: a link opened inside another app (Facebook, Gmail, Google, Chrome, Firefox…) can't go on the Home Screen
+function inAppBrowser(){ const u=navigator.userAgent; return isIOS() && (!/Safari\//.test(u) || /CriOS|FxiOS|EdgiOS|GSA\/|FBAN|FBAV|Instagram|Line\/|Snapchat|LinkedInApp/.test(u)); }
 // One random id per code, kept for this visit: a join tried again after a lost answer gets the same answer.
 function joinNonce(code){
   const k='tamarack_library_join_nonce:'+String(code).toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -374,7 +391,7 @@ $('btn-addphone').onclick=async()=>{
     box.innerHTML='<div class="wz-invite"><div class="note" style="margin:0;">Send this to the other phone. It works once, for 14 days.</div>'
       +'<div class="wz-code">'+esc(j.code)+'</div><input readonly id="addphone-link" value="'+esc(link)+'">'
       +'<div class="row" style="margin-top:8px;">'+(navigator.share?'<button id="addphone-share">Share link</button>':'')+'<button class="secondary" id="addphone-copy">Copy link</button></div></div>';
-    if($('addphone-share')) $('addphone-share').onclick=()=>navigator.share({ title:libCfg().title, text:'Join our library: open this link on your phone (code '+j.code+').', url:link }).catch(()=>{});
+    if($('addphone-share')) $('addphone-share').onclick=()=>navigator.share({ title:libCfg().title, text:inviteText(libCfg().title, j.code), url:link }).catch(()=>{});
     $('addphone-copy').onclick=async()=>{ try{ await navigator.clipboard.writeText(link); toast('Link copied'); }catch(e){ $('addphone-link').select(); } };
   }catch(e){ box.innerHTML='<p class="note">Couldn’t make a link ('+esc(e.message)+'). Check the connection and try again.</p>'; }
 };

@@ -67,12 +67,12 @@ $('adm-invite').onclick=async()=>{
   try{
     const j=await adminCall('invite', { lib, title:title||lib, uses:2, days:30 });
     adminMsg('');
-    const text='Here’s your invite to '+(title||lib)+'. Open this link on your phone (code '+j.code+'):';
+    const text=inviteText(title||lib, j.code);
     $('adm-invite-out').innerHTML='<div class="wz-invite"><div class="note" style="margin:0;">Invite for <b>'+esc(lib)+'</b>: good for two phones (a couple) for 30 days.</div>'
       +'<div class="wz-code">'+esc(j.code)+'</div><input readonly id="adm-link" value="'+esc(j.link)+'">'
       +'<div class="row" style="margin-top:8px;">'+(navigator.share?'<button id="adm-share">Share invite</button>':'')+'<button class="secondary" id="adm-copy">Copy link</button></div></div>';
     if($('adm-share')) $('adm-share').onclick=()=>navigator.share({ title:title||lib, text, url:j.link }).catch(()=>{});
-    $('adm-copy').onclick=async()=>{ try{ await navigator.clipboard.writeText(text+' '+j.link); toast('Invite copied'); }catch(e){ $('adm-link').select(); } };
+    $('adm-copy').onclick=async()=>{ try{ await navigator.clipboard.writeText(text+'\n'+j.link); toast('Invite copied'); }catch(e){ $('adm-link').select(); } };
     adminList();
   }catch(e){ adminFail(e); }
   btn.disabled=false;
