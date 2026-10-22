@@ -588,6 +588,7 @@ button.wz-opt.quiet{ background:transparent; border-style:dashed; }
 .cam-redo.on{ background:#ffd98a; color:#222; border-color:#ffd98a; }
 .cam-redo:disabled{ opacity:.35; }
 /* a filter that's on is hard to miss: highlighted, and listed above the books with a Clear button */
+#f-q.filter-on{ background-color:#fbe3a8; border-color:#c8901c; color:#5a3b00; box-shadow:0 0 0 2px rgba(200,144,28,.25); }
 select.filter-on, button.filter-on{ background:#fbe3a8 !important; border-color:#c8901c !important; color:#5a3b00 !important; font-weight:700; box-shadow:0 0 0 2px rgba(200,144,28,.25); }
 .filter-bar{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; background:#fff4d6; border:1px solid #e3c06a; border-radius:12px; padding:8px 10px; margin:0 0 10px; }
 .filter-bar .fb-label{ font-size:.8rem; font-weight:700; color:#5a3b00; margin-right:2px; }

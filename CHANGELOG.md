@@ -3,6 +3,7 @@
 ## 2.1 — 2026-10 · Friends' libraries and setup wizard
 
 **New**
+- **"Filters on" lists the search too.** Text left in the search box and a picked collection now show in the bar above the books (`Filters on: Search: “tolkien” · Collection: Read-alouds`), and the search box lights up like a filter. **Clear filters** (in the bar and under Filters) now clears the search and the collection as well, and the saved collection with them, so a reload stays clear.
 - **Setup wizard.** It opens by itself the first time the app runs on a phone. You pick one of three ways in (invite code, your own Dropbox, or just this device), then get shelf-photo tips and how to add the app to the home screen. Run it again from Data & Sync.
 - **Friends' libraries.** Friends can keep their library in Matt's Dropbox through a small service (`worker/`), with no Dropbox account of their own. Each phone's key opens only its own library.
 - **Add another phone.** A one-time link brings a second phone in the household into the same library.

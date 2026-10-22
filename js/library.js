@@ -131,34 +131,40 @@ $('f-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(
   ui.sort=$('f-sort').value; lsSet(UI_KEY, JSON.stringify(ui));
   renderLibrary(true);
 }));
-$('btn-reset').onclick = ()=>{ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); syncClearBtn && setTimeout(syncClearBtn); ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); };
+$('btn-reset').onclick = ()=>clearFilters();
 document.querySelectorAll('#view-seg button').forEach(b=>b.onclick=()=>{ ui.view=b.dataset.view; lsSet(UI_KEY, JSON.stringify(ui)); syncViewSeg(); renderLibrary(false); });
 const SCOPE_PH = { all:'Search books…', title:'Search titles…', author:'Search authors…' };
 function syncScope(){ document.querySelectorAll('#scope-seg button').forEach(b=>b.classList.toggle('active', b.dataset.scope===(ui.scope||'all'))); $('f-q').placeholder = SCOPE_PH[ui.scope||'all']; }
 document.querySelectorAll('#scope-seg button').forEach(b=>b.onclick=()=>{ ui.scope=b.dataset.scope; lsSet(UI_KEY, JSON.stringify(ui)); syncScope(); renderLibrary(true); $('f-q').focus(); });
 /* Filters that are on, so a forgotten one is easy to see: highlighted on the page, listed above the books. */
 const FILTER_NAMES={ 'f-genre':'Genre', 'f-room':'Room', 'f-case':'Bookcase', 'f-shelf':'Shelf', 'f-status':'Read status', 'f-loan':'Loaned', 'f-rating':'Rating', 'f-added':'Added' };
+const SCOPE_NAMES={ all:'Search', title:'Title', author:'Author' };
 function activeFilters(){
-  const out=[];
+  const out=[], q=$('f-q').value.trim();
+  if(q) out.push({ id:'f-q', label:SCOPE_NAMES[ui.scope||'all']+': “'+q+'”' });
+  if(ui.coll) out.push({ id:'coll', label:'Collection: '+ui.coll });
   for(const [id,name] of Object.entries(FILTER_NAMES)){ const el=$(id); if(el.value) out.push({ id, label:name+': '+(el.selectedOptions[0]?el.selectedOptions[0].textContent.replace(/^.*?—\s*/,'').trim():el.value) }); }
   if($('f-review').checked) out.push({ id:'f-review', label:'Needs review only' });
   return out;
 }
 function syncFilterFlags(){
   const on=activeFilters(), ids=new Set(on.map(f=>f.id));
-  Object.keys(FILTER_NAMES).forEach(id=>$(id).classList.toggle('filter-on', ids.has(id)));
-  $('btn-more-filters').classList.toggle('filter-on', on.some(f=>f.id!=='f-genre'));
+  ['f-q'].concat(Object.keys(FILTER_NAMES)).forEach(id=>$(id).classList.toggle('filter-on', ids.has(id)));
+  $('btn-more-filters').classList.toggle('filter-on', on.some(f=>!['f-genre','f-q','coll'].includes(f.id)));
   const bar=$('filter-bar'); bar.classList.toggle('hide', !on.length);
-  if(on.length) bar.innerHTML='<span class="fb-label">Showing only</span>'+on.map(f=>'<button class="fb-chip" data-off="'+f.id+'" title="Turn this filter off">'+esc(f.label)+' <span aria-hidden="true">×</span></button>').join('')
+  if(on.length) bar.innerHTML='<span class="fb-label">Filters on:</span>'+on.map(f=>'<button class="fb-chip" data-off="'+f.id+'" title="Turn this filter off">'+esc(f.label)+' <span aria-hidden="true">×</span></button>').join('')
     +'<button class="fb-clear" data-clear-filters>Clear filters</button>';
 }
-// one filter off (its chip), or all of them (search text stays)
-function clearFilters(){ ['f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; refreshLists(); renderLibrary(true); }
+// one filter off (its chip), or all of them: search text and the collection too, and the saved collection with them
+function clearFilters(){ ['f-q','f-room','f-case','f-shelf','f-status','f-genre','f-loan','f-rating','f-added'].forEach(id=>$(id).value=''); $('f-review').checked=false; ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); syncClearBtn(); refreshLists(); renderLibrary(true); }
 document.addEventListener('click', e=>{
   if(e.target.closest('[data-clear-filters]')){ clearFilters(); return; }
   const chip=e.target.closest('[data-off]'); if(!chip) return;
   const id=chip.dataset.off;
-  if(id==='f-review') $('f-review').checked=false; else $(id).value='';
+  if(id==='f-review') $('f-review').checked=false;
+  else if(id==='coll'){ ui.coll=''; lsSet(UI_KEY, JSON.stringify(ui)); }
+  else $(id).value='';
+  if(id==='f-q') syncClearBtn();
   if(id==='f-room'){ $('f-case').value=''; $('f-shelf').value=''; } if(id==='f-case') $('f-shelf').value='';
   refreshLists(); renderLibrary(true);
 });

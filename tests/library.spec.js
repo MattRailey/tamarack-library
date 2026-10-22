@@ -162,6 +162,37 @@ test('a filter that is on stands out, is listed above the books, and Clear filte
   await expect(page.locator('#f-genre')).not.toHaveClass(/filter-on/);
 });
 
+test('forgotten search text and a collection show as Filters on; Clear filters brings every book back, and a reload keeps it that way', async ({ page }) => {
+  const all = `Showing ${liveCount.toLocaleString()} of`;
+  const ready = () => page.waitForFunction(() => /Showing/.test(document.getElementById('summary').textContent));
+  await page.click('.coll-pill[data-coll="Read-alouds"]');
+  await search(page, 'hobbit');
+  await expect(page.locator('#filter-bar')).toBeVisible();
+  await expect(page.locator('#filter-bar')).toContainText('Filters on:');
+  await expect(page.locator('#filter-bar')).toContainText('Search: “hobbit”');
+  await expect(page.locator('#filter-bar')).toContainText('Collection: Read-alouds');
+  await expect(page.locator('#f-q')).toHaveClass(/filter-on/);
+  // the collection is saved on the device, so it comes back after a reload, and is still listed
+  await page.reload(); await ready();
+  await expect(page.locator('#filter-bar')).toContainText('Collection: Read-alouds');
+  expect(await summary(page)).not.toContain(all);
+  // the search chip turns just the search off
+  await search(page, 'hobbit');
+  await page.locator('#filter-bar .fb-chip', { hasText: 'Search' }).click();
+  await expect(page.locator('#f-q')).toHaveValue('');
+  await expect(page.locator('#filter-bar .fb-chip')).toHaveCount(1);
+  // Clear filters: search, collection, everything
+  await search(page, 'hobbit');
+  await page.click('#filter-bar .fb-clear');
+  await expect(page.locator('#filter-bar')).toBeHidden();
+  await expect(page.locator('#f-q')).toHaveValue('');
+  await expect(page.locator('#btn-clear-q')).toBeHidden();
+  expect(await summary(page)).toContain(all);
+  await page.reload(); await ready();
+  await expect(page.locator('#filter-bar')).toBeHidden();
+  expect(await summary(page)).toContain(all);
+});
+
 test('Loan out from the book window: who, when, a note; shown at the top and in the Loaned tab; Returned clears it', async ({ page }) => {
   await mockNet(page); await openApp(page);
   page.on('dialog', d => d.accept());
