@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.3 — 2026-10-24 · Steadier camera picture
+
+- **The live picture no longer resizes.** The screen around it (the name at the top, the message and page count, the buttons at the bottom) changed height as text came and went (for example when ← Previous recipe appeared or a longer message showed), which resized the video and made it look soft before settling. Those areas are now fixed in size and the video fills its space without sizing it.
+- **📷 Camera app** button (next to Redo last): takes the photo with the phone's own Camera app, which can switch to the close-up lens and tap-to-focus. The photo is named, counted and sent like any other. For pages the web camera keeps losing focus on.
+
 ## 2.5.2 — 2026-10-24 · Re-read an unclear recipe
 
 - **Check this** is a filter button under the recipe search (shows how many), so you can work through just those.
