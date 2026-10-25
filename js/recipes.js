@@ -161,7 +161,7 @@ function renderRecipes(){
   const cats=uniq(liveRecipes().map(r=>r.category));
   $('r-cat').innerHTML='<option value="">All kinds</option>'+cats.map(c=>'<option'+(c===rui.cat?' selected':'')+'>'+esc(c)+'</option>').join('');
   $('r-sort').value=rui.sort;
-  fillDatalist('dl-rcat', uniq(liveRecipes().map(r=>r.category).concat(['Breakfast','Bread','Main dish','Side dish','Soup','Salad','Dessert','Cookies','Snack','Drink','Canning'])));
+  fillDatalist('dl-rcat', uniq(liveRecipes().map(r=>r.category).concat(['Breakfast','Lunch','Dinner','Bread','Main dish','Side dish','Soup','Salad','Dessert','Cookies','Snack','Drink','Canning','Appetizer','Candy'])));
   fillDatalist('dl-rfrom', uniq(liveRecipes().map(r=>r.from)));
   // filters on (same look as the Library's)
   const on=[]; const q=$('r-q').value.trim();
