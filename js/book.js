@@ -21,6 +21,7 @@ function fillForm(b){
   $('e-review').checked = !!b.needsReview;
   pendingCover = b.coverUrl || null;
   viewFill({cover:$('m-cover'), title:$('m-title'), sub:$('m-sub'), about:$('m-about'), view:$('m-view')}, b);
+  bookRecipesNote(b);
   $('modal').classList.toggle('viewing', !isNew);
   $('lookup-res').innerHTML = '';
   $('btn-returned').classList.toggle('hide', !b.loanedTo);

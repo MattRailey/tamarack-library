@@ -354,3 +354,87 @@ test('Remove library: phones off, codes gone, out of the list, folder moved to _
   assert.ok([...dbx.files.keys()].some(k => k.startsWith('/_removed/smith library ') && k.endsWith('/tamarack-library.json')));
   assert.equal((await call('/admin/remove', { admin: ADMIN, body: { lib: 'Smith Library' } })).status, 404);
 });
+
+/* ---------------- recipes ---------------- */
+const recipesFile = recipes => JSON.stringify({ format: 'tamarack-recipes', version: 1, recipes });
+
+test('recipes: each library keeps its own recipes.json (rev-guarded) and can read its recipes/ photos, nothing else', async () => {
+  const { call, dbx } = setup();
+  const s = (await joinLib(call, (await adminInvite(call, 'Smith Library')).code)).j;
+  const j = (await joinLib(call, (await adminInvite(call, 'Jones Library')).code)).j;
+  const up = (tok, p, body, mode = 'add') => call('/files/upload', { token: tok, headers: { 'X-Path': encodeURIComponent(p), 'X-Mode': mode }, body });
+  const dl = (tok, p) => call('/files/download', { token: tok, headers: { 'X-Path': encodeURIComponent(p) } });
+  let r = await up(s.token, '/Smith Library/recipes.json', recipesFile([{ id: 'r1', title: 'Rolls' }]));
+  assert.equal(r.status, 200); const rev = (await r.json()).rev;
+  assert.equal((await up(s.token, '/Smith Library/recipes.json', recipesFile([]))).status, 409);              // never a blind overwrite
+  assert.equal((await up(s.token, '/Smith Library/recipes.json', recipesFile([{ id: 'r1' }]), 'update:' + rev)).status, 200);
+  assert.equal((await up(s.token, '/Smith Library/recipes.json', catalog([]), 'update:x')).status, 400);       // must be a recipe file
+  assert.equal((await dl(j.token, '/Smith Library/recipes.json')).status, 403);                                 // private to the library
+  assert.equal((await up(j.token, '/Smith Library/recipes.json', recipesFile([]))).status, 403);
+  assert.equal((await dl(s.token, '/Smith Library/recipes.json')).status, 200);
+  // original photos: Claude puts them in recipes/; phones can read them but not write there
+  dbx.files.set('/smith library/recipes/r1-1.jpg', { body: Buffer.from(JPG), rev: 'r9' });
+  assert.equal((await dl(s.token, '/Smith Library/recipes/r1-1.jpg')).status, 200);
+  assert.equal((await dl(j.token, '/Smith Library/recipes/r1-1.jpg')).status, 403);
+  assert.equal((await up(s.token, '/Smith Library/recipes/r2-1.jpg', JPG)).status, 403);
+  // a daily backup copy of recipes.json, beside the catalog's
+  assert.ok([...dbx.files.keys()].some(k => /^\/smith library\/backups\/recipes-slot-\d\d\.json$/.test(k)));
+});
+
+const PAGE = `<html><head><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","name":"x"},
+ {"@type":["Recipe"],"name":"Grandma&#39;s Rolls","author":{"@type":"Person","name":"Ann"},"description":"Soft &amp; sweet.",
+  "recipeYield":["12","12 rolls"],"prepTime":"PT20M","cookTime":"PT25M","totalTime":"PT1H45M","recipeCategory":"Bread","recipeCuisine":"American",
+  "keywords":"yeast, holiday","image":["https://img.example.com/rolls.jpg"],
+  "recipeIngredient":["1 1/2 cups warm milk","2 &frac14; tsp yeast","4 cups flour"],
+  "recipeInstructions":[{"@type":"HowToSection","name":"Dough","itemListElement":[{"@type":"HowToStep","text":"Mix milk and yeast; wait 10 minutes."},{"@type":"HowToStep","text":"Add flour and knead."}]},
+   {"@type":"HowToSection","name":"Bake","itemListElement":[{"@type":"HowToStep","text":"Bake 20–25 minutes."}]}]}]}</script></head><body>ads…</body></html>`;
+
+test('recipes: the recipe a page carries for search engines comes out clean', () => {
+  const r = _test.extractRecipe(PAGE);
+  assert.equal(r.title, "Grandma's Rolls"); assert.equal(r.author, 'Ann'); assert.equal(r.about, 'Soft & sweet.');
+  assert.equal(r.servings, '12 rolls'); assert.equal(r.prep, '20 min'); assert.equal(r.cook, '25 min'); assert.equal(r.total, '1 hr 45 min');
+  assert.equal(r.category, 'Bread'); assert.deepEqual(r.tags, ['yeast', 'holiday']); assert.equal(r.image, 'https://img.example.com/rolls.jpg');
+  assert.deepEqual(r.ingredients, ['1 1/2 cups warm milk', '2 ¼ tsp yeast', '4 cups flour']);
+  assert.deepEqual(r.steps, ['## Dough', 'Mix milk and yeast; wait 10 minutes.', 'Add flour and knead.', '## Bake', 'Bake 20–25 minutes.']);
+  assert.equal(_test.extractRecipe('<html>no recipe here</html>'), null);
+  assert.equal(_test.extractRecipe('<script type="application/ld+json">{"@type":"Recipe","name":"Plain","recipeInstructions":"Mix.\\nBake 1 hour."}</script>'), null);   // no ingredients: not a recipe
+});
+
+test('recipes: /recipe/fetch only for the app, only public web pages, and returns only the recipe', async () => {
+  const { call } = setup();
+  const base = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url, opt) => { if (String(url).startsWith('https://cooking.example.org/')) { asked.push(url); return new Response(PAGE, { headers: { 'Content-Type': 'text/html' } }); } return base(url, opt); };
+  try {
+    let r = await call('/recipe/fetch', { body: { url: 'https://cooking.example.org/rolls' } });
+    assert.equal(r.status, 200); const j = await r.json(); assert.equal(j.recipe.title, "Grandma's Rolls"); assert.ok(!('html' in j));
+    r = await call('/recipe/fetch', { body: { url: 'https://cooking.example.org/rolls' }, origin: 'https://evil.example.net' }); assert.equal(r.status, 403);
+    r = await call('/recipe/fetch', { body: { url: 'https://cooking.example.org/rolls' }, origin: '' }); assert.equal(r.status, 403);
+    for (const bad of ['http://localhost/x', 'http://127.0.0.1/', 'http://10.0.0.5/r', 'file:///etc/passwd', 'https://[::1]/', 'https://printer.local/', 'https://cooking.example.org:8080/', 'not a url'])
+      assert.equal((await call('/recipe/fetch', { body: { url: bad } })).status, 400, bad);
+    for (const bad of ['http://localhost./x', 'http://foo.localhost./', 'http://10.0.0.1.nip.io/', 'http://192-168-1-1.sslip.io/'])
+      assert.equal((await call('/recipe/fetch', { body: { url: bad } })).status, 400, bad);
+    assert.equal(asked.length, 1);
+  } finally { globalThis.fetch = base; }
+});
+
+test('recipes: a redirect to a private address is not followed; a huge page is cut short', async () => {
+  const { call } = setup();
+  const base = globalThis.fetch; const asked = [];
+  globalThis.fetch = async (url, opt) => {
+    const u = String(url);
+    if (u.startsWith('https://short.example.org/')) { asked.push(u); return new Response('', { status: 302, headers: { Location: 'http://127.0.0.1/admin' } }); }
+    if (u.startsWith('https://hop.example.org/')) { asked.push(u); return new Response('', { status: 301, headers: { Location: 'https://cooking.example.org/rolls' } }); }
+    if (u.startsWith('https://cooking.example.org/')) { asked.push(u); assert.equal(opt.redirect, 'manual'); return new Response(PAGE); }
+    if (u.startsWith('https://big.example.org/')) { asked.push(u);
+      let n = 0; const body = new ReadableStream({ pull(c) { n++; if (n > 2000) return c.close(); c.enqueue(new TextEncoder().encode('x'.repeat(4096))); } });
+      return new Response(body); }
+    return base(url, opt);
+  };
+  try {
+    assert.deepEqual(await (await call('/recipe/fetch', { body: { url: 'https://short.example.org/a' } })).json(), { none: true });
+    assert.equal((await (await call('/recipe/fetch', { body: { url: 'https://hop.example.org/a' } })).json()).recipe.title, "Grandma's Rolls");
+    assert.deepEqual(asked.slice(0, 3), ['https://short.example.org/a', 'https://hop.example.org/a', 'https://cooking.example.org/rolls']);
+    assert.ok((await (await call('/recipe/fetch', { body: { url: 'https://big.example.org/' } })).json()).none);
+  } finally { globalThis.fetch = base; }
+});

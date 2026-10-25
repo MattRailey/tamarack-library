@@ -42,6 +42,8 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `photos.js` | Uploading shelf and title-page photos to the Dropbox photo inbox. |
 | `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones (last used), last photos per library, switch off, through the service's `/admin/*`. The password (ADMIN_SECRET) is kept in sessionStorage only (`tamarack_library_admin`): the github.io origin is shared with Matt's other apps, and the password can get into any library. |
 | `shelfcam.js` | The shelf camera: stays open, one tap per photo, sends in the background, Redo last, next bookcase. `optional:true` (Send photos) lets it run with no room/bookcase. |
+| `recipes.js` | The Recipes tab: `recipes.json` (device copy, sync, merge), search, list, recipe window, edit form, adding (camera in recipe mode, links, typing), grocery list, "recipes from this book" in the book window. |
+| `cooking.js` | Timers (found in step text, docked at the bottom of every screen, kept on the phone) and the cooking view (one step at a time, Screen Wake Lock). |
 | `recheck.js` | Recheck shelves tab: bookcases by when they were last photographed, recheck photos. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |
 | `wizard.js` | First-run setup wizard (invite code, own Dropbox, or this device only; photo tips; home screen). "Add another phone" links. |
@@ -116,7 +118,7 @@ There are two ways a library can be kept, and nothing else in the app knows the 
 
 - **Own Dropbox:** straight to the Dropbox API with this device's sign-in (`DBX_TOKENS_KEY`).
 - **Friend library:** through the friends service in `worker/`, with this phone's device key (`FRIEND_KEY`, `{ server, token, lib, device }`).
-  - The service holds the only Dropbox sign-in. It checks that every path is `/<this phone's library>/` plus an allowed file: the catalog, `covers/*`, `photos/inbox/*` or `photos/identify/*`.
+  - The service holds the only Dropbox sign-in. It checks that every path is `/<this phone's library>/` plus an allowed file: the catalog, `recipes.json`, `covers/*`, `photos/inbox/*` or `photos/identify/*` (and, read only, `recipes/*`).
   - It keeps the same never-overwrite rules: `add`, or `update:<rev>`.
   - Paths look the same to the app either way, so `dbx:` cover paths and `idPhoto` work unchanged.
 - **Joining:** `?join=CODE` (parsed in `core.js`) opens the wizard. `/join` returns a device key. The wizard stores it under the library's namespace, sets the folder, and reloads.
@@ -162,6 +164,30 @@ Sent from **Epilogue → Import & Export → Recheck shelves** when books have d
 7. The change log in `imports/` lists moved / added / not seen, with counts.
 
 The Recheck tab lists bookcases by the latest `checkedAt` (or `addedAt`), oldest first, and counts the "not seen" ones.
+
+## Recipes
+
+Each library keeps its recipes in **`<library folder>/recipes.json`**, private to that library like its catalog (the friends service lets a phone reach only its own library's `recipes.json` and `recipes/`). Original card / page photos live in `<library folder>/recipes/`.
+
+```js
+{ format: 'tamarack-recipes', version: 1, updatedAt,
+  recipes: [ Recipe | { id, deleted: true, updatedAt } ] }
+```
+
+A **recipe** (written in this order, blanks left out): `id` (`r…`), `title`, `from` (who: "Grandma Railey"), `source` (`card`, `family`, `cookbook`, `web`, `magazine`, `other`), `bookId` (a book in this library) or `bookTitle` (not in the library), `page`, `url` (http/https only), `author`, `servings`, `prep`, `cook`, `total` (text: "20 min"), `category`, `cuisine`, `tags` [], `about`, `ingredients` [], `steps` [] (one line each; a line starting `## ` is a section heading, e.g. `## For the crust`), `notes`, `favorite`, `want`, `rating`, `made` [{ date `YYYY-MM-DD`, note }], `photos` [paths relative to the library folder, `recipes/<id>-<n>.jpg`], `image` (https only), `pending` (`'link'`: waiting for Claude), `needsReview`, `addedAt`, `updatedAt`, `importBatch`.
+
+- **Sync** (`syncRecipes` in `recipes.js`) runs after each catalog sync and 1.5 s after a change: download with its revision, merge, upload with `update:<rev>` (or `add` when there's no file yet), retry on a conflict. Never a blind overwrite; nothing is uploaded while both sides are empty. **Merge is per recipe: the newer `updatedAt` wins** (recipes are edited rarely; no per-field stamps). A delete is a tombstone.
+- **Device copy**: IndexedDB key `tamarack_library_recipes_v1<LIB_NS>` (localStorage fallback). The grocery list (`tamarack_library_grocery<LIB_NS>`) and timers (`tamarack_library_timers`) stay on the phone.
+- **Adding** (has to be quick): **+** opens the shelf camera in recipe mode at once (`openShelfCam({ kind:'recipe', recipe:true, optional:true })`): photo names `<stamp> <from or cookbook | no-room> Recipe-<n> recipe <NNN>.jpg`, pages of one recipe share `Recipe-<n>`, **Next recipe →** counts up. 📚 Cookbook / the scan form also write `<stamp> recipe-info NOTE.txt` (JSON: source, from, bookId, bookTitle, page). A link goes to the friends service's `/recipe/fetch` (schema.org Recipe JSON-LD); if that gives nothing, the recipe is saved with `pending:'link'` for Claude. A link pasted in the search box offers *Add this recipe*.
+- **Timers** (`findTimes`): "25 minutes", "1 hour 15 minutes", "20–25 min" (starts at 20, **+5** adds the rest), "1 1/2 hours", "½ hour", "half an hour", "one and a half hours". Each keeps its end time, so one that ran out while the phone slept shows done on return.
+
+### Reading recipe photos and waiting links (Claude)
+
+Use **`tools/recipe-merge.mjs`** (the book tool, `photo-merge.mjs`, skips recipe photos):
+
+1. `node tools/recipe-merge.mjs "<folder>"` lists recipe photos waiting (grouped by `Recipe-<n>`), any `recipe-info` notes, and the links waiting (`pending`), with their ids.
+2. Read the photos (all pages of a recipe together) and open the waiting links. Write **`recipes-in.json`**: one entry per recipe, `photos` in page order, `fill:<id>` for a waiting link, the fields above, `book` (title; matched to the library), `unsure` for words that couldn't be read. Keep the recipe's own wording; split ingredients and steps one per line, with `## ` headings where the recipe has sections. Copy cookbook recipes in full (Matt, 2026-10-24).
+3. `node tools/recipe-merge.mjs "<folder>" recipes-in.json` (dry run), then `--apply`: originals copied to `recipes/<id>-<n>.jpg`, `recipes.json` written (re-applied if a phone saved meanwhile), log in `imports/`, the ledger `photos/inbox/_processed.json`, inbox photos and recipe notes deleted. A same-name recipe is added flagged "Possible duplicate", never merged. Tests: `node --test tests/recipe-merge.test.mjs`.
 
 ## Offline
 

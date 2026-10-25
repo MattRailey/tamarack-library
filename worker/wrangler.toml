@@ -43,3 +43,20 @@ namespace_id = "1002"
   [ratelimits.simple]
   limit = 30
   period = 60
+
+# /recipe/fetch (reading a recipe from a web page): 10 a minute from one address, 60 a minute in all
+[[ratelimits]]
+name = "FETCH_LIMIT"
+namespace_id = "1003"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[ratelimits]]
+name = "FETCH_ALL"
+namespace_id = "1004"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60

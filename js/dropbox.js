@@ -191,7 +191,7 @@ async function syncNow(){
     if(done){
       lastSyncAt=Date.now(); lastSyncedSig=sig(store); lsSet(SYNCED_KEY, lastSyncedSig);
       setSync('ok','Synced ' + new Date(lastSyncAt).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
-      setTimeout(migrateCovers, 3000); setTimeout(fillPendingIsbns, 1500);
+      setTimeout(migrateCovers, 3000); setTimeout(fillPendingIsbns, 1500); setTimeout(syncRecipes, 300);
     } else setSync('err','Sync kept conflicting — try again');
   }catch(e){ if(navigator.onLine===false) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); else setSync('err', e.friendly ? e.message : 'Sync failed: '+e.message); }
   finally{

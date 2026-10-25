@@ -12,6 +12,8 @@
    opts.optional (Send photos): the room and bookcase can stay empty. The camera opens straight to shooting, the heading
    says "no location yet", and the photos are named "no-room no-bookcase" for Claude to place later. Setting a place
    (Change) is still there when it is known. Setup and Recheck shelves keep asking: they need to know which bookcase.
+   opts.recipe (Recipes → Photograph recipes): the heading shows "Recipe 1" (and who it's from / the cookbook);
+   "Next recipe →" moves straight on to Recipe 2, so each recipe's pages share one name and count. No pop-up.
    Redo last: the next shot replaces the last photo under the same name (Dropbox revision, or its place in the
    waiting queue). If that can't overwrite, it goes up as "NNN redo.jpg": a redo replaces the photo with that number.
    Part of the app's shared script scope: see DEVELOPER.md. */
@@ -41,7 +43,9 @@ async function openShelfCam(opts){
   // no place yet: ask for it before the first photo
   if(cam && !opts.optional && (!$('cam-room').value || !$('cam-case').value)) camChange('Which bookcase are you photographing?', $('cam-case').value);
 }
-function camWhere(){ $('cam-where-txt').textContent=[$('cam-room').value, $('cam-case').value].filter(Boolean).join(' · ') || (cam && cam.opts.optional ? 'no location yet' : 'no bookcase yet'); }
+function camWhere(){
+  if(cam && cam.opts.recipe){ $('cam-where-txt').textContent=$('cam-case').value+($('cam-room').value?' · '+$('cam-room').value:''); $('cam-change').classList.add('hide'); return; }
+  $('cam-change').classList.remove('hide'); $('cam-where-txt').textContent=[$('cam-room').value, $('cam-case').value].filter(Boolean).join(' · ') || (cam && cam.opts.optional ? 'no location yet' : 'no bookcase yet'); }
 
 /* The pop-up: room + bookcase, Start / Cancel → { room, bookcase } or null. Works over the camera or the setup wizard. */
 function camAsk(title, room, bookcase){
@@ -85,7 +89,7 @@ function camStop(){ if(cam && cam.stream){ cam.stream.getTracks().forEach(t=>t.s
 // finished: "Finished adding to library" / "Done"; otherwise just closed (×)
 function closeShelfCam(silent, finished){
   // remember where the camera got to (after "Finished with N3 →" that's N4), for Send photos next time
-  if(cam && cam.opts.kind!=='recheck'){ ui.phLoc=Object.assign({}, ui.phLoc, { room:$('cam-room').value.trim(), bookcase:$('cam-case').value.trim() }); lsSet(UI_KEY, JSON.stringify(ui)); }
+  if(cam && cam.opts.kind!=='recheck' && !cam.opts.recipe){ ui.phLoc=Object.assign({}, ui.phLoc, { room:$('cam-room').value.trim(), bookcase:$('cam-case').value.trim() }); lsSet(UI_KEY, JSON.stringify(ui)); }
   camStop(); $('cam-bg').classList.remove('open'); unlockPage();
   const c=cam; cam=null;
   if(!silent && c && c.opts.onFinish) c.opts.onFinish(c.cases, !!finished);
@@ -93,9 +97,10 @@ function closeShelfCam(silent, finished){
 function camCount(){
   if(!cam) return;
   const loc=camLoc(), here=(cam.cases.find(c=>c.room===loc.room && c.bookcase===loc.bookcase)||{}).n||0;
+  if(cam.opts.recipe){ $('cam-count').textContent=(here?here+' page'+(here===1?'':'s')+' of '+loc.bookcase:'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':''); return; }
   $('cam-count').textContent=(here?here+' of '+(loc.bookcase||(cam.opts.optional?'these (no location yet)':'this bookcase')):'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':'');
 }
-function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim(); $('cam-next').textContent='Finished with '+(bc||'this bookcase')+' →';
+function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim(); $('cam-next').textContent=cam.opts.recipe ? 'Next recipe →' : 'Finished with '+(bc||'this bookcase')+' →';
   $('cam-next').classList.toggle('hide', !cam.opts.build || (!!cam.opts.optional && !bc)); }   // no bookcase named: nothing to finish with
 
 /* One frame from the video at full size, shrunk to the usual shelf-photo size (photos.js PHOTO_SIZE). */
@@ -171,7 +176,10 @@ $('cam-redo').onclick=()=>{
   $('cam-msg').textContent=cam.redo ? 'Take it again: the next photo replaces the last one.' : '';
 };
 $('cam-shutter').onclick=camShoot;
-$('cam-next').onclick=()=>camChange('Name of the next bookcase', nextCaseName($('cam-case').value.trim()));
+$('cam-next').onclick=()=>{
+  if(cam && cam.opts.recipe){ camSetPlace({ room:$('cam-room').value, bookcase:nextCaseName($('cam-case').value.trim())||'Recipe 2' }); $('cam-msg').textContent='Now '+$('cam-case').value+'. Photograph each page of it.'; return; }
+  camChange('Name of the next bookcase', nextCaseName($('cam-case').value.trim()));
+};
 $('cam-change').onclick=()=>camChange('Change room or bookcase', $('cam-case').value);
 $('cam-finish').onclick=()=>closeShelfCam(false, true);
 $('cam-close').onclick=()=>closeShelfCam(false);

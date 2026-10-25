@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3 — 2026-10-24 · Recipes
+
+**New**
+- **Recipes tab** (Chapter III). Each library keeps its own recipes, private like its books, in `recipes.json` beside the catalog. Same search as the library: Anything, Name, or **Ingredient** ("chicken rice" finds what you can make).
+- **Quick to add.** **+** opens the camera straight away: photograph the card or page (every page), **Next recipe →**, **Done**. Claude splits out the ingredients and steps and keeps the original photo. **🔗 Link** (*Paste and add*), or paste a link into the search box and tap *Add this recipe*: most sites come in at once through the friends service, the rest wait for Claude. **📚 Cookbook** links the recipe to the book in the library (and the book shows its recipes). **✍️ Type** for the ones you know by heart.
+- **Cooking view:** one step at a time in big letters, screen kept on, ingredients to tick off, **½× 2× 3×** scaling.
+- **Timers:** every time in a step ("bake 25 minutes", "1 hour 15 minutes", "20–25 min", "1 1/2 hours") gets a ⏱ button. Several at once, docked at the bottom of every screen, ringing until OK; one that ran out while the phone slept shows done on return.
+- **♥ Favorite, Want to make, ✓ Made it** (with a note), **🛒 Grocery list** (on this phone; share or copy it), **Share**, **Print**.
+- **Friends service:** recipes.json and recipes/ per library, a daily recipes backup, and `/recipe/fetch` (reads the recipe a page carries for search engines). Needs `npx wrangler deploy`.
+- **For Claude:** `tools/recipe-merge.mjs` brings recipe photos and waiting links in; `photo-merge.mjs` leaves recipe photos alone.
+
 ## 2.1 — 2026-10 · Friends' libraries and setup wizard
 
 **New**
