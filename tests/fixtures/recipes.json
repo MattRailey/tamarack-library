@@ -1,0 +1,90 @@
+{
+  "format": "tamarack-recipes",
+  "version": 1,
+  "updatedAt": 1,
+  "recipes": [
+    {
+      "id": "rmvn5uc9w4f54b0",
+      "title": "Frittata with Parmesan and Herbs",
+      "servings": "4",
+      "category": "Breakfast",
+      "ingredients": [
+        "6 large eggs, lightly beaten",
+        "1 ounce Parmesan cheese, grated (½ cup)",
+        "¼ teaspoon salt",
+        "¼ teaspoon pepper",
+        "1 tablespoon olive oil",
+        "½ onion, chopped fine",
+        "2 tablespoons minced fresh parsley, basil, dill, tarragon, and/or mint"
+      ],
+      "steps": [
+        "Adjust an oven rack to the upper-middle position and heat the oven to 350 degrees. Whisk together the eggs, Parmesan, salt, and pepper.",
+        "Heat the oil in a 10-inch nonstick ovenproof skillet over medium heat until shimmering. Add the onion and cook until softened, about 4 minutes.",
+        "Add the parsley and eggs and stir gently until the eggs on the bottom are set and firm, about 30 seconds.",
+        "Gently pull the cooked eggs back from one edge of the skillet and tilt the pan, allowing any uncooked egg to run to the cleared edge of the skillet. Repeat this process, working your way around the skillet, until the egg on top is mostly set but still moist, 1 to 2 minutes.",
+        "Transfer the skillet to the oven and bake until the frittata top is set and dry to the touch, about 3 minutes.",
+        "Run a spatula around the skillet edge to loosen the frittata and invert it onto a serving plate. Serve warm, at room temperature, or chilled."
+      ],
+      "addedAt": 1,
+      "updatedAt": 1
+    },
+    {
+      "id": "rmvn5uc9x84d011",
+      "title": "Dairy-Free Iced Lemon Loaf (Starbucks Copycat)",
+      "servings": "12 slices",
+      "category": "Dessert",
+      "ingredients": [
+        "## Lemon loaf",
+        "1 ½ cups all-purpose flour",
+        "1 ¼ teaspoons baking powder (reduce to 1 teaspoon above 4,000 feet)",
+        "½ teaspoon salt",
+        "2 large eggs (see Vegan option in the notes for egg-free)",
+        "⅞ cup sugar",
+        "⅔ cup lite canned coconut milk",
+        "⅓ cup oil",
+        "2 tablespoons fresh-squeezed lemon juice",
+        "2 teaspoons lightly packed lemon zest",
+        "## Lemon icing",
+        "¾ cup powdered sugar",
+        "1 tablespoon fresh-squeezed lemon juice (or ½ tablespoon lemon juice + ½ tablespoon unsweetened dairy-free milk alternative)",
+        "¼ teaspoon pure vanilla flavoring or vanilla extract"
+      ],
+      "steps": [
+        "## Lemon loaf",
+        "Preheat your oven to 350°F and grease and flour an 8×4-inch loaf pan.",
+        "In a medium bowl, whisk together the flour, baking powder, and salt.",
+        "Put the eggs, sugar, coconut milk, oil, lemon juice, and zest in a large mixing bowl. Beat with a hand mixer or whisk until combined, about 1 minute. Add the dry ingredients and stir just until combined. Some small lumps are okay; you do not want to overmix.",
+        "Scrape the batter into your prepared loaf pan and even it out.",
+        "Bake the lemon bread for 50 to 60 minutes, or until a toothpick inserted into the center of the loaf comes out clean.",
+        "Let the loaf cool in the pan on a cooling rack for 15 to 20 minutes. Run a knife around the edge of the bread and carefully remove it to the wire rack to cool completely.",
+        "## Lemon icing",
+        "Sift the powdered sugar into a medium bowl. Add the lemon juice (or lemon juice plus milk beverage for less pucker) and vanilla. Whisk until smooth.",
+        "Immediately pour the icing onto the cooled bread, spreading it out to the sides.",
+        "Let the icing set for a few minutes before slicing."
+      ],
+      "addedAt": 1,
+      "updatedAt": 1
+    },
+    {
+      "id": "rmvn5uca3284ec2",
+      "title": "Basic Vanilla Ice Cream",
+      "servings": "1 quart per container",
+      "category": "Dessert",
+      "ingredients": [
+        "## In each container",
+        "1 cup heavy cream",
+        "1 cup light cream",
+        "½ cup sugar",
+        "¾ tsp. vanilla extract",
+        "a pinch of salt"
+      ],
+      "steps": [
+        "Pour the heavy cream and light cream into each container. Add the sugar, vanilla and salt.",
+        "Stir the contents of each container until the sugar dissolves.",
+        "Continue as directed in the booklet, pages 6–8, steps 6 through 16."
+      ],
+      "addedAt": 1,
+      "updatedAt": 1
+    }
+  ]
+}
