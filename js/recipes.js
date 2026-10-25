@@ -41,17 +41,27 @@ async function rLoadLocal(){
   if(validRecipes(s)){ rstore=mergeRecipes(rstore, s); renderRecipes(); }
 }
 // Whole recipes: the newer one wins (a deleted recipe is a tombstone, so the delete reaches the other phones).
+// The meal plan (plan: entries by id, the same rule, deletes as tombstones) and the household settings
+// (settings: { people, updatedAt }, the newer wins) live in the same file, so the whole household shares them.
+function mergeById(x, y){ const m=new Map(); for(const e of (x||[])) if(e && e.id) m.set(e.id, e); for(const e of (y||[])){ if(!e || !e.id) continue; const c=m.get(e.id); if(!c || (e.updatedAt||0)>(c.updatedAt||0)) m.set(e.id, e); } return [...m.values()]; }
 function mergeRecipes(a, b){
-  const m=new Map();
-  for(const r of a.recipes) m.set(r.id, r);
-  for(const r of b.recipes){ const c=m.get(r.id); if(!c || (r.updatedAt||0)>(c.updatedAt||0)) m.set(r.id, r); }
-  return { format:'tamarack-recipes', version:1, updatedAt:Math.max(a.updatedAt||0, b.updatedAt||0), recipes:[...m.values()] };
+  const sa=a.settings||{}, sb=b.settings||{};
+  const out={ format:'tamarack-recipes', version:1, updatedAt:Math.max(a.updatedAt||0, b.updatedAt||0), recipes:mergeById(a.recipes, b.recipes) };
+  const plan=mergeById(a.plan, b.plan); if(plan.length) out.plan=plan;
+  const st=(sb.updatedAt||0)>(sa.updatedAt||0) ? sb : (a.settings||b.settings); if(st) out.settings=st;
+  return out;
 }
-function rsig(s){ return s.recipes.map(r=>r.id+':'+(r.updatedAt||0)+(r.deleted?'x':'')).sort().join('|'); }
+function rsig(s){
+  const ids=arr=>(arr||[]).map(r=>r.id+':'+(r.updatedAt||0)+(r.deleted?'x':'')).sort().join('|');
+  return ids(s.recipes)+'#'+ids(s.plan)+'#'+((s.settings||{}).updatedAt||0);
+}
 function rcommit(){ rstore.updatedAt=Date.now(); rSaveLocal(); renderRecipes(); rSchedule(); }
 function readableRecipes(s){
   const tidy=r=>{ if(r.deleted) return r; const o={}; for(const k of RCP_ORDER) if(k in r && r[k]!=='' && r[k]!=null) o[k]=r[k]; for(const k in r) if(!(k in o) && r[k]!=='' && r[k]!=null) o[k]=r[k]; return o; };
-  return JSON.stringify({ format:'tamarack-recipes', version:1, updatedAt:s.updatedAt, recipes:s.recipes.map(tidy) }, null, 2);
+  const o={ format:'tamarack-recipes', version:1, updatedAt:s.updatedAt, recipes:s.recipes.map(tidy) };
+  if((s.plan||[]).length) o.plan=s.plan.slice().sort((x,y)=>String(x.date||'').localeCompare(String(y.date||'')));
+  if(s.settings) o.settings=s.settings;
+  return JSON.stringify(o, null, 2);
 }
 
 /* ---------------- sync: download, merge, upload with the revision (never a blind overwrite) ---------------- */
@@ -139,6 +149,7 @@ function rThumb(r){
 }
 function renderRecipes(){
   if(!$('recipes')) return;
+  if(typeof renderTodayPlan==='function'){ renderTodayPlan(); renderPlan(); }
   $('r-q').placeholder={ all:'Search recipes…', title:'Search recipe names…', ing:'What’s in the fridge? e.g. chicken rice' }[rui.scope]||'Search recipes…';
   document.querySelectorAll('#r-scope button').forEach(b=>b.classList.toggle('active', b.dataset.scope===rui.scope));
   document.querySelectorAll('#r-show button').forEach(b=>b.classList.toggle('active', b.dataset.show===rui.show));
@@ -232,9 +243,11 @@ function sectioned(arr, fn){
   }
   return html+(open?'</ul>':'');
 }
-function openRecipe(id){
+let rFor=0;   // people, when opened from the meal plan
+function openRecipe(id, opts){
   const r=recipeById(id); if(!r) return;
-  rCur=id; rScale=1;
+  opts=opts||{};
+  rCur=id; rScale=opts.scale>0 ? opts.scale : 1; rFor=opts.people||0;
   $('rc-modal').classList.remove('editing');
   drawRecipe();
   $('rc-bg').classList.add('open'); lockPage(); $('rc-modal').scrollTop=0;
@@ -254,6 +267,8 @@ function drawRecipe(){
   $('rc-pending').classList.toggle('hide', !r.pending);
   $('rc-pending').innerHTML=r.pending ? (r.pending==='link' ? 'This link couldn’t be read here. <b>Claude will fill it in</b> next time you say “check the recipes”.' : 'The photos are with Claude, waiting to be read.') : '';
   document.querySelectorAll('#rc-scale button').forEach(b=>b.classList.toggle('active', +b.dataset.k===rScale));
+  $('rc-scaled').classList.toggle('hide', !rFor || rScale===1);
+  $('rc-scaled').textContent=rFor ? 'Amounts for '+rFor+' '+(rFor===1?'person':'people')+' (recipe serves '+r.servings+')' : '';
   $('rc-ing').innerHTML=(r.ingredients||[]).length ? sectioned(r.ingredients, s=>'<li>'+esc(scaleLine(s, rScale))+'</li>') : '<p class="note">No ingredients yet.</p>';
   $('rc-steps').innerHTML=(r.steps||[]).length ? sectioned(r.steps, (s,n)=>'<li><span class="rc-n">'+n+'</span><span>'+esc(s)+timerButtons(s, r.title, n)+'</span></li>').replace(/<ul>/g,'<ol class="rc-ol">').replace(/<\/ul>/g,'</ol>') : '<p class="note">No steps yet.</p>';
   $('rc-notes').innerHTML=(r.about?'<p>'+esc(r.about)+'</p>':'')+(r.notes?'<p class="rc-note">'+esc(r.notes).replace(/\n/g,'<br>')+'</p>':'');
@@ -266,7 +281,7 @@ function drawRecipe(){
 $('rc-close').onclick=closeRecipe;
 function closeRecipe(){ $('rc-bg').classList.remove('open'); unlockPage(); rCur=null; }
 $('rc-bg').addEventListener('click', e=>{ if(e.target===$('rc-bg')) closeRecipe(); });
-document.querySelectorAll('#rc-scale button').forEach(b=>b.onclick=()=>{ rScale=+b.dataset.k; drawRecipe(); });
+document.querySelectorAll('#rc-scale button').forEach(b=>b.onclick=()=>{ rScale=+b.dataset.k; rFor=0; drawRecipe(); });
 function rUpdate(fn){ const r=recipeById(rCur); if(!r){ drawRecipe(); return; } fn(r); r.updatedAt=Date.now(); RIDX.delete(r); rcommit(); drawRecipe(); }
 $('rc-fav').onclick=()=>rUpdate(r=>{ r.favorite=!r.favorite; });
 $('rc-want').onclick=()=>rUpdate(r=>{ r.want=!r.want; });
@@ -478,7 +493,7 @@ $('gr-list').onchange=e=>{ const c=e.target.closest('[data-gi]'); if(!c) return;
 $('gr-clear-done').onclick=()=>{ saveGrocery(grocery().filter(x=>!x.done)); renderGrocery(); };
 $('gr-clear-all').onclick=()=>{ if(confirm('Empty the grocery list?')){ saveGrocery([]); renderGrocery(); } };
 $('gr-share').onclick=async()=>{
-  const text=grocery().filter(x=>!x.done).map(x=>'• '+x.t).join('\n'); if(!text){ toast('Nothing left on the list'); return; }
+  const text=grocery().filter(x=>!x.done).map(x=>x.t).join('\n'); if(!text){ toast('Nothing left on the list'); return; }
   if(navigator.share){ try{ await navigator.share({ title:'Grocery list', text }); return; }catch(e){ if(e && e.name==='AbortError') return; } }
   try{ await navigator.clipboard.writeText(text); toast('List copied'); }catch(e){ toast('Couldn’t copy on this device'); }
 };

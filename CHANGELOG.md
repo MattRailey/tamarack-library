@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4 — 2026-10-24 · Meal plan
+
+**New**
+- **📅 Meal plan** in the Recipes tab: the next seven days (‹ › a week at a time), Breakfast, Lunch, Dinner, Snacks & dessert. Pick recipes (favorites first) or type a note. Shared by the household through `recipes.json`.
+- **Cooking for N people:** the household's number, changeable per meal. A planned recipe opens with the amounts for that many people.
+- **Ingredients for this week:** everything planned, scaled and added up ("1 cup flour" + "2 cups flour" = "3 cups flour"), rounded up for buying (2½ eggs → 3). Tick what you need, then add to the shopping list or share it.
+- **📅 Plan it** on every recipe; today's meals show above the recipe list.
+- Shopping lists share one item per line, so they paste cleanly into Reminders or a store's list.
+
 ## 2.3 — 2026-10-24 · Recipes
 
 **New**

@@ -84,3 +84,15 @@ test('only recipe photos, by plain name; a link deleted in the app is not brough
   assert.equal(r.store.recipes.find(x => x.title === 'Soup').url, undefined);
   assert.equal(r.log.problems.length, 2);
 });
+
+test('bringing recipes in keeps the meal plan and settings in recipes.json', () => {
+  const dir = lib();
+  const f = path.join(dir, 'recipes.json'); const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+  s.plan = [{ id: 'p1', date: '2026-10-26', meal: 'dinner', recipeId: 'rOld', people: 5, updatedAt: 3 }]; s.settings = { people: 5, updatedAt: 3 };
+  fs.writeFileSync(f, JSON.stringify(s));
+  const inF = path.join(dir, 'in.json'); fs.writeFileSync(inF, JSON.stringify([{ title: 'Soup', ingredients: ['water'], steps: ['Boil 10 minutes.'] }]));
+  run(dir, inF, { apply: true });
+  const out = JSON.parse(fs.readFileSync(f, 'utf8'));
+  assert.equal(out.plan.length, 1); assert.equal(out.plan[0].people, 5); assert.equal(out.settings.people, 5);
+  assert.ok(out.recipes.some(r => r.title === 'Soup'));
+});

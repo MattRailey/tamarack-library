@@ -38,7 +38,8 @@ export const isRecipePhoto = f => / recipe( \d{2,3})?( redo)?\.jpe?g$/i.test(f);
 
 export function readableRecipes(s) {
   const tidy = r => { if (r.deleted) return r; const o = {}; for (const k of ORDER) if (k in r && r[k] !== '' && r[k] != null) o[k] = r[k]; for (const k in r) if (!(k in o) && r[k] !== '' && r[k] != null) o[k] = r[k]; return o; };
-  return JSON.stringify({ format: 'tamarack-recipes', version: 1, updatedAt: s.updatedAt, recipes: s.recipes.map(tidy) }, null, 2);
+  // everything else in the file (the meal plan, settings) is kept as it is
+  return JSON.stringify(Object.assign({}, s, { format: 'tamarack-recipes', version: 1, updatedAt: s.updatedAt, recipes: s.recipes.map(tidy) }), null, 2);
 }
 function readRecipes(dir) {
   const p = path.join(dir, FILE);
@@ -60,7 +61,7 @@ function readLedger(dir) { let raw = null; try { raw = JSON.parse(fs.readFileSyn
 // Pure: apply the entries to a recipe store → { store, log, copies:[{from, to}], batch }
 export function applyRecipes(store, entries, opts = {}) {
   const now = opts.now || Date.now(), batch = opts.batch || 'rc' + now.toString(36), list = opts.books || [];
-  const out = { format: 'tamarack-recipes', version: 1, updatedAt: now, recipes: store.recipes.map(r => Object.assign({}, r)) };
+  const out = Object.assign({}, store, { format: 'tamarack-recipes', version: 1, updatedAt: now, recipes: store.recipes.map(r => Object.assign({}, r)) });
   const log = { added: [], filled: [], dups: [], problems: [] }, copies = [];
   entries.forEach((e, i) => {
     if (!e || !String(e.title || '').trim()) { log.problems.push('entry ' + (i + 1) + ': no title'); return; }

@@ -39,6 +39,7 @@
 <script src="js/shelfcam.js" defer></script>
 <script src="js/recheck.js" defer></script>
 <script src="js/recipes.js" defer></script>
+<script src="js/mealplan.js" defer></script>
 <script src="js/cooking.js" defer></script>
 <script src="js/settings.js" defer></script>
 <script src="js/wizard.js" defer></script>
@@ -178,6 +179,8 @@
     <section class="panel" id="recipes">
       <h2>Recipes</h2>
       <p class="sub">Family cards, cookbook pages and recipes from the web, all in one place. Search by name, or by what’s in the fridge.</p>
+      <div class="rc-viewseg"><div class="seg" id="r-view"><button data-rv="recipes" class="active">Recipes</button><button data-rv="plan">📅 Meal plan</button></div></div>
+      <div id="r-recipes-view">
       <div class="card search-card">
         <div class="search-wrap">
           <input type="search" id="r-q" placeholder="Search recipes…" autocomplete="off" enterkeyhint="search">
@@ -203,8 +206,21 @@
       <div class="filter-bar hide" id="r-filter-bar" role="status"></div>
       <div class="note rc-waiting hide" id="r-waiting"></div>
       <div class="note rc-waiting hide" id="r-status"></div>
+      <div class="rc-today hide" id="r-today"></div>
       <div class="note" id="r-summary" style="margin:0 0 8px;"></div>
       <div id="r-results" class="rc-list"></div>
+      </div>
+      <div id="r-plan-view" class="hide">
+        <div class="card mp-head">
+          <div class="mp-nav"><button class="secondary" id="mp-prev" aria-label="Last week">‹</button><b id="mp-range"></b><button class="secondary" id="mp-next" aria-label="Next week">›</button></div>
+          <div class="mp-bar">
+            <button class="secondary hide" id="mp-thisweek">Today</button>
+            <span class="mp-ppl">Cooking for <button class="secondary" id="mp-ppl-minus" aria-label="One fewer">−</button><b id="mp-people">4</b><button class="secondary" id="mp-ppl-plus" aria-label="One more">+</button> people</span>
+          </div>
+          <button id="mp-ing" class="mp-ingbtn">🛒 Ingredients for this week</button>
+        </div>
+        <div id="mp-days" class="mp-days"></div>
+      </div>
       <input type="file" id="r-file" accept="image/*" multiple class="hide">
     </section>
 
@@ -384,6 +400,7 @@
           <li><b>📚 Cookbook</b> asks which book (from your library) and the page, then opens the camera. The recipe links to the book, and the book shows its recipes.</li>
           <li><b>Search</b> works like the library: <b>Ingredient</b> finds what you can make with what’s in the fridge (“chicken rice”).</li>
           <li><b>🍳 Cook</b> shows one step at a time in big letters, keeps the screen on, and ticks off ingredients. <b>½× 2× 3×</b> scales the amounts. Any step with a time (“bake 25 minutes”) has a <b>⏱</b> button: timers run at the bottom of every screen and ring when done. On iPhone, keep the app open: a locked phone can’t ring, but a timer that ran out shows the moment you’re back.</li>
+          <li><b>📅 Meal plan</b> (top of the Recipes tab): the next seven days, breakfast to snacks. Tap <b>＋</b> on a meal to pick a recipe (favorites first) or type a note like “Leftovers”. Set <b>Cooking for</b> to your household; tap <b>👤</b> on a meal to change it for that meal. Tapping a planned recipe opens it with the amounts for that many people. <b>🛒 Ingredients for this week</b> adds everything up: tick what you need and add it to the shopping list, or share it. Everyone in the library sees the same plan.</li>
           <li><b>♥ Favorite</b>, <b>Want to make</b>, <b>✓ Made it</b> (with a note for next time), <b>🛒 Grocery list</b>, <b>Share</b> and <b>Print</b> are on each recipe. Each library’s recipes are its own, private like its books.</li>
         </ul>
         <h3>Phones, computers and no signal</h3>
@@ -628,9 +645,11 @@
         <button class="secondary rc-tog" id="rc-fav">♡ Favorite</button>
         <button class="secondary rc-tog" id="rc-want">Want to make</button>
         <button class="secondary" id="rc-madeit">✓ Made it</button>
+        <button class="secondary" id="rc-plan">📅 Plan it</button>
       </div>
       <div class="rc-cols">
         <div class="rc-ingcol">
+          <p class="note rc-scaled hide" id="rc-scaled"></p>
           <div class="rc-ing-h"><h4>Ingredients</h4><div class="seg rc-scale" id="rc-scale" aria-label="Servings"><button data-k="0.5">½×</button><button data-k="1" class="active">1×</button><button data-k="2">2×</button><button data-k="3">3×</button></div></div>
           <div id="rc-ing" class="rc-ing"></div>
         </div>
@@ -700,6 +719,37 @@
       <p class="note"><a href="#" onclick="rAddView('menu');return false;">← Other ways</a></p>
     </div>
     <p class="note" id="ra-msg"></p>
+  </div>
+</div>
+
+<!-- meal plan: pick a recipe for a meal -->
+<div class="modal-bg" id="mpk-bg">
+  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="mpk-h">
+    <button class="modal-close" id="mpk-close" aria-label="Close">&times;</button>
+    <h3 id="mpk-h">Pick a recipe</h3>
+    <div class="row mpk-top"><input type="search" id="mpk-q" placeholder="Search, or type a note like “Leftovers”" autocomplete="off"><label class="mpk-pl">For <input id="mpk-people" type="number" inputmode="numeric" min="1" max="60"> people</label></div>
+    <div id="mpk-list" class="mpk-list"></div>
+  </div>
+</div>
+<div class="modal-bg" id="mpq-bg">
+  <div class="modal scan-modal mpq" role="dialog" aria-modal="true" aria-labelledby="mpq-h">
+    <h3 id="mpq-h">Plan it</h3>
+    <div class="grid">
+      <div><label for="mpq-date">Day</label><input id="mpq-date" type="date"></div>
+      <div><label for="mpq-meal">Meal</label><select id="mpq-meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snacks &amp; dessert</option></select></div>
+      <div><label for="mpq-people">People</label><input id="mpq-people" type="number" inputmode="numeric" min="1" max="60"></div>
+    </div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="mpq-cancel">Cancel</button><button id="mpq-save">Add to the plan</button></div>
+  </div>
+</div>
+<!-- meal plan: the week's ingredients -->
+<div class="modal-bg" id="mi-bg">
+  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="mi-h">
+    <button class="modal-close" id="mi-close" aria-label="Close">&times;</button>
+    <h3 id="mi-h">Ingredients for the week</h3>
+    <p class="note" id="mi-note" style="margin-top:0;"></p>
+    <div id="mi-list"></div>
+    <div class="row" style="margin-top:12px;"><button id="mi-add">Add to the shopping list</button><button class="secondary" id="mi-all">Tick all</button><button class="secondary" id="mi-share">Share or copy</button></div>
   </div>
 </div>
 

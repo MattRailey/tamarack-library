@@ -43,6 +43,7 @@ The price is that load order matters for **top-level statements**, meaning code 
 | `admin.js` | Invite a friend (Data & Sync, Matt's devices only): invites, phones (last used), last photos per library, switch off, through the service's `/admin/*`. The password (ADMIN_SECRET) is kept in sessionStorage only (`tamarack_library_admin`): the github.io origin is shared with Matt's other apps, and the password can get into any library. |
 | `shelfcam.js` | The shelf camera: stays open, one tap per photo, sends in the background, Redo last, next bookcase. `optional:true` (Send photos) lets it run with no room/bookcase. |
 | `recipes.js` | The Recipes tab: `recipes.json` (device copy, sync, merge), search, list, recipe window, edit form, adding (camera in recipe mode, links, typing), grocery list, "recipes from this book" in the book window. |
+| `mealplan.js` | Meal plan (Recipes → 📅 Meal plan): seven days from today, meals per day, recipes or notes for a number of people, the week's ingredients added up and scaled (tick what you need → shopping list), "Plan it" from a recipe, today's meals above the recipe list. |
 | `cooking.js` | Timers (found in step text, docked at the bottom of every screen, kept on the phone) and the cooking view (one step at a time, Screen Wake Lock). |
 | `recheck.js` | Recheck shelves tab: bookcases by when they were last photographed, recheck photos. |
 | `settings.js` | Library name and tagline, switching libraries, set-up links. |
@@ -171,8 +172,12 @@ Each library keeps its recipes in **`<library folder>/recipes.json`**, private t
 
 ```js
 { format: 'tamarack-recipes', version: 1, updatedAt,
-  recipes: [ Recipe | { id, deleted: true, updatedAt } ] }
+  recipes: [ Recipe | { id, deleted: true, updatedAt } ],
+  plan: [ { id, date: 'YYYY-MM-DD', meal: 'breakfast|lunch|dinner|snack', recipeId | text, people, at, updatedAt } | tombstone ],
+  settings: { people, updatedAt } }        // the household's number ("Cooking for 5")
 ```
+
+The meal plan merges like the recipes (per entry, newer `updatedAt` wins, deletes as tombstones); `settings` as a whole, newer wins. A planned recipe opens scaled by `people / servings` (the first number in `servings`; "2 dozen" = 24; no number = not scaled). The week's ingredients (`combineIngredients`) add up the same ingredient and unit ("1 cup flour" + "2 cups flour"), then round up for buying: counted things to whole ones, measures to ¼ ⅓ ½ ⅔ ¾. `tools/recipe-merge.mjs` keeps `plan` and `settings` untouched.
 
 A **recipe** (written in this order, blanks left out): `id` (`r…`), `title`, `from` (who: "Grandma Railey"), `source` (`card`, `family`, `cookbook`, `web`, `magazine`, `other`), `bookId` (a book in this library) or `bookTitle` (not in the library), `page`, `url` (http/https only), `author`, `servings`, `prep`, `cook`, `total` (text: "20 min"), `category`, `cuisine`, `tags` [], `about`, `ingredients` [], `steps` [] (one line each; a line starting `## ` is a section heading, e.g. `## For the crust`), `notes`, `favorite`, `want`, `rating`, `made` [{ date `YYYY-MM-DD`, note }], `photos` [paths relative to the library folder, `recipes/<id>-<n>.jpg`], `image` (https only), `pending` (`'link'`: waiting for Claude), `needsReview`, `addedAt`, `updatedAt`, `importBatch`.
 
