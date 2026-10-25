@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1 — 2026-10-24 · Previous recipe
+
+- **← Previous recipe** in the recipe camera: missed a page? Go back one; the photo joins that recipe (same name, next number). **Next recipe →** then goes on past the last recipe with photos.
+
 ## 2.4 — 2026-10-24 · Meal plan
 
 **New**

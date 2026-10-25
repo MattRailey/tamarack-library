@@ -14,6 +14,8 @@
    (Change) is still there when it is known. Setup and Recheck shelves keep asking: they need to know which bookcase.
    opts.recipe (Recipes → Photograph recipes): the heading shows "Recipe 1" (and who it's from / the cookbook);
    "Next recipe →" moves straight on to Recipe 2, so each recipe's pages share one name and count. No pop-up.
+   "← Previous recipe" goes back one (a page that was missed): the photo joins that recipe's name and numbering
+   (002 → 003…). "Next recipe →" from there goes to a new recipe after the last one with photos.
    Redo last: the next shot replaces the last photo under the same name (Dropbox revision, or its place in the
    waiting queue). If that can't overwrite, it goes up as "NNN redo.jpg": a redo replaces the photo with that number.
    Part of the app's shared script scope: see DEVELOPER.md. */
@@ -100,7 +102,8 @@ function camCount(){
   if(cam.opts.recipe){ $('cam-count').textContent=(here?here+' page'+(here===1?'':'s')+' of '+loc.bookcase:'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':''); return; }
   $('cam-count').textContent=(here?here+' of '+(loc.bookcase||(cam.opts.optional?'these (no location yet)':'this bookcase')):'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':'');
 }
-function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim(); $('cam-next').textContent=cam.opts.recipe ? 'Next recipe →' : 'Finished with '+(bc||'this bookcase')+' →';
+function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim();
+  $('cam-prevrec').classList.toggle('hide', !cam.opts.recipe || recipeNum(bc)<=1); $('cam-next').textContent=cam.opts.recipe ? 'Next recipe →' : 'Finished with '+(bc||'this bookcase')+' →';
   $('cam-next').classList.toggle('hide', !cam.opts.build || (!!cam.opts.optional && !bc)); }   // no bookcase named: nothing to finish with
 
 /* One frame from the video at full size, shrunk to the usual shelf-photo size (photos.js PHOTO_SIZE). */
@@ -122,7 +125,10 @@ async function camShoot(){
   if(cam.redo && cam.last) return camRedo(blob);
   // a new bookcase (or room) starts a new name and count
   const key=loc.room+'|'+loc.bookcase;
-  if(!cam.session || cam.session.key!==key) cam.session={ key, base:camBase(loc), n:0 };
+  // each place keeps its own name and count, so going back to Recipe 1 (or N1) carries on 003, 004…
+  cam.sessions=cam.sessions||{};
+  if(!cam.sessions[key]) cam.sessions[key]={ key, base:camBase(loc), n:0 };
+  cam.session=cam.sessions[key];
   const n=++cam.session.n, path=dbxFolder()+'/photos/inbox/'+cam.session.base+' '+String(n).padStart(3,'0')+'.jpg';
   let c=cam.cases.find(x=>x.room===loc.room && x.bookcase===loc.bookcase); if(!c){ c={ room:loc.room, bookcase:loc.bookcase, n:0 }; cam.cases.push(c); }
   c.n++; logSent(loc, 1);
@@ -176,9 +182,21 @@ $('cam-redo').onclick=()=>{
   $('cam-msg').textContent=cam.redo ? 'Take it again: the next photo replaces the last one.' : '';
 };
 $('cam-shutter').onclick=camShoot;
+function recipeNum(s){ const m=String(s||'').match(/(\d+)$/); return m ? +m[1] : 1; }
 $('cam-next').onclick=()=>{
-  if(cam && cam.opts.recipe){ camSetPlace({ room:$('cam-room').value, bookcase:nextCaseName($('cam-case').value.trim())||'Recipe 2' }); $('cam-msg').textContent='Now '+$('cam-case').value+'. Photograph each page of it.'; return; }
+  if(cam && cam.opts.recipe){
+    // after going back for a missed page, Next goes on past the last recipe that has photos
+    const cur=recipeNum($('cam-case').value), last=Math.max(0, ...cam.cases.filter(c=>c.n>0).map(c=>recipeNum(c.bookcase)));
+    camSetPlace({ room:$('cam-room').value, bookcase:'Recipe '+(Math.max(cur, last)+1) });
+    $('cam-msg').textContent='Now '+$('cam-case').value+'. Photograph each page of it.'; return; }
   camChange('Name of the next bookcase', nextCaseName($('cam-case').value.trim()));
+};
+$('cam-prevrec').onclick=()=>{
+  if(!cam || !cam.opts.recipe) return;
+  const n=recipeNum($('cam-case').value); if(n<=1) return;
+  camSetPlace({ room:$('cam-room').value, bookcase:'Recipe '+(n-1) });
+  const had=(cam.cases.find(c=>c.bookcase==='Recipe '+(n-1))||{}).n||0;
+  $('cam-msg').textContent='Back to Recipe '+(n-1)+(had?' ('+had+' page'+(had===1?'':'s')+' so far)':'')+'. Photograph the page you missed; it joins that recipe.';
 };
 $('cam-change').onclick=()=>camChange('Change room or bookcase', $('cam-case').value);
 $('cam-finish').onclick=()=>closeShelfCam(false, true);

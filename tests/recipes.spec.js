@@ -229,3 +229,29 @@ test('only web links are links (a javascript: address is never clickable)', asyn
   await page.click('#rc-edit'); await page.selectOption('#rf-source', 'web'); await page.fill('#rf-url', 'javascript:alert(2)'); await page.click('#rf-save');
   await expect(page.locator('#rc-sub a')).toHaveCount(0);
 });
+
+test('recipe camera: "← Previous recipe" adds a missed page to the recipe before; Next then goes on past the last one', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await openRecipes(page); await page.click('#r-add');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  const inbox = () => net.uploads.filter(u => u.path.includes('/photos/inbox/') && u.path.endsWith('.jpg')).map(u => u.path.split('/').pop());
+  await expect(page.locator('#cam-prevrec')).toBeHidden();                       // nothing before Recipe 1
+  await page.click('#cam-shutter'); await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(1);
+  await page.click('#cam-next'); await expect(page.locator('#cam-where-txt')).toHaveText('Recipe 2');
+  await page.click('#cam-shutter'); await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(2);
+  await page.click('#cam-next'); await page.click('#cam-shutter'); await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(3);
+  // missed a page of Recipe 2: go back one
+  await expect(page.locator('#cam-prevrec')).toBeVisible();
+  await page.click('#cam-prevrec');
+  await expect(page.locator('#cam-where-txt')).toHaveText('Recipe 2');
+  await expect(page.locator('#cam-msg')).toContainText('Back to Recipe 2 (1 page so far)');
+  await page.click('#cam-shutter'); await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(4);
+  const names = inbox();
+  expect(names[3].replace(/ \d{3}\.jpg$/, '')).toBe(names[1].replace(/ \d{3}\.jpg$/, ''));   // same name as Recipe 2's first page…
+  expect(names[3]).toMatch(/ Recipe-2 recipe 002\.jpg$/);                                         // …and the next number
+  await expect(page.locator('#cam-count')).toContainText('2 pages of Recipe 2');
+  // Next from there: a new recipe after Recipe 3, not Recipe 3 again
+  await page.click('#cam-next'); await expect(page.locator('#cam-where-txt')).toHaveText('Recipe 4');
+  await page.click('#cam-finish');
+});
