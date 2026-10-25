@@ -13,7 +13,6 @@ const RCP_FILE='recipes.json';
 const RCP_KEY='tamarack_library_recipes_v1'+LIB_NS;        // device copy (IndexedDB, localStorage fallback)
 const RCP_SIG_KEY='tamarack_library_recipes_sig'+LIB_NS;   // what was last synced
 const RUI_KEY='tamarack_library_recipes_ui'+LIB_NS;        // search scope, filters, sort
-const GROC_KEY='tamarack_library_grocery'+LIB_NS;          // grocery list, kept on this phone
 const RCP_SOURCES={ card:'Recipe card or sheet', cookbook:'Cookbook', web:'Website', magazine:'Magazine or clipping', family:'Family recipe', other:'Other' };
 const RCP_ORDER=['id','title','from','source','bookId','bookTitle','page','url','author','servings','prep','cook','total','category','cuisine','tags',
   'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','reread','needsReview','addedAt','updatedAt'];
@@ -162,7 +161,6 @@ function rThumb(r){
 }
 function renderRecipes(){
   if(!$('recipes')) return;
-  if(typeof renderTodayPlan==='function'){ renderTodayPlan(); renderPlan(); }
   $('r-q').placeholder={ all:'Search recipes…', title:'Search recipe names…', ing:'What’s in the fridge? e.g. chicken rice' }[rui.scope]||'Search recipes…';
   document.querySelectorAll('#r-scope button').forEach(b=>b.classList.toggle('active', b.dataset.scope===rui.scope));
   document.querySelectorAll('#r-show button').forEach(b=>b.classList.toggle('active', b.dataset.show===rui.show));
@@ -195,8 +193,8 @@ function renderRecipes(){
   const waiting=liveRecipes().filter(r=>r.pending).length;
   $('r-waiting').classList.toggle('hide', !waiting);
   $('r-waiting').textContent=waiting ? waiting+' waiting for Claude to read (links or photos sent). Say “check the recipes” next time you chat.' : '';
-  if(!all){ $('r-results').innerHTML='<div class="card empty rc-empty"><b>No recipes yet.</b><br>Tap <b>+</b> to photograph recipe cards or cookbook pages, paste a link, or type one in.</div>'; renderGrocBadge(); return; }
-  if(!list.length){ $('r-results').innerHTML='<div class="card empty">No recipes match. <button class="secondary" data-rclear>Clear filters</button></div>'; renderGrocBadge(); return; }
+  if(!all){ $('r-results').innerHTML='<div class="card empty rc-empty"><b>No recipes yet.</b><br>Tap <b>+</b> to photograph recipe cards or cookbook pages, paste a link, or type one in.</div>'; return; }
+  if(!list.length){ $('r-results').innerHTML='<div class="card empty">No recipes match. <button class="secondary" data-rclear>Clear filters</button></div>'; return; }
   $('r-results').innerHTML=list.map(r=>'<button class="rc-item" data-rid="'+esc(r.id)+'">'+rThumb(r)+'<div class="rc-txt">'
     +'<b>'+esc(r.title||'(untitled)')+'</b>'
     +'<span class="rc-meta">'+esc(rSourceLine(r))+'</span>'
@@ -205,7 +203,6 @@ function renderRecipes(){
       +(r.pending?'<span class="chip review">Waiting for Claude</span>':'')+(r.reread?'<span class="chip review">Waiting for Claude to re-read</span>':r.needsReview&&!r.pending?'<span class="chip review">Check this</span>':'')
       +((r.made||[]).length?'<span class="chip read">Made '+r.made.length+'×</span>':'')+dietBadges(r)+'</span>'
     +'</div></button>').join('');
-  renderGrocBadge();
 }
 let _rqT=null;
 $('r-q').addEventListener('input', ()=>{ clearTimeout(_rqT); _rqT=setTimeout(renderRecipes, 150); });
@@ -319,7 +316,6 @@ $('rc-madeit').onclick=()=>{
   toast('Marked as made today');
 };
 $('rc-cook').onclick=()=>{ const r=recipeById(rCur); if(r) openCooking(r, rScale); };
-$('rc-groc').onclick=()=>{ const r=recipeById(rCur); if(!r) return; if(!(r.ingredients||[]).some(s=>!/^##\s/.test(s))){ toast('No ingredients to add'); return; } openRecipeIng(r, rScale); };
 $('rc-reread').onclick=async()=>{
   const r=recipeById(rCur); if(!r) return;
   if(!cloudOn()){ toast('Connect the library first (Epilogue → Data & Sync), so the photo can reach Claude.'); return; }
@@ -514,33 +510,6 @@ async function fetchRecipe(url){
   const j=await r.json().catch(()=>null);
   return j && j.recipe ? j.recipe : null;
 }
-
-/* ---------------- grocery list (kept on this phone) ---------------- */
-function grocery(){ try{ return JSON.parse(lsGet(GROC_KEY)||'[]'); }catch(e){ return []; } }
-function saveGrocery(L){ lsSet(GROC_KEY, JSON.stringify(L)); renderGrocBadge(); }
-function addToGrocery(r, k){
-  const L=grocery(); let n=0;
-  for(const s of (r.ingredients||[])){ if(/^##\s/.test(s) || !String(s).trim()) continue; L.push({ t:scaleLine(s, k||1), r:r.title, done:false }); n++; }
-  saveGrocery(L); return n;
-}
-function renderGrocBadge(){ const n=grocery().filter(x=>!x.done).length; const b=$('r-groc-n'); if(b){ b.textContent=n; b.classList.toggle('hide', !n); } }
-function renderGrocery(){
-  const L=grocery();
-  if(!L.length){ $('gr-list').innerHTML='<p class="note">The list is empty. Open a recipe and tap <b>🛒 Grocery list</b> to add its ingredients.</p>'; return; }
-  const by=new Map(); L.forEach((x,i)=>{ if(!by.has(x.r)) by.set(x.r, []); by.get(x.r).push([x,i]); });
-  $('gr-list').innerHTML=[...by.entries()].map(([r,items])=>'<h4 class="rc-sec">'+esc(r||'Other')+'</h4>'
-    +items.map(([x,i])=>'<label class="gr-item'+(x.done?' done':'')+'"><input type="checkbox" data-gi="'+i+'"'+(x.done?' checked':'')+'> <span>'+esc(x.t)+'</span></label>').join('')).join('');
-}
-$('r-grocery').onclick=()=>{ renderGrocery(); $('gr-bg').classList.add('open'); lockPage(); };
-$('gr-close').onclick=()=>{ $('gr-bg').classList.remove('open'); unlockPage(); };
-$('gr-list').onchange=e=>{ const c=e.target.closest('[data-gi]'); if(!c) return; const L=grocery(); const x=L[+c.dataset.gi]; if(x){ x.done=c.checked; saveGrocery(L); renderGrocery(); } };
-$('gr-clear-done').onclick=()=>{ saveGrocery(grocery().filter(x=>!x.done)); renderGrocery(); };
-$('gr-clear-all').onclick=()=>{ if(confirm('Empty the grocery list?')){ saveGrocery([]); renderGrocery(); } };
-$('gr-share').onclick=async()=>{
-  const text=grocery().filter(x=>!x.done).map(x=>x.t).join('\n'); if(!text){ toast('Nothing left on the list'); return; }
-  if(navigator.share){ try{ await navigator.share({ title:'Grocery list', text }); return; }catch(e){ if(e && e.name==='AbortError') return; } }
-  try{ await navigator.clipboard.writeText(text); toast('List copied'); }catch(e){ toast('Couldn’t copy on this device'); }
-};
 
 /* ---------------- recipes from a cookbook, shown in that book's window ---------------- */
 function bookRecipesNote(b){

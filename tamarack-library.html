@@ -40,7 +40,6 @@
 <script src="js/recheck.js" defer></script>
 <script src="js/recipes.js" defer></script>
 <script src="js/diet.js" defer></script>
-<script src="js/mealplan.js" defer></script>
 <script src="js/cooking.js" defer></script>
 <script src="js/settings.js" defer></script>
 <script src="js/wizard.js" defer></script>
@@ -180,7 +179,7 @@
     <section class="panel" id="recipes">
       <h2>Recipes</h2>
       <p class="sub">Family cards, cookbook pages and recipes from the web, all in one place. Search by name, or by what’s in the fridge.</p>
-      <div class="rc-viewseg"><div class="seg" id="r-view"><button data-rv="recipes" class="active">Recipes</button><button data-rv="plan">📅 Meal plan</button><button data-rv="trips">🏕 Trips</button></div></div>
+      
       <div id="r-recipes-view">
       <div class="card search-card">
         <div class="search-wrap">
@@ -191,7 +190,6 @@
           <div class="seg" id="r-scope"><button data-scope="all" class="active">Anything</button><button data-scope="title">Name</button><button data-scope="ing">Ingredient</button></div>
           <div class="genre-acts">
             <select id="r-cat" class="genre-main" aria-label="Kind of dish"><option value="">All kinds</option></select>
-            <button id="r-grocery" class="add-round scan-round secondary rc-groc-btn" aria-label="Grocery list" title="Grocery list">🛒<span class="rc-badge hide" id="r-groc-n"></span></button>
             <button id="r-add" class="add-round" aria-label="Add recipe" title="Add recipe">+</button>
           </div>
         </div>
@@ -210,36 +208,8 @@
       <div class="filter-bar hide" id="r-filter-bar" role="status"></div>
       <div class="note rc-waiting hide" id="r-waiting"></div>
       <div class="note rc-waiting hide" id="r-status"></div>
-      <div class="rc-today hide" id="r-today"></div>
       <div class="note" id="r-summary" style="margin:0 0 8px;"></div>
       <div id="r-results" class="rc-list"></div>
-      </div>
-      <div id="r-plan-view" class="hide">
-        <div class="card mp-head">
-          <div class="mp-nav"><button class="secondary" id="mp-prev" aria-label="Last week">‹</button><b id="mp-range"></b><button class="secondary" id="mp-next" aria-label="Next week">›</button></div>
-          <div class="mp-bar">
-            <button class="secondary hide" id="mp-thisweek">Today</button>
-            <span class="mp-ppl">Cooking for <button class="secondary" id="mp-ppl-minus" aria-label="One fewer">−</button><b id="mp-people">4</b><button class="secondary" id="mp-ppl-plus" aria-label="One more">+</button> people</span>
-          </div>
-          <button id="mp-ing" class="mp-ingbtn">🛒 Ingredients for this week</button>
-        </div>
-        <div id="mp-days" class="mp-days"></div>
-      </div>
-      <div id="r-trips-view" class="hide">
-        <div id="tr-list-pane">
-          <div class="card mp-head"><button id="tr-new">＋ Plan a trip</button><p class="note" style="margin:0;">Camping, a cabin weekend, a road trip: pick the days, choose what to cook for each meal, then get one shopping list for the whole trip.</p></div>
-          <div id="tr-list" class="tr-list"></div>
-        </div>
-        <div id="tr-detail-pane" class="hide">
-          <div class="card mp-head">
-            <div class="mp-nav"><button class="secondary" id="tr-back" aria-label="All trips">‹</button><b id="tr-title"></b><button class="secondary" id="tr-edit" aria-label="Change trip" style="font-size:.9rem;">Edit</button></div>
-            <div class="note" id="tr-sub" style="margin:0;text-align:center;"></div>
-            <div class="note" id="tr-notes" style="margin:0;white-space:pre-wrap;"></div>
-            <button id="tr-ing" class="mp-ingbtn">🛒 Ingredients for this trip</button>
-            <button id="tr-meals" class="secondary mp-ingbtn">📋 Meals to prepare</button>
-          </div>
-          <div id="tr-days" class="mp-days"></div>
-        </div>
       </div>
       <input type="file" id="r-file" accept="image/*" multiple class="hide">
     </section>
@@ -421,8 +391,7 @@
           <li><b>Search</b> works like the library: <b>Ingredient</b> finds what you can make with what’s in the fridge (“chicken rice”).</li>
           <li><b>Dairy-free, Corn-free, Gluten-free</b> (under the search) show recipes that are, or can be with swaps (“1 swap”). <b>Only ones that are already free</b> leaves the swaps out. In a recipe, <b>Show options</b> lists each ingredient to swap and what to use. Corn hides in baking powder, powdered sugar, oil and vinegar, so those say “check the label”. It’s checked from the ingredient list, so read labels; if a recipe is fine as it is, tick it in <b>Edit</b>.</li>
           <li><b>🍳 Cook</b> shows one step at a time in big letters, keeps the screen on, and ticks off ingredients. <b>½× 2× 3×</b> scales the amounts. Any step with a time (“bake 25 minutes”) has a <b>⏱</b> button: timers run at the bottom of every screen and ring when done. On iPhone, keep the app open: a locked phone can’t ring, but a timer that ran out shows the moment you’re back.</li>
-          <li><b>📅 Meal plan</b> (top of the Recipes tab): the next seven days, breakfast to snacks. Tap <b>＋</b> on a meal to pick a recipe (favorites first) or type a note like “Leftovers”. Set <b>Cooking for</b> to your household; tap <b>👤</b> on a meal to change it for that meal. Tapping a planned recipe opens it with the amounts for that many people. <b>🛒 Ingredients for this week</b> adds everything up: tick what you need and add it to the shopping list, or share it. Everyone in the library sees the same plan.</li>
-          <li><b>♥ Favorite</b>, <b>Want to make</b>, <b>✓ Made it</b> (with a note for next time), <b>🛒 Grocery list</b>, <b>Share</b> and <b>Print</b> are on each recipe. Each library’s recipes are its own, private like its books.</li>
+          <li><b>♥ Favorite</b>, <b>Want to make</b>, <b>✓ Made it</b> (with a note for next time), <b>Share</b> and <b>Print</b> are on each recipe. Each library’s recipes are its own, private like its books.</li>
         </ul>
         <h3>Phones, computers and no signal</h3>
         <ul>
@@ -669,8 +638,7 @@
         <button class="secondary rc-tog" id="rc-fav">♡ Favorite</button>
         <button class="secondary rc-tog" id="rc-want">Want to make</button>
         <button class="secondary" id="rc-madeit">✓ Made it</button>
-        <button class="secondary" id="rc-plan">📅 Plan it</button>
-      </div>
+        </div>
       <div class="rc-cols">
         <div class="rc-ingcol">
           <p class="note rc-scaled hide" id="rc-scaled"></p>
@@ -683,7 +651,6 @@
       <div id="rc-made" class="rc-made"></div>
       <div id="rc-photos"></div>
       <div class="row rc-more">
-        <button class="secondary" id="rc-groc">🛒 Grocery list</button>
         <button class="secondary" id="rc-share">Share</button>
         <button class="secondary" id="rc-print">Print</button>
         <button class="secondary" id="rc-edit">Edit</button>
@@ -747,69 +714,6 @@
   </div>
 </div>
 
-<!-- meal plan: pick a recipe for a meal -->
-<div class="modal-bg" id="mpk-bg">
-  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="mpk-h">
-    <button class="modal-close" id="mpk-close" aria-label="Close">&times;</button>
-    <h3 id="mpk-h">Pick a recipe</h3>
-    <div class="row mpk-top"><input type="search" id="mpk-q" placeholder="Search, or type a note like “Leftovers”" autocomplete="off"><label class="mpk-pl">For <input id="mpk-people" type="number" inputmode="numeric" min="1" max="60"> people</label></div>
-    <div id="mpk-list" class="mpk-list"></div>
-  </div>
-</div>
-<div class="modal-bg" id="mpq-bg">
-  <div class="modal scan-modal mpq" role="dialog" aria-modal="true" aria-labelledby="mpq-h">
-    <h3 id="mpq-h">Plan it</h3>
-    <div class="grid">
-      <div><label for="mpq-date">Day</label><input id="mpq-date" type="date"></div>
-      <div><label for="mpq-meal">Meal</label><select id="mpq-meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snacks &amp; dessert</option></select></div>
-      <div><label for="mpq-people">People</label><input id="mpq-people" type="number" inputmode="numeric" min="1" max="60"></div>
-    </div>
-    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="mpq-cancel">Cancel</button><button id="mpq-save">Add to the plan</button></div>
-  </div>
-</div>
-<!-- trips: add or change a trip -->
-<div class="modal-bg" id="trm-bg">
-  <div class="modal scan-modal mpq" role="dialog" aria-modal="true" aria-labelledby="trm-h">
-    <h3 id="trm-h">Plan a trip</h3>
-    <label for="trm-name">Trip</label><input id="trm-name" placeholder="Camping at Wallowa Lake" maxlength="60">
-    <div class="grid">
-      <div><label for="trm-start">First day</label><input id="trm-start" type="date"></div>
-      <div><label for="trm-days">Days</label><input id="trm-days" type="number" inputmode="numeric" min="1" max="21"></div>
-      <div><label for="trm-people">People</label><input id="trm-people" type="number" inputmode="numeric" min="1" max="60"></div>
-    </div>
-    <label for="trm-notes">Notes (optional)</label><textarea id="trm-notes" rows="3" placeholder="Campfire only, no fridge, bring the Dutch oven…"></textarea>
-    <div class="row" style="margin-top:14px;justify-content:space-between;"><button class="danger hide" id="trm-del">Delete trip</button><span class="row"><button class="secondary" id="trm-cancel">Cancel</button><button id="trm-save">Save</button></span></div>
-  </div>
-</div>
-<div class="modal-bg" id="trmenu-bg">
-  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="trmenu-h">
-    <button class="modal-close" id="trmenu-close" aria-label="Close">&times;</button>
-    <h3 id="trmenu-h">Meals to prepare</h3>
-    <pre id="trmenu-text" class="tr-menu"></pre>
-    <div class="row" style="margin-top:12px;"><button id="trmenu-share">Share or copy</button></div>
-  </div>
-</div>
-<!-- meal plan: the week's ingredients -->
-<div class="modal-bg" id="mi-bg">
-  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="mi-h">
-    <button class="modal-close" id="mi-close" aria-label="Close">&times;</button>
-    <h3 id="mi-h">Ingredients for the week</h3>
-    <p class="note" id="mi-note" style="margin-top:0;"></p>
-    <div id="mi-list"></div>
-    <div class="row" style="margin-top:12px;"><button id="mi-add">Add to the shopping list</button><button class="secondary" id="mi-all">Tick all</button><button class="secondary" id="mi-share">Share or copy</button></div>
-  </div>
-</div>
-
-<!-- grocery list -->
-<div class="modal-bg" id="gr-bg">
-  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="gr-h">
-    <button class="modal-close" id="gr-close" aria-label="Close">&times;</button>
-    <h3 id="gr-h">Grocery list</h3>
-    <p class="note" style="margin-top:0;">Tick off what you already have or have bought. The list stays on this phone.</p>
-    <div id="gr-list"></div>
-    <div class="row" style="margin-top:12px;"><button id="gr-share">Share or copy list</button><button class="secondary" id="gr-clear-done">Remove ticked</button><button class="secondary" id="gr-clear-all">Empty list</button></div>
-  </div>
-</div>
 
 <!-- cooking view -->
 <div class="modal-bg ck-bg" id="ck-bg">
