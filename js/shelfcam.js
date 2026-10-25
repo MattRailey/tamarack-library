@@ -162,15 +162,15 @@ function camShoot(){
   const me=cam; me.shots=(me.shots||Promise.resolve()).then(()=>cam===me && camShootNow()).catch(()=>{});
   return me.shots;
 }
-async function camShootNow(){
+async function camShootNow(pre){
   if(!cam) return;
   const loc=camLoc();
   if(!cam.opts.optional && (!loc.room || !loc.bookcase)){ camChange('Which bookcase are you photographing?', loc.bookcase); return; }
   $('cam-msg').textContent=''; $('cam-shutter').classList.add('busy');
-  let got=null; try{ got=await camGrab(); }finally{ $('cam-shutter').classList.remove('busy'); }
+  let got=null; try{ got=pre||await camGrab(); }finally{ $('cam-shutter').classList.remove('busy'); }
   if(!cam) return;
   if(!got){ $('cam-msg').textContent='The camera isn’t ready yet. Try again in a second.'; return; }
-  const blob=got.blob, blurry=camBlurry(got.score);
+  const blob=got.blob, blurry=got.score==null ? false : camBlurry(got.score);
   if(cam.redo && cam.last) return camRedo(blob);
   // a new bookcase (or room) starts a new name and count
   const key=loc.room+'|'+loc.bookcase;
@@ -232,6 +232,17 @@ $('cam-redo').onclick=()=>{
   $('cam-msg').textContent=cam.redo ? 'Take it again: the next photo replaces the last one.' : '';
 };
 $('cam-shutter').onclick=camShoot;
+// The phone's own Camera app, for a page the web camera keeps losing focus on: it can switch to the close-up lens and
+// tap-to-focus. Each photo it gives back goes through the same naming, thumbnails and sending as a tap on the shutter.
+$('cam-native').onclick=()=>{ if(cam) $('cam-native-file').click(); };
+$('cam-native-file').onchange=e=>{
+  const files=[...e.target.files]; e.target.value=''; const me=cam; if(!me || !files.length) return;
+  const [max, q]=PHOTO_SIZE[me.opts.kind||'shelf']||PHOTO_SIZE.shelf;
+  files.forEach(f=>{ me.shots=(me.shots||Promise.resolve()).then(async()=>{
+    if(cam!==me) return; let blob=null; try{ blob=await shrinkPhoto(f, max, q); }catch(err){}
+    if(!blob){ $('cam-msg').textContent='That photo couldn’t be read. Try again.'; return; }
+    return camShootNow({ blob, score:null }); }).catch(()=>{}); });
+};
 function recipeNum(s){ const m=String(s||'').match(/(\d+)$/); return m ? +m[1] : 1; }
 $('cam-next').onclick=()=>{
   if(cam && cam.opts.recipe){

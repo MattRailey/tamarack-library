@@ -137,3 +137,32 @@ test('taps in a row are all taken, in order (none lost while a shot picks its fr
   const inbox = () => net.uploads.filter(u => u.path.includes('/photos/inbox/')).map(u => u.path.slice(-7));
   await expect.poll(inbox, { timeout: 15000 }).toEqual(['001.jpg', '002.jpg', '003.jpg', '004.jpg']);
 });
+
+test('the live picture never changes size while you work (a longer message, the Previous recipe button, a wrapped count)', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await page.click('nav [data-panel="recipes"]'); await page.click('#r-add');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  const box = () => page.evaluate(() => { const r = document.querySelector('.cam-view').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.height)]; });
+  const start = await box();
+  await page.click('#cam-shutter'); await page.waitForTimeout(500); expect(await box()).toEqual(start);
+  await page.click('#cam-next'); await page.click('#cam-shutter'); await page.waitForTimeout(500);   // Previous recipe appears
+  await expect(page.locator('#cam-prevrec')).toBeVisible(); expect(await box()).toEqual(start);
+  await page.evaluate(() => { document.getElementById('cam-msg').textContent = 'That one looks blurry. Tap ↺ Redo last to take it again. And a much longer second sentence that would wrap onto more lines than before.'; });
+  expect(await box()).toEqual(start);
+});
+
+test('"Camera app": a photo from the phone’s own camera is named, counted and sent like a tap on the shutter', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await page.click('nav [data-panel="recipes"]'); await page.click('#r-add');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  const jpg = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = 600; c.height = 800; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 600, 800); x.fillStyle = '#000'; x.fillText('recipe', 50, 50);
+    const b = await new Promise(r => c.toBlob(r, 'image/jpeg')); return Array.from(new Uint8Array(await b.arrayBuffer())); });
+  await page.click('#cam-shutter');
+  await page.setInputFiles('#cam-native-file', { name: 'IMG_1.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(jpg) });
+  const inbox = () => net.uploads.filter(u => u.path.includes('/photos/inbox/') && u.path.endsWith('.jpg')).map(u => u.path.split('/').pop());
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(2);
+  expect(inbox()[1]).toMatch(/ Recipe-1 recipe 002\.jpg$/);
+  await expect(page.locator('#cam-count')).toContainText('2 pages of Recipe 1');
+});
