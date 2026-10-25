@@ -1,6 +1,6 @@
 // The Recipes tab: typed recipes, search (Anything / Name / Ingredient), sync of recipes.json (never a blind
 // overwrite), scaling, timers, the cookbook link both ways, links (read by the friends service, or waiting for Claude),
-// recipe photos (camera in recipe mode), grocery list, delete.
+// recipe photos (camera in recipe mode), delete.
 const { test, expect } = require('@playwright/test');
 const { mockNet, openApp, click } = require('./helpers');
 
@@ -175,12 +175,10 @@ test('photograph recipes: pages of one recipe share a name; "Next recipe" starts
   await page.click('#cam-finish');
 });
 
-test('grocery list from a recipe; delete reaches other phones as a tombstone', async ({ page }) => {
+test('delete reaches other phones as a tombstone', async ({ page }) => {
   const net = await mockNet(page); seedRemote(net, [ROLLS]); await openApp(page, { dropbox: true });
   await openRecipes(page); await page.click('#r-results .rc-item');
-  await page.click('#rc-scale [data-k="2"]'); await page.click('#rc-groc');
-  await expect(page.locator('#mi-list .mi-item')).toHaveCount(3);
-  await page.click('#mi-close'); await page.click('#rc-close');
+  await page.click('#rc-close');
   await page.click('#r-results .rc-item');
   page.once('dialog', d => d.accept());
   await page.click('#rc-del');
@@ -295,14 +293,4 @@ test('time filter keeps recipes made within the chosen minutes', async ({ page }
   await expect(page.locator('#r-results .rc-item')).toHaveCount(1);
   await page.evaluate(()=>{ rui.time='90'; renderRecipes(); });
   await expect(page.locator('#r-results .rc-item')).toHaveCount(2);
-});
-
-test('recipe 🛒 opens a tick-list popup and saves nothing', async ({ page }) => {
-  await mockNet(page); await openApp(page);
-  await page.evaluate(()=>{ rstore.recipes=[{id:'a',title:'Toast',updatedAt:Date.now(),addedAt:1,ingredients:['2 eggs','1 cup milk'],steps:['y']}]; renderRecipes(); openRecipe('a'); });
-  await page.evaluate(()=>document.getElementById('rc-groc').click());
-  await expect(page.locator('#mi-bg')).toHaveClass(/open/);
-  await expect(page.locator('#mi-list .mi-item')).toHaveCount(2);
-  await expect(page.locator('#mi-add')).toBeHidden();
-  expect(await page.evaluate(()=>grocery().length)).toBe(0);
 });
