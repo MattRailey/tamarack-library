@@ -52,14 +52,12 @@ test('tap, tap, tap: photos go in order; redo replaces the last; next bookcase s
   await expect(page.locator('#ph-done')).toContainText('Den N2 · 1');
 });
 
-test('Change opens the same pop-up; Cancel leaves it as it was; a camera opened with no bookcase asks first', async ({ page }) => {
+test('Change opens the same pop-up; Cancel leaves it as it was', async ({ page }) => {
   const net = await mockNet(page); await openApp(page, { dropbox: true });
   await click(page, '#btn-photos'); await page.waitForSelector('#ph-bg.open');
-  await page.fill('#ph-room', 'Den'); await page.fill('#ph-case', '');
+  await page.fill('#ph-room', 'Den'); await page.fill('#ph-case', 'Tall oak');
   await click(page, '#ph-cam');
-  await expect(page.locator('#cam-ask')).toBeVisible({ timeout: 15000 });
-  await expect(page.locator('#ca-title')).toHaveText('Which bookcase are you photographing?');
-  await page.fill('#ca-case', 'Tall oak'); await page.click('#ca-start');
+  await page.waitForSelector('#cam-bg.open');
   await expect(page.locator('#cam-where-txt')).toHaveText('Den · Tall oak');
   await page.click('#cam-change');
   await expect(page.locator('#ca-title')).toHaveText('Change room or bookcase');
@@ -69,4 +67,44 @@ test('Change opens the same pop-up; Cancel leaves it as it was; a camera opened 
   await page.click('#cam-next');
   await expect(page.locator('#ca-case')).toHaveValue('');
   await page.click('#ca-cancel');
+});
+
+test('Send photos works with no room or bookcase: no pop-up, photos go as no-room no-bookcase; a place can be set later', async ({ page }) => {
+  const net = await mockNet(page); await openApp(page, { dropbox: true });
+  await click(page, '#btn-photos'); await page.waitForSelector('#ph-bg.open');
+  await page.fill('#ph-room', 'Den'); await page.fill('#ph-case', 'N1');
+  await click(page, '#ph-noloc');                       // "Clear the place"
+  await expect(page.locator('#ph-room')).toHaveValue(''); await expect(page.locator('#ph-case')).toHaveValue('');
+  await click(page, '#ph-cam');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  await expect(page.locator('#cam-ask')).toBeHidden();                      // it does not ask first
+  await expect(page.locator('#cam-where-txt')).toHaveText('no location yet');
+  await expect(page.locator('#cam-next')).toBeHidden();                     // nothing to "finish with"
+  await page.click('#cam-shutter');
+  const inbox = () => net.uploads.filter(u => u.path.includes('/photos/inbox/'));
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(1);
+  expect(inbox()[0].path).toMatch(/^\/Railey Library\/photos\/inbox\/\d{4}-\d\d-\d\d \d{6} no-room no-bookcase shelf 001\.jpg$/);
+  await expect(page.locator('#cam-count')).toContainText('1 of these (no location yet)');
+  // it is known after all: Change → Start sets a place; "No location yet" in the pop-up puts it back
+  await page.click('#cam-change');
+  await expect(page.locator('#ca-none')).toBeVisible();
+  await page.fill('#ca-room', 'Den'); await page.fill('#ca-case', 'N1'); await page.click('#ca-start');
+  await expect(page.locator('#cam-ask')).toBeHidden();
+  await expect(page.locator('#cam-where-txt')).toHaveText('Den · N1');
+  await page.click('#cam-change'); await expect(page.locator('#ca-none')).toBeVisible(); await page.click('#ca-none');
+  await expect(page.locator('#cam-ask')).toBeHidden();
+  await expect(page.locator('#cam-where-txt')).toHaveText('no location yet');
+  await page.click('#cam-shutter');
+  await expect.poll(() => inbox().length, { timeout: 10000 }).toBe(2);
+  expect(inbox()[1].path).toMatch(/ no-room no-bookcase shelf 002\.jpg$/);   // back to "no location": its numbering carries on (no name clash)
+});
+
+test('Recheck shelves still needs the bookcase (the pop-up has no "No location yet")', async ({ page }) => {
+  await mockNet(page); await openApp(page, { dropbox: true });
+  await page.evaluate(() => openShelfCam({ room: '', bookcase: '', kind: 'recheck', build: false }));
+  await expect(page.locator('#cam-ask')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#ca-none')).toBeHidden();
+  await page.click('#ca-start');
+  await expect(page.locator('#ca-err')).toBeVisible();
 });

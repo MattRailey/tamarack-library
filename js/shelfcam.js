@@ -9,6 +9,9 @@
    No camera (or permission refused): falls back to the photo picker (opts.fallback()).
    The bookcase being photographed shows as a heading ("Photographing: Living room · N1"); "Change" and "Finished with
    N1 →" open a small pop-up (camAsk) that asks for the room and bookcase, the next one counted up (N1 → N2).
+   opts.optional (Send photos): the room and bookcase can stay empty. The camera opens straight to shooting, the heading
+   says "no location yet", and the photos are named "no-room no-bookcase" for Claude to place later. Setting a place
+   (Change) is still there when it is known. Setup and Recheck shelves keep asking: they need to know which bookcase.
    Redo last: the next shot replaces the last photo under the same name (Dropbox revision, or its place in the
    waiting queue). If that can't overwrite, it goes up as "NNN redo.jpg": a redo replaces the photo with that number.
    Part of the app's shared script scope: see DEVELOPER.md. */
@@ -36,21 +39,24 @@ async function openShelfCam(opts){
   if(!cam || !$('cam-bg').classList.contains('open')){ cam && cam.stream && cam.stream.getTracks().forEach(t=>t.stop()); return; }
   const v=$('cam-video'); v.srcObject=cam.stream; v.setAttribute('playsinline',''); try{ await v.play(); }catch(e){}
   // no place yet: ask for it before the first photo
-  if(cam && (!$('cam-room').value || !$('cam-case').value)) camChange('Which bookcase are you photographing?', $('cam-case').value);
+  if(cam && !opts.optional && (!$('cam-room').value || !$('cam-case').value)) camChange('Which bookcase are you photographing?', $('cam-case').value);
 }
-function camWhere(){ $('cam-where-txt').textContent=[$('cam-room').value, $('cam-case').value].filter(Boolean).join(' · ') || 'no bookcase yet'; }
+function camWhere(){ $('cam-where-txt').textContent=[$('cam-room').value, $('cam-case').value].filter(Boolean).join(' · ') || (cam && cam.opts.optional ? 'no location yet' : 'no bookcase yet'); }
 
 /* The pop-up: room + bookcase, Start / Cancel → { room, bookcase } or null. Works over the camera or the setup wizard. */
 function camAsk(title, room, bookcase){
   return new Promise(res=>{
+    const opt=!!(cam && cam.opts.optional);
     $('ca-title').textContent=title; $('ca-room').value=room||''; $('ca-case').value=bookcase||''; $('ca-err').classList.add('hide');
+    $('ca-none').classList.toggle('hide', !opt);
     $('cam-ask').classList.remove('hide');
     const f=(!room ? $('ca-room') : $('ca-case')); setTimeout(()=>{ f.focus(); if(f.value) f.select(); }, 50);
-    const done=v=>{ $('cam-ask').classList.add('hide'); $('ca-start').onclick=$('ca-cancel').onclick=null; $('ca-case').onkeydown=null; res(v); };
+    const done=v=>{ $('cam-ask').classList.add('hide'); $('ca-start').onclick=$('ca-cancel').onclick=$('ca-none').onclick=null; $('ca-case').onkeydown=null; res(v); };
     $('ca-cancel').onclick=()=>done(null);
+    $('ca-none').onclick=()=>done({ room:'', bookcase:'' });   // "I don't know where these go yet"
     $('ca-start').onclick=()=>{
       const r=$('ca-room').value.trim(), b=$('ca-case').value.trim();
-      if(!r || !b){ $('ca-err').textContent='Type the room and the bookcase name.'; $('ca-err').classList.remove('hide'); return; }
+      if(!opt && (!r || !b)){ $('ca-err').textContent='Type the room and the bookcase name.'; $('ca-err').classList.remove('hide'); return; }
       done({ room:r, bookcase:b });
     };
     $('ca-case').onkeydown=e=>{ if(e.key==='Enter') $('ca-start').onclick(); };
@@ -67,7 +73,7 @@ function camSetPlace(p){
 async function camChange(title, suggest){
   if(!cam) return;
   const p=await camAsk(title, $('cam-room').value, suggest);
-  if(p && cam){ camSetPlace(p); $('cam-msg').textContent='Now photographing '+p.bookcase+'.'; }
+  if(p && cam){ camSetPlace(p); $('cam-msg').textContent=p.bookcase ? 'Now photographing '+p.bookcase+'.' : 'No location: Claude will place these later.'; }
 }
 function camNoCamera(e){
   const why=e && e.name==='NotAllowedError' ? 'Camera permission was turned down.' : 'This browser can’t open the camera here.';
@@ -87,9 +93,10 @@ function closeShelfCam(silent, finished){
 function camCount(){
   if(!cam) return;
   const loc=camLoc(), here=(cam.cases.find(c=>c.room===loc.room && c.bookcase===loc.bookcase)||{}).n||0;
-  $('cam-count').textContent=(here?here+' of '+(loc.bookcase||'this bookcase'):'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':'');
+  $('cam-count').textContent=(here?here+' of '+(loc.bookcase||(cam.opts.optional?'these (no location yet)':'this bookcase')):'No photos yet')+(cam.sending?' · sending '+cam.sending+'…':'')+(cam.failed?' · '+cam.failed+' waiting for signal':'');
 }
-function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim(); $('cam-next').textContent='Finished with '+(bc||'this bookcase')+' →'; }
+function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim(); $('cam-next').textContent='Finished with '+(bc||'this bookcase')+' →';
+  $('cam-next').classList.toggle('hide', !cam.opts.build || (!!cam.opts.optional && !bc)); }   // no bookcase named: nothing to finish with
 
 /* One frame from the video at full size, shrunk to the usual shelf-photo size (photos.js PHOTO_SIZE). */
 function camGrab(){
@@ -103,7 +110,7 @@ function camGrab(){
 async function camShoot(){
   if(!cam) return;
   const loc=camLoc();
-  if(!loc.room || !loc.bookcase){ camChange('Which bookcase are you photographing?', loc.bookcase); return; }
+  if(!cam.opts.optional && (!loc.room || !loc.bookcase)){ camChange('Which bookcase are you photographing?', loc.bookcase); return; }
   $('cam-msg').textContent='';
   const blob=await camGrab(); if(!blob){ $('cam-msg').textContent='The camera isn’t ready yet. Try again in a second.'; return; }
   $('cam-flash').classList.remove('go'); void $('cam-flash').offsetWidth; $('cam-flash').classList.add('go');
