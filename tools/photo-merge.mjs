@@ -252,7 +252,7 @@ function listInbox(dir) {
   const out = [];
   for (const sub of ['inbox', 'identify']) {
     const d = path.join(dir, 'photos', sub); if (!fs.existsSync(d)) continue;
-    for (const f of fs.readdirSync(d).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) if (/\.jpe?g$/i.test(f)) out.push(sub === 'identify' ? 'identify/' + f : f);
+    for (const f of fs.readdirSync(d).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))) if (/\.jpe?g$/i.test(f) && !/ recipe( \d{2,3})?( redo)?\.jpe?g$/i.test(f)) out.push(sub === 'identify' ? 'identify/' + f : f);
   }
   return out;
 }
@@ -272,6 +272,8 @@ export function run(dir, readingsFile, opts = {}) {
   const conflicts = conflictedCopies(dir);
   if (!readingsFile) {
     out.push(waiting.length + ' photo(s) waiting in ' + path.join(dir, 'photos'));
+    const rc = fs.existsSync(path.join(dir, 'photos', 'inbox')) ? fs.readdirSync(path.join(dir, 'photos', 'inbox')).filter(f => / recipe( \d{2,3})?( redo)?\.jpe?g$/i.test(f)).length : 0;
+    if (rc) out.push(rc + ' recipe photo(s) too: those go through tools/recipe-merge.mjs');
     for (const f of waiting) out.push('  ' + (ledger.photos[f] ? '[done before] ' : '') + f);
     if (conflicts.length) out.push('Conflicted copies of the catalog (merged on the next --apply): ' + conflicts.join(', '));
     return { text: out.join('\n') };

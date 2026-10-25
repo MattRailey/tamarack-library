@@ -25,7 +25,7 @@ async function mockNet(page, opts = {}) {
       if (arg.path.endsWith('tamarack-library.json') && net.remote)
         return route.fulfill({ status: 200, body: JSON.stringify(net.remote), headers: { 'Dropbox-API-Result': JSON.stringify({ rev: 'r' + net.uploads.length }) } });
       const up = [...net.uploads].reverse().find(x => x.path === arg.path);
-      if (up) return route.fulfill({ status: 200, body: up.raw });
+      if (up) return route.fulfill({ status: 200, body: up.raw, headers: { 'Dropbox-API-Result': JSON.stringify({ rev: 'rev' + (net.uploads.indexOf(up) + 1) }), 'Access-Control-Expose-Headers': 'Dropbox-API-Result' } });
       return route.fulfill({ status: 409, body: '{}' });
     }
     if (u.includes('content.dropboxapi.com/2/files/upload')) {

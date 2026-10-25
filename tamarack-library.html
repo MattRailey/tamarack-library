@@ -38,6 +38,8 @@
 <script src="js/photos.js" defer></script>
 <script src="js/shelfcam.js" defer></script>
 <script src="js/recheck.js" defer></script>
+<script src="js/recipes.js" defer></script>
+<script src="js/cooking.js" defer></script>
 <script src="js/settings.js" defer></script>
 <script src="js/wizard.js" defer></script>
 <script src="js/admin.js" defer></script>
@@ -66,6 +68,7 @@
   <nav id="nav">
     <button data-panel="library" class="active">Library</button>
     <button data-panel="shelves">Shelves</button>
+    <button data-panel="recipes" id="nav-rec">Recipes</button>
     <button id="nav-epi" type="button">Epilogue</button>
   </nav>
   <main>
@@ -169,6 +172,40 @@
         </div>
       </div>
       <div id="shelf-tree"></div>
+    </section>
+
+    <!-- RECIPES -->
+    <section class="panel" id="recipes">
+      <h2>Recipes</h2>
+      <p class="sub">Family cards, cookbook pages and recipes from the web, all in one place. Search by name, or by what’s in the fridge.</p>
+      <div class="card search-card">
+        <div class="search-wrap">
+          <input type="search" id="r-q" placeholder="Search recipes…" autocomplete="off" enterkeyhint="search">
+          <button type="button" id="r-clear-q" class="clear-q hide" aria-label="Clear search">&times;</button>
+        </div>
+        <div class="search-row">
+          <div class="seg" id="r-scope"><button data-scope="all" class="active">Anything</button><button data-scope="title">Name</button><button data-scope="ing">Ingredient</button></div>
+          <div class="genre-acts">
+            <select id="r-cat" class="genre-main" aria-label="Kind of dish"><option value="">All kinds</option></select>
+            <button id="r-grocery" class="add-round scan-round secondary rc-groc-btn" aria-label="Grocery list" title="Grocery list">🛒<span class="rc-badge hide" id="r-groc-n"></span></button>
+            <button id="r-add" class="add-round" aria-label="Add recipe" title="Add recipe">+</button>
+          </div>
+        </div>
+        <div class="search-row rc-row2">
+          <div class="seg" id="r-show"><button data-show="" class="active">All</button><button data-show="fav">♥ Favorites</button><button data-show="want">Want to make</button></div>
+          <select id="r-sort" aria-label="Sort recipes"><option value="title">Sort: Name</option><option value="added">Sort: Recently added</option><option value="made">Sort: Recently made</option></select>
+        </div>
+      </div>
+      <div class="rc-quick" role="group" aria-label="Add a recipe">
+        <button class="secondary" id="rq-photo">📷 Photo</button><button class="secondary" id="rq-link">🔗 Link</button><button class="secondary" id="rq-book">📚 Cookbook</button><button class="secondary" id="rq-type">✍️ Type</button>
+      </div>
+      <div class="rc-urladd hide" id="r-urladd"></div>
+      <div class="filter-bar hide" id="r-filter-bar" role="status"></div>
+      <div class="note rc-waiting hide" id="r-waiting"></div>
+      <div class="note rc-waiting hide" id="r-status"></div>
+      <div class="note" id="r-summary" style="margin:0 0 8px;"></div>
+      <div id="r-results" class="rc-list"></div>
+      <input type="file" id="r-file" accept="image/*" multiple class="hide">
     </section>
 
     <!-- IMPORT -->
@@ -339,6 +376,15 @@
           <li><b>Split series</b> lists sets and series spread over more than one place, with where every book is.</li>
           <li><b>Loaned</b> lists every book that’s out, who has it and since when. Search it by book or by name.</li>
           <li><b>Recheck shelves</b>: when books have moved around, photograph a bookcase again. Claude moves each book to its new spot and never adds a second copy.</li>
+        </ul>
+        <h3>Recipes</h3>
+        <ul>
+          <li><b>Adding is quick.</b> Tap <b>+</b> and the camera opens: photograph the card or page (every page of it), tap <b>Next recipe →</b> for the next one, then <b>Done</b>. Claude reads them, splits out the ingredients and steps, and keeps the original photo with each recipe. Say “check the recipes” next time you chat.</li>
+          <li><b>From a website:</b> paste the link into the search box and tap <b>Add this recipe</b> (or <b>🔗 Link</b> → <b>Paste and add</b>). Most sites come straight in; any that can’t wait for Claude.</li>
+          <li><b>📚 Cookbook</b> asks which book (from your library) and the page, then opens the camera. The recipe links to the book, and the book shows its recipes.</li>
+          <li><b>Search</b> works like the library: <b>Ingredient</b> finds what you can make with what’s in the fridge (“chicken rice”).</li>
+          <li><b>🍳 Cook</b> shows one step at a time in big letters, keeps the screen on, and ticks off ingredients. <b>½× 2× 3×</b> scales the amounts. Any step with a time (“bake 25 minutes”) has a <b>⏱</b> button: timers run at the bottom of every screen and ring when done. On iPhone, keep the app open: a locked phone can’t ring, but a timer that ran out shows the moment you’re back.</li>
+          <li><b>♥ Favorite</b>, <b>Want to make</b>, <b>✓ Made it</b> (with a note for next time), <b>🛒 Grocery list</b>, <b>Share</b> and <b>Print</b> are on each recipe. Each library’s recipes are its own, private like its books.</li>
         </ul>
         <h3>Phones, computers and no signal</h3>
         <ul>
@@ -567,6 +613,125 @@
   </div>
 </div>
 
+<!-- a recipe: view, and the edit form -->
+<div class="modal-bg" id="rc-bg">
+  <div class="modal rc-modal" id="rc-modal" role="dialog" aria-modal="true" aria-labelledby="rc-title">
+    <button class="modal-close" id="rc-close" aria-label="Close">&times;</button>
+    <div class="rc-view">
+      <h3 id="rc-title" class="rc-h">Recipe</h3>
+      <div class="note rc-sub" id="rc-sub"></div>
+      <div class="rc-facts" id="rc-facts"></div>
+      <div class="chips" id="rc-tags"></div>
+      <p class="note rc-pending hide" id="rc-pending"></p>
+      <div class="row rc-acts">
+        <button id="rc-cook">🍳 Cook</button>
+        <button class="secondary rc-tog" id="rc-fav">♡ Favorite</button>
+        <button class="secondary rc-tog" id="rc-want">Want to make</button>
+        <button class="secondary" id="rc-madeit">✓ Made it</button>
+      </div>
+      <div class="rc-cols">
+        <div class="rc-ingcol">
+          <div class="rc-ing-h"><h4>Ingredients</h4><div class="seg rc-scale" id="rc-scale" aria-label="Servings"><button data-k="0.5">½×</button><button data-k="1" class="active">1×</button><button data-k="2">2×</button><button data-k="3">3×</button></div></div>
+          <div id="rc-ing" class="rc-ing"></div>
+        </div>
+        <div class="rc-stepcol"><h4>Steps</h4><div id="rc-steps"></div></div>
+      </div>
+      <div id="rc-notes" class="rc-notes"></div>
+      <div id="rc-made" class="rc-made"></div>
+      <div id="rc-photos"></div>
+      <div class="row rc-more">
+        <button class="secondary" id="rc-groc">🛒 Grocery list</button>
+        <button class="secondary" id="rc-share">Share</button>
+        <button class="secondary" id="rc-print">Print</button>
+        <button class="secondary" id="rc-edit">Edit</button>
+        <button class="danger" id="rc-del">Delete</button>
+      </div>
+    </div>
+    <div class="rc-form">
+      <h3 id="rc-form-h">Type in a recipe</h3>
+      <div class="grid">
+        <div style="grid-column:1/-1;"><label for="rf-title">Name</label><input id="rf-title" placeholder="e.g. Grandma’s cinnamon rolls"></div>
+        <div><label for="rf-from">From (who)</label><input id="rf-from" list="dl-rfrom" placeholder="e.g. Grandma Railey"></div>
+        <div><label for="rf-source">Where it’s from</label><select id="rf-source"><option value="card">Recipe card or sheet</option><option value="family">Family recipe</option><option value="cookbook">Cookbook</option><option value="web">Website</option><option value="magazine">Magazine or clipping</option><option value="other">Other</option></select></div>
+        <div id="rf-bookrow" class="hide" style="grid-column:1/-1;"><div class="grid" style="margin:0;"><div><label for="rf-book">Cookbook (from your library)</label><input id="rf-book" list="dl-rbook" placeholder="Start typing the title"></div><div><label for="rf-page">Page</label><input id="rf-page" inputmode="numeric"></div></div></div>
+        <div id="rf-urlrow" class="hide" style="grid-column:1/-1;"><label for="rf-url">Web address</label><input id="rf-url" type="url" placeholder="https://…"></div>
+        <div><label for="rf-servings">Serves / makes</label><input id="rf-servings" placeholder="e.g. 6, or 2 dozen"></div>
+        <div><label for="rf-cat">Kind</label><input id="rf-cat" list="dl-rcat" placeholder="e.g. Dessert"></div>
+        <div><label for="rf-prep">Prep time</label><input id="rf-prep" placeholder="e.g. 20 min"></div>
+        <div><label for="rf-cook">Cook time</label><input id="rf-cook" placeholder="e.g. 45 min"></div>
+        <div><label for="rf-total">Total time</label><input id="rf-total" placeholder="e.g. 1 hr 5 min"></div>
+        <div><label for="rf-tags">Tags</label><input id="rf-tags" placeholder="e.g. Christmas, kids"></div>
+        <div style="grid-column:1/-1;"><label for="rf-ing">Ingredients <span class="note">(one per line; a line ending in “:” is a heading, like “For the crust:”)</span></label><textarea id="rf-ing" rows="8"></textarea></div>
+        <div style="grid-column:1/-1;"><label for="rf-steps">Steps <span class="note">(one per line, in order; times like “bake 25 minutes” get a timer)</span></label><textarea id="rf-steps" rows="8"></textarea></div>
+        <div style="grid-column:1/-1;"><label for="rf-notes">Notes</label><textarea id="rf-notes" rows="3" placeholder="e.g. less sugar next time"></textarea></div>
+      </div>
+      <div class="row" style="margin-top:14px;"><button id="rf-save">Save recipe</button><button class="secondary" id="rf-cancel">Cancel</button><button class="danger hide" id="rf-del" style="margin-left:auto;">Delete</button></div>
+    </div>
+  </div>
+</div>
+<div class="modal-bg rcp-bg" id="rcp-bg"><img id="rcp-img" alt="Original recipe photo"></div>
+
+<!-- add a recipe -->
+<div class="modal-bg" id="ra-bg">
+  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="ra-h">
+    <button class="modal-close" id="ra-close" aria-label="Close">&times;</button>
+    <h3 id="ra-h">Add recipes</h3>
+    <div id="ra-menu" class="ra-menu">
+      <button class="wz-opt" data-ra="scan"><b>📷 Photograph recipes</b><span>Recipe cards, loose sheets, cookbook pages, clippings. Claude reads them and splits out the ingredients and steps.</span></button>
+      <button class="wz-opt" data-ra="link"><b>🔗 From a website</b><span>Paste a link. Most recipe sites come in right away; any that can’t wait for Claude.</span></button>
+      <button class="wz-opt" data-ra="type"><b>✍️ Type it in</b><span>For the ones you know by heart.</span></button>
+    </div>
+    <div id="ra-scan" class="hide">
+      <p class="note" style="margin-top:0;">Photograph each recipe, every page of it. Tap <b>Next recipe →</b> between recipes so the pages stay together. Claude adds them next time you say “check the recipes”, and keeps the original photo with each one.</p>
+      <div class="grid">
+        <div><label for="ra-scan-src">What are they?</label><select id="ra-scan-src"><option value="card">Recipe cards or sheets</option><option value="family">Family recipes</option><option value="cookbook">Pages from a cookbook</option><option value="magazine">Magazine or clippings</option><option value="other">Other</option></select></div>
+        <div><label for="ra-from">From (optional)</label><input id="ra-from" list="dl-rfrom" placeholder="e.g. Grandma Railey"></div>
+        <div id="ra-bookrow" class="hide" style="grid-column:1/-1;"><div class="grid" style="margin:0;"><div><label for="ra-book">Cookbook</label><input id="ra-book" list="dl-rbook" placeholder="Start typing the title"></div><div><label for="ra-page">Page (optional)</label><input id="ra-page" inputmode="numeric"></div></div></div>
+      </div>
+      <div class="row" style="margin-top:12px;"><button id="ra-cam">📷 Open camera</button><button class="secondary" id="ra-pick">Choose photos</button></div>
+      <label class="check" style="margin-top:8px;"><input type="checkbox" id="ra-onefile"> The photos I choose are pages of one recipe</label>
+      <p class="note"><a href="#" onclick="rAddView('menu');return false;">← Other ways</a></p>
+    </div>
+    <div id="ra-link" class="hide">
+      <label for="ra-url">Web address</label>
+      <input id="ra-url" type="url" inputmode="url" autocomplete="off" placeholder="Paste the recipe’s link">
+      <div class="row" style="margin-top:12px;"><button id="ra-paste">📋 Paste and add</button><button class="secondary" id="ra-link-go">Add recipe</button></div>
+      <p class="note">Most recipe sites include a clean copy of the recipe in the page, and it comes straight in. If a site doesn’t (or you’re offline), the link is saved and Claude fills it in next time you ask.</p>
+      <p class="note"><a href="#" onclick="rAddView('menu');return false;">← Other ways</a></p>
+    </div>
+    <p class="note" id="ra-msg"></p>
+  </div>
+</div>
+
+<!-- grocery list -->
+<div class="modal-bg" id="gr-bg">
+  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="gr-h">
+    <button class="modal-close" id="gr-close" aria-label="Close">&times;</button>
+    <h3 id="gr-h">Grocery list</h3>
+    <p class="note" style="margin-top:0;">Tick off what you already have or have bought. The list stays on this phone.</p>
+    <div id="gr-list"></div>
+    <div class="row" style="margin-top:12px;"><button id="gr-share">Share or copy list</button><button class="secondary" id="gr-clear-done">Remove ticked</button><button class="secondary" id="gr-clear-all">Empty list</button></div>
+  </div>
+</div>
+
+<!-- cooking view -->
+<div class="modal-bg ck-bg" id="ck-bg">
+  <div class="ck" role="dialog" aria-modal="true" aria-labelledby="ck-title">
+    <div class="ck-top"><h3 id="ck-title">Cooking</h3><button class="modal-close" id="ck-close" aria-label="Close">&times;</button></div>
+    <div class="row ck-bar"><div class="seg" id="ck-tabs"><button data-ck="ing">Ingredients</button><button data-ck="steps" class="active">Steps</button></div>
+      <div class="seg" id="ck-scale" aria-label="Servings"><button data-k="0.5">½×</button><button data-k="1" class="active">1×</button><button data-k="2">2×</button><button data-k="3">3×</button></div></div>
+    <div class="ck-body">
+      <div class="ck-ingw"><div id="ck-ing"></div></div>
+      <div class="ck-stepw"><div id="ck-step" class="ck-step"></div>
+        <div class="row ck-nav"><button class="secondary" id="ck-prev">← Back</button><button id="ck-next">Next step →</button></div></div>
+    </div>
+    <p class="note ck-awake" id="ck-awake"></p>
+  </div>
+</div>
+
+<!-- running timers, on every screen -->
+<div class="tm-dock hide" id="tm-dock" aria-live="polite"></div>
+
 <!-- unidentified walk-through -->
 <div class="modal-bg" id="walk-bg">
   <div class="modal wk-modal">
@@ -577,6 +742,7 @@
     <input type="file" id="wa-file" accept="image/*" capture="environment" class="hide">
   </div>
 </div>
+<datalist id="dl-rcat"></datalist><datalist id="dl-rfrom"></datalist><datalist id="dl-rbook"></datalist>
 <datalist id="dl-coll"></datalist><datalist id="dl-room"></datalist><datalist id="dl-case"></datalist><datalist id="dl-shelf"></datalist>
 <datalist id="dl-author"></datalist><datalist id="dl-series"></datalist><datalist id="dl-genre"></datalist><datalist id="dl-loan"></datalist>
 <!-- shelf camera: stays open, one tap = one photo -->

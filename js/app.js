@@ -12,6 +12,7 @@ function showPanel(p){
   $('nav-epi').classList.toggle('active', p==='import'||p==='data'||p==='help');
   document.querySelectorAll('.panel').forEach(s=>s.classList.toggle('active', s.id===p));
   if(p==='shelves') renderShelves();
+  if(p==='recipes') renderRecipes();
   if(p==='data'){ renderData(); fillCfgForm(); renderAdmin(); }
   if(p==='import'||p==='data'||p==='help') ui.appx=p;
   if(p==='import'){ renderUndo(); showIE(IE_TABS.includes(ui.ie)?ui.ie:'import'); }
@@ -37,6 +38,7 @@ function refreshAll(){
   refreshLists();
   renderLibrary(false);
   if($('shelves').classList.contains('active')) renderShelves();
+  if($('recipes').classList.contains('active')) renderRecipes();
   if($('data').classList.contains('active')) renderData();
   if($('import').classList.contains('active')){ renderUndo(); renderIE(IE_TABS.find(k=>!$('ie-'+k).classList.contains('hide'))); }
 }
@@ -50,6 +52,7 @@ refreshLists();
 renderLibrary(true);
 showPanel(ui.panel || 'library');
 renderDbxCard();
+rLoadLocal(); renderTimers();
 loadFromIdb().then(()=>dbxHandleRedirect()).then(()=>{ if(lsGet(STORE_KEY)) writeLocal(); renderDbxCard(); setSync('', cloudOn() ? 'Connecting…' : 'Local only (Dropbox not connected)'); syncNow(); wizardBoot(); renderHomeBanner(); setTimeout(()=>retryPhotos(true), 4000); });
 window.addEventListener('online', ()=>{ syncNow(); setTimeout(fillPendingIsbns, 1000); if($('scan-bg').classList.contains('open')) syncScanMode(); });
 window.addEventListener('offline', ()=>{ if(cloudOn()) setSync('warn','Offline — changes are saved on this phone and sync when you’re back online'); if($('scan-bg').classList.contains('open')) syncScanMode(); });

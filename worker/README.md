@@ -97,6 +97,12 @@ Other commands:
 
 Their photos land in `Dropbox/Apps/Tamarack Friends/<Library>/photos/inbox/`. Link that folder (or `Tamarack Friends`) in a Claude session and say *"check the photo inbox for the Smith Library."* It's the same workflow as Railey Library: read the photos, update `tamarack-library.json`, log to `imports/`, delete the photos.
 
+## Recipes
+
+Each library's recipes are in `<Library>/recipes.json` (private to that library, like its catalog) with the original photos in `<Library>/recipes/`. Recipe photos land in the same `photos/inbox/`; say *"check the recipes for the Smith Library"* and Claude uses `tools/recipe-merge.mjs` (see DEVELOPER.md, "Recipes").
+
+**Links:** the app asks the service's `/recipe/fetch` to read the recipe a web page carries for search engines. It sends back only the recipe, never the page, and keeps nothing. Anyone can ask from the app's web address (your own Dropbox library has no device key), so it's held back by limits: `FETCH_LIMIT` (10 a minute per address) and `FETCH_ALL` (60 a minute in all) in `wrangler.toml`. Only public `http(s)` addresses; each redirect is checked; 10 seconds and 3 MB at most. **After pulling this change, run `npx wrangler deploy` once** in `worker/`, or links wait for Claude instead of coming in straight away, and friends' phones can't sync recipes.
+
 ## Getting a notice when photos arrive (optional, 5 minutes)
 
 The service can ping your phone when a friend's photos start arriving (at most once an hour per library), and right away if its Dropbox sign-in stops working.
@@ -110,7 +116,8 @@ The admin box (Invite a friend) also shows when each library last sent photos an
 - **Sizes**: a photo up to 8 MB (the app sends 2–4 MB), a cover photo up to 1.5 MB, the catalog up to 25 MB.
 - **About 600 photos or covers a day per library.** Counted in the service's memory, so it's rough: it resets when Cloudflare restarts the service, and retries count too.
 - **Codes are 5 digits** (easy to type), so guessing is held back: codes expire (invites 30 days, *Add another phone* 14, the iPhone Home Screen code 2), one address gets 10 tries a minute (`JOIN_LIMIT`), and more than 30 wrong codes a minute from anywhere (`JOIN_FAIL`) closes joining for 10 minutes and sends you a notice. Older 8-letter codes keep working until they expire.
-- **Daily catalog backup**: before the first save each day, the service copies the catalog to `<Library>/backups/tamarack-library-slot-NN.json` (14 slots, overwritten in turn, so the last two weeks are kept). Phones can't reach `backups/`. No extra Dropbox permission is needed.
+- **Daily catalog backup**: before the first save each day, the service copies the catalog to `<Library>/backups/tamarack-library-slot-NN.json` (14 slots, overwritten in turn, so the last two weeks are kept), and `recipes.json` the same way to `recipes-slot-NN.json`. Phones can't reach `backups/`. No extra Dropbox permission is needed.
+- **Recipes**: a phone can read and save its own library's `recipes.json` (revision-checked, must be a recipe file, up to 25 MB) and read its `recipes/` photos; it can't write to `recipes/`.
 - **Logs**: `[observability]` is on, so Cloudflare's dashboard shows each request (Workers → tamarack-friends → Observability).
 
 ## Runbook

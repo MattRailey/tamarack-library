@@ -27,8 +27,11 @@
 
    Endpoints (all POST):
      /join                 { code, device }            → { token, lib, title, device }
-     /files/download       X-Path                      → file bytes, X-Rev header        (catalog, covers/)
-     /files/upload         X-Path, X-Mode, X-Autorename, body → { path, rev }            (catalog, covers/, photos/…)
+     /files/download       X-Path                      → file bytes, X-Rev header        (catalog, recipes.json, covers/, recipes/)
+     /files/upload         X-Path, X-Mode, X-Autorename, body → { path, rev }            (catalog, recipes.json, covers/, photos/…)
+     /recipe/fetch         { url }  (device key optional; the app's own web address only)  → { recipe } | { none }
+                                                   reads the recipe a web page carries for search engines (schema.org Recipe, JSON-LD)
+     FETCH_LIMIT, FETCH_ALL (bindings, optional)  rate limiters for /recipe/fetch: per address, and in all
      /invite               (device) { handoff? }       → { code, link, expires }         "add another phone"; handoff:
                                                          the Home Screen app takes this phone's place when it joins
      /leave                (device)                    → { left }                        "Remove this phone"
@@ -41,8 +44,9 @@
 */
 
 const CATALOG = 'tamarack-library.json';
+const RECIPES = 'recipes.json';         // the library's recipes: private to the library, like its catalog
 const UPLOAD_DIRS = ['photos/inbox/', 'photos/identify/', 'covers/'];
-const DOWNLOAD_DIRS = ['covers/'];
+const DOWNLOAD_DIRS = ['covers/', 'recipes/'];   // recipes/: the original card / page photos (Claude puts them there)
 const MAX_PHOTO = 8 * 1024 * 1024;      // one photo (the app sends 3600 px JPEGs, about 2-4 MB)
 const MAX_COVER = 1.5 * 1024 * 1024;    // one cover photo
 const MAX_NOTE = 64 * 1024;             // a NOTE.txt beside photos
@@ -90,6 +94,7 @@ async function route(req, env, ctx) {
     return join(req, env);
   }
   if (p.startsWith('/admin/')) { await adminAuth(req, env); return admin(p, req, env); }
+  if (p === '/recipe/fetch') return recipeFetch(req, env);
   const dev = await deviceAuth(req, env, ctx);
   if (p === '/whoami') return json({ lib: dev.lib, name: dev.name, id: dev.id });
   if (p === '/invite') {   // one open "add another phone" code per phone: a new one replaces the last
@@ -287,6 +292,7 @@ function checkPath(env, raw, dev, dirs, allowCatalog) {
   // plain printable ASCII only, and no name part that is "." / ".." or ends in a dot or space (Windows/Dropbox trim those)
   if (!rest || rest.length > 200 || !/^[\x20-\x7e]+$/.test(rest) || /\\/.test(rest) || rest.split('/').some(seg => !seg || /[. ]$/.test(seg))) throw err(400, 'bad path');
   if (allowCatalog && rest === CATALOG) return { path, real: root(env) + path, rest, kind: 'catalog' };
+  if (allowCatalog && rest === RECIPES) return { path, real: root(env) + path, rest, kind: 'recipes' };
   const dir = dirs.find(d => rest.startsWith(d) && rest.length > d.length && !rest.slice(d.length).includes('/'));
   if (!dir) throw err(403, 'that file is off-limits');
   const name = rest.slice(dir.length);
@@ -309,17 +315,18 @@ async function download(req, env, dev) {
 }
 async function upload(req, env, dev, ctx) {
   const { real, rest, kind } = checkPath(env, req.headers.get('X-Path'), dev, UPLOAD_DIRS, true);
-  const isCatalog = kind === 'catalog';
-  const limit = { catalog: MAX_CATALOG, photo: MAX_PHOTO, cover: MAX_COVER, note: MAX_NOTE }[kind];
+  const isCatalog = kind === 'catalog' || kind === 'recipes';
+  const limit = { catalog: MAX_CATALOG, recipes: MAX_CATALOG, photo: MAX_PHOTO, cover: MAX_COVER, note: MAX_NOTE }[kind];
   if (+(req.headers.get('Content-Length') || 0) > limit) throw err(413, 'That file is too big to send.');   // refuse before reading it
   if (!isCatalog && !allowUpload(dev.lib)) throw err(429, 'Too many photos today. Try again tomorrow, or ask Matt.');
   const body = await req.arrayBuffer();
   if (body.byteLength > limit) throw err(413, 'That file is too big to send.');
   if (isCatalog) {
-    try { const s = JSON.parse(new TextDecoder().decode(body)); if (!s || !Array.isArray(s.books)) throw 0; }
-    catch (e) { throw err(400, 'not a library file'); }
-    // once a day, before the first save: a copy of the catalog as it was (backups/, which no phone can reach)
-    try { await snapshot(env, dev.lib); } catch (e) {}
+    const list = kind === 'recipes' ? 'recipes' : 'books';
+    try { const s = JSON.parse(new TextDecoder().decode(body)); if (!s || !Array.isArray(s[list])) throw 0; }
+    catch (e) { throw err(400, kind === 'recipes' ? 'not a recipe file' : 'not a library file'); }
+    // once a day, before the first save: a copy of the file as it was (backups/, which no phone can reach)
+    try { await snapshot(env, dev.lib, kind === 'recipes' ? RECIPES : CATALOG); } catch (e) {}
   } else if (kind === 'note') {
     try { new TextDecoder('utf-8', { fatal: true }).decode(body); } catch (e) { throw err(415, 'Only photos can be sent here'); }
   } else if (!isImage(new Uint8Array(body))) throw err(415, 'Only photos can be sent here');
@@ -347,17 +354,18 @@ function isImage(b) {
 }
 // Daily snapshot: 14 rotating slots (backups/tamarack-library-slot-NN.json), overwritten in turn, so nothing needs
 // deleting (the Dropbox app only needs files.content.write). The slot is the day number mod 14; its Dropbox date says when.
-async function snapshot(env, lib) {
+async function snapshot(env, lib, file = CATALOG) {
   const day = new Date().toISOString().slice(0, 10);
-  if ((await env.LIBS.get('snap:' + lib)) === day) return;
+  const key = (file === CATALOG ? 'snap:' : 'snaprc:') + lib, stem = file.replace(/\.json$/, '');
+  if ((await env.LIBS.get(key)) === day) return;
   const base = root(env) + '/' + lib + '/';
-  const cur = await dbx(env, 'https://content.dropboxapi.com/2/files/download', { 'Dropbox-API-Arg': dbxArg({ path: base + CATALOG }) });
+  const cur = await dbx(env, 'https://content.dropboxapi.com/2/files/download', { 'Dropbox-API-Arg': dbxArg({ path: base + file }) });
   if (!cur.ok) return;   // no catalog yet: nothing to keep; the next save today tries again
   const slot = String(Math.floor(Date.now() / 864e5) % BACKUP_SLOTS).padStart(2, '0');
   const up = await dbx(env, 'https://content.dropboxapi.com/2/files/upload',
-    { 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': dbxArg({ path: base + 'backups/tamarack-library-slot-' + slot + '.json', mode: { '.tag': 'overwrite' }, autorename: false, mute: true }) },
+    { 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': dbxArg({ path: base + 'backups/' + stem + '-slot-' + slot + '.json', mode: { '.tag': 'overwrite' }, autorename: false, mute: true }) },
     await cur.arrayBuffer());
-  if (up.ok) await env.LIBS.put('snap:' + lib, day, { expirationTtl: 3 * 86400 });
+  if (up.ok) await env.LIBS.put(key, day, { expirationTtl: 3 * 86400 });
 }
 // Photos arrived: tell Matt (ntfy), at most once an hour per library, and note the time for the admin list
 async function photosArrived(env, lib) {
@@ -428,4 +436,120 @@ function fmtCode(c) { return /^\d+$/.test(c) ? c : c.slice(0, 4) + '-' + c.slice
 function cleanLib(s) { const v = String(s || '').replace(/[\\/\x00-\x1f:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); return v && v !== '.' && v !== '..' ? v : ''; }
 function dbxArg(o) { return JSON.stringify(o).replace(/[\u007f-￿]/g, c => '\\u' + ('000' + c.charCodeAt(0).toString(16)).slice(-4)); }
 
-export const _test = { checkPath, normCode, cleanLib, isImage, resetToken: () => { _tok = null; _count.clear(); } };
+export const _test = { extractRecipe, publicUrl,  checkPath, normCode, cleanLib, isImage, resetToken: () => { _tok = null; _count.clear(); _fetchCount.clear(); } };
+
+/* ---------------- a recipe from a web page ----------------
+   Most recipe sites put a clean copy of the recipe in the page for search engines (schema.org "Recipe", as JSON-LD).
+   This reads only that, and sends back only the recipe (never the page). Who may ask: the app's own web address
+   (ALLOWED_ORIGINS), with or without a device key, so Matt's own-Dropbox library can use it too. A script can fake
+   the web address, so this is held back by limits rather than a key: FETCH_LIMIT (10 a minute per address) and
+   FETCH_ALL (60 a minute in all) when set in wrangler.toml, else about 60 an hour per Worker instance. Only http(s)
+   to a named public host, every redirect checked (3 at most); 10 s and 3 MB at most, read in pieces. Nothing stored. */
+const FETCH_PER_HOUR = 60;
+const _fetchCount = new Map();
+function allowFetch(ip) {
+  const hour = Math.floor(Date.now() / 3600e3), k = hour + '|' + ip;
+  if (_fetchCount.size > 2000) for (const key of _fetchCount.keys()) if (!key.startsWith(hour + '|')) _fetchCount.delete(key);
+  const n = (_fetchCount.get(k) || 0) + 1; _fetchCount.set(k, n); return n <= FETCH_PER_HOUR;
+}
+function publicUrl(raw) {
+  let u; try { u = new URL(String(raw || '').trim()); } catch (e) { return null; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return null;
+  const h = u.hostname.toLowerCase().replace(/\.+$/, '');
+  if (/(^|\.)(nip\.io|sslip\.io|xip\.io|localtest\.me|lvh\.me)$/.test(h) || /(^|[.-])\d{1,3}[.-]\d{1,3}[.-]\d{1,3}[.-]\d{1,3}([.-]|$)/.test(h)) return null;
+  if (!h.includes('.') || /^[\d.]+$/.test(h) || h.includes(':') || h.startsWith('[') || /(^|\.)(localhost|local|internal|lan|home|test|invalid|example)$/.test(h)) return null;
+  if (u.port && !['80', '443'].includes(u.port)) return null;
+  return u;
+}
+async function recipeFetch(req, env) {
+  const origin = req.headers.get('Origin') || '';
+  if (!origin || !corsHeaders(origin, env)) throw err(403, 'not allowed');
+  const ip = req.headers.get('CF-Connecting-IP') || 'none';
+  if (env.FETCH_LIMIT && !(await env.FETCH_LIMIT.limit({ key: ip })).success) throw err(429, 'Too many links just now. Try again in a minute.');
+  if (env.FETCH_ALL && !(await env.FETCH_ALL.limit({ key: 'all' })).success) throw err(429, 'Too many links just now. Try again in a minute.');
+  if (!allowFetch(ip)) throw err(429, 'Too many links just now. Try again in a while.');
+  const body = await req.json().catch(() => ({}));
+  let u = publicUrl(body.url);
+  if (!u) throw err(400, 'That doesn’t look like a web page address.');
+  let html = '';
+  try {
+    let r = null;
+    for (let hop = 0; hop < 4; hop++) {   // follow redirects ourselves, checking each address
+      r = await fetch(u.toString(), { redirect: 'manual', signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TamarackLibrary/1.0; +https://mattrailey.github.io/tamarack-library/)', Accept: 'text/html,application/xhtml+xml' } });
+      if (r.status < 300 || r.status > 399) break;
+      const next = publicUrl(new URL(r.headers.get('Location') || '', u).toString());
+      if (!next || hop === 3) return json({ none: true });
+      u = next; r = null;
+    }
+    if (!r || !r.ok) return json({ none: true, why: r ? 'The site answered ' + r.status : '' });
+    if (+(r.headers.get('Content-Length') || 0) > 5e6) return json({ none: true, why: 'That page is too big' });
+    html = await readCapped(r, 3e6);
+  } catch (e) { return json({ none: true, why: 'Couldn’t reach that page' }); }
+  const recipe = extractRecipe(html);
+  return json(recipe ? { recipe } : { none: true });
+}
+// read a response in pieces and stop at max bytes (a huge or endless page can't fill the Worker's memory)
+async function readCapped(r, max) {
+  if (!r.body || !r.body.getReader) return new TextDecoder().decode((await r.arrayBuffer()).slice(0, max));
+  const reader = r.body.getReader(), parts = []; let n = 0;
+  while (n < max) { const { done, value } = await reader.read(); if (done) break; parts.push(value); n += value.length; }
+  try { await reader.cancel(); } catch (e) {}
+  const all = new Uint8Array(Math.min(n, max)); let o = 0;
+  for (const p of parts) { const take = Math.min(p.length, all.length - o); all.set(p.subarray(0, take), o); o += take; if (o >= all.length) break; }
+  return new TextDecoder().decode(all);
+}
+function extractRecipe(html) {
+  const re = /<script[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(String(html || '')))) {
+    let data; try { data = JSON.parse(m[1].trim().replace(/^<!\[CDATA\[|\]\]>$/g, '')); } catch (e) { continue; }
+    const node = findRecipeNode(data, 0); if (node) { const r = mapRecipe(node); if (r.title && r.ingredients.length) return r; }
+  }
+  return null;
+}
+function isType(n, t) { const x = n && n['@type']; return Array.isArray(x) ? x.some(y => String(y).toLowerCase() === t) : String(x || '').toLowerCase() === t; }
+function findRecipeNode(d, depth) {
+  if (!d || typeof d !== 'object' || depth > 6) return null;
+  if (Array.isArray(d)) { for (const x of d) { const f = findRecipeNode(x, depth + 1); if (f) return f; } return null; }
+  if (isType(d, 'recipe')) return d;
+  for (const k of ['@graph', 'mainEntity', 'mainEntityOfPage', 'itemListElement', 'item']) { const f = findRecipeNode(d[k], depth + 1); if (f) return f; }
+  return null;
+}
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', frac12: '½', frac14: '¼', frac34: '¾', deg: '°', ndash: '–', mdash: '—', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', hellip: '…' };
+function clean(s) {
+  return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ')
+    .replace(/&(#x?[0-9a-f]+|[a-z][a-z0-9]*);/gi, (a, e) => e[0] === '#' ? String.fromCodePoint(parseInt(e.slice(1).replace(/^x/i, ''), /^#x/i.test(e) ? 16 : 10) || 32) : (ENT[e.toLowerCase()] || a))
+    .replace(/\s+/g, ' ').trim();
+}
+function isoDur(s) {   // PT1H15M → "1 hr 15 min"
+  const m = String(s || '').match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i); if (!m) return clean(s);
+  const h = (+m[1] || 0) * 24 + (+m[2] || 0), mi = +m[3] || 0; if (!h && !mi) return '';
+  return [h ? h + ' hr' : '', mi ? mi + ' min' : ''].filter(Boolean).join(' ');
+}
+function steps(ins, out = []) {
+  if (!ins) return out;
+  if (typeof ins === 'string') { clean(ins).split(/\s*(?:\r?\n)+\s*|(?<=\.)\s+(?=\d+[.)]\s)/).map(x => x.replace(/^\d+[.)]\s*/, '').trim()).filter(Boolean).forEach(x => out.push(x)); return out; }
+  if (Array.isArray(ins)) { ins.forEach(x => steps(x, out)); return out; }
+  if (isType(ins, 'howtosection')) { const n = clean(ins.name); if (n) out.push('## ' + n); return steps(ins.itemListElement, out); }
+  const t = clean(ins.text || ins.name || ''); if (t) out.push(t);
+  return out;
+}
+function mapRecipe(n) {
+  const str = v => clean(Array.isArray(v) ? v.join(', ') : (v && typeof v === 'object' ? v.name || '' : v));
+  const img = (() => { let i = n.image; if (Array.isArray(i)) i = i[0]; if (i && typeof i === 'object') i = i.url || i['@id']; i = String(i || ''); return /^https:\/\//.test(i) ? i.slice(0, 500) : ''; })();
+  let yieldTxt = n.recipeYield; if (Array.isArray(yieldTxt)) yieldTxt = yieldTxt.find(y => /\D/.test(String(y))) || yieldTxt[0];
+  const kw = Array.isArray(n.keywords) ? n.keywords : String(n.keywords || '').split(',');
+  const author = Array.isArray(n.author) ? n.author.map(a => str(a)).filter(Boolean).join(', ') : str(n.author);
+  const out = {
+    title: clean(n.name).slice(0, 200), author: author.slice(0, 120), about: clean(n.description).slice(0, 600),
+    servings: clean(yieldTxt).slice(0, 60), prep: isoDur(n.prepTime), cook: isoDur(n.cookTime), total: isoDur(n.totalTime),
+    category: str(n.recipeCategory).split(',')[0].trim().slice(0, 60), cuisine: str(n.recipeCuisine).split(',')[0].trim().slice(0, 60),
+    tags: kw.map(clean).filter(Boolean).slice(0, 8),
+    ingredients: (Array.isArray(n.recipeIngredient) ? n.recipeIngredient : Array.isArray(n.ingredients) ? n.ingredients : []).map(clean).filter(Boolean).slice(0, 120),
+    steps: steps(n.recipeInstructions).slice(0, 120), image: img,
+  };
+  for (const k of Object.keys(out)) if (out[k] === '' || (Array.isArray(out[k]) && !out[k].length)) delete out[k];
+  if (!out.ingredients) out.ingredients = [];
+  return out;
+}
