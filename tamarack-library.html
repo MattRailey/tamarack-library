@@ -180,7 +180,7 @@
     <section class="panel" id="recipes">
       <h2>Recipes</h2>
       <p class="sub">Family cards, cookbook pages and recipes from the web, all in one place. Search by name, or by what’s in the fridge.</p>
-      <div class="rc-viewseg"><div class="seg" id="r-view"><button data-rv="recipes" class="active">Recipes</button><button data-rv="plan">📅 Meal plan</button></div></div>
+      <div class="rc-viewseg"><div class="seg" id="r-view"><button data-rv="recipes" class="active">Recipes</button><button data-rv="plan">📅 Meal plan</button><button data-rv="trips">🏕 Trips</button></div></div>
       <div id="r-recipes-view">
       <div class="card search-card">
         <div class="search-wrap">
@@ -223,6 +223,22 @@
           <button id="mp-ing" class="mp-ingbtn">🛒 Ingredients for this week</button>
         </div>
         <div id="mp-days" class="mp-days"></div>
+      </div>
+      <div id="r-trips-view" class="hide">
+        <div id="tr-list-pane">
+          <div class="card mp-head"><button id="tr-new">＋ Plan a trip</button><p class="note" style="margin:0;">Camping, a cabin weekend, a road trip: pick the days, choose what to cook for each meal, then get one shopping list for the whole trip.</p></div>
+          <div id="tr-list" class="tr-list"></div>
+        </div>
+        <div id="tr-detail-pane" class="hide">
+          <div class="card mp-head">
+            <div class="mp-nav"><button class="secondary" id="tr-back" aria-label="All trips">‹</button><b id="tr-title"></b><button class="secondary" id="tr-edit" aria-label="Change trip" style="font-size:.9rem;">Edit</button></div>
+            <div class="note" id="tr-sub" style="margin:0;text-align:center;"></div>
+            <div class="note" id="tr-notes" style="margin:0;white-space:pre-wrap;"></div>
+            <button id="tr-ing" class="mp-ingbtn">🛒 Ingredients for this trip</button>
+            <button id="tr-meals" class="secondary mp-ingbtn">📋 Meals to prepare</button>
+          </div>
+          <div id="tr-days" class="mp-days"></div>
+        </div>
       </div>
       <input type="file" id="r-file" accept="image/*" multiple class="hide">
     </section>
@@ -747,6 +763,28 @@
       <div><label for="mpq-people">People</label><input id="mpq-people" type="number" inputmode="numeric" min="1" max="60"></div>
     </div>
     <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="mpq-cancel">Cancel</button><button id="mpq-save">Add to the plan</button></div>
+  </div>
+</div>
+<!-- trips: add or change a trip -->
+<div class="modal-bg" id="trm-bg">
+  <div class="modal scan-modal mpq" role="dialog" aria-modal="true" aria-labelledby="trm-h">
+    <h3 id="trm-h">Plan a trip</h3>
+    <label for="trm-name">Trip</label><input id="trm-name" placeholder="Camping at Wallowa Lake" maxlength="60">
+    <div class="grid">
+      <div><label for="trm-start">First day</label><input id="trm-start" type="date"></div>
+      <div><label for="trm-days">Days</label><input id="trm-days" type="number" inputmode="numeric" min="1" max="21"></div>
+      <div><label for="trm-people">People</label><input id="trm-people" type="number" inputmode="numeric" min="1" max="60"></div>
+    </div>
+    <label for="trm-notes">Notes (optional)</label><textarea id="trm-notes" rows="3" placeholder="Campfire only, no fridge, bring the Dutch oven…"></textarea>
+    <div class="row" style="margin-top:14px;justify-content:space-between;"><button class="danger hide" id="trm-del">Delete trip</button><span class="row"><button class="secondary" id="trm-cancel">Cancel</button><button id="trm-save">Save</button></span></div>
+  </div>
+</div>
+<div class="modal-bg" id="trmenu-bg">
+  <div class="modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="trmenu-h">
+    <button class="modal-close" id="trmenu-close" aria-label="Close">&times;</button>
+    <h3 id="trmenu-h">Meals to prepare</h3>
+    <pre id="trmenu-text" class="tr-menu"></pre>
+    <div class="row" style="margin-top:12px;"><button id="trmenu-share">Share or copy</button></div>
   </div>
 </div>
 <!-- meal plan: the week's ingredients -->

@@ -830,3 +830,11 @@ button.linkish, button.linkish:hover{ background:none !important; border:none !i
 /* sharpest-frame shots: the shutter shows it's working; a blurry one is outlined */
 #cam-shutter.busy{ opacity:.6; transform:scale(.94); transition:transform .1s; }
 .cam-th.blurry{ outline:3px solid #e0a43a; outline-offset:-3px; }
+
+.tr-list{ display:flex; flex-direction:column; gap:8px; }
+.tr-card{ display:block; width:100%; text-align:left; background:#fffdf9; color:var(--ink); border:1px solid var(--line); border-radius:14px; padding:12px 14px; min-height:0; }
+.tr-card.past{ opacity:.65; }
+.tr-card b{ display:block; font-family:var(--serif); font-size:1.1rem; color:var(--navy); }
+.tr-card span{ display:block; font-size:.8rem; color:var(--steel); margin-top:2px; }
+.tr-menu{ white-space:pre-wrap; font-family:var(--sans); font-size:.9rem; line-height:1.5; margin:0; background:#fffdf9; border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+#trm-notes{ width:100%; }
