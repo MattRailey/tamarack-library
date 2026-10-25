@@ -16,7 +16,7 @@ const RUI_KEY='tamarack_library_recipes_ui'+LIB_NS;        // search scope, filt
 const GROC_KEY='tamarack_library_grocery'+LIB_NS;          // grocery list, kept on this phone
 const RCP_SOURCES={ card:'Recipe card or sheet', cookbook:'Cookbook', web:'Website', magazine:'Magazine or clipping', family:'Family recipe', other:'Other' };
 const RCP_ORDER=['id','title','from','source','bookId','bookTitle','page','url','author','servings','prep','cook','total','category','cuisine','tags',
-  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
+  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','reread','needsReview','addedAt','updatedAt'];
 
 function emptyRecipes(){ return { format:'tamarack-recipes', version:1, updatedAt:0, recipes:[] }; }
 function validRecipes(s){ return !!s && typeof s==='object' && Array.isArray(s.recipes); }
@@ -109,7 +109,7 @@ function lastMade(r){ const m=(r.made||[]).map(x=>x.date||'').sort(); return m[m
 function filteredRecipes(){
   let q=words($('r-q').value).split(' ').filter(Boolean);
   if(q.some(t=>!STOP.has(t))) q=q.filter(t=>!STOP.has(t));
-  const pool=liveRecipes().filter(r=>(!rui.show || (rui.show==='fav' ? r.favorite : rui.show==='want' ? r.want : true))
+  const pool=liveRecipes().filter(r=>(!rui.show || (rui.show==='fav' ? r.favorite : rui.show==='want' ? r.want : rui.show==='check' ? (r.needsReview && !r.pending) : true))
     && (!rui.cat || r.category===rui.cat) && (!rui.book || r.bookId===rui.book) && dietOk(r));
   const out=[];
   for(const fuzzy of [false, true]){
@@ -153,6 +153,9 @@ function renderRecipes(){
   $('r-q').placeholder={ all:'Search recipes…', title:'Search recipe names…', ing:'What’s in the fridge? e.g. chicken rice' }[rui.scope]||'Search recipes…';
   document.querySelectorAll('#r-scope button').forEach(b=>b.classList.toggle('active', b.dataset.scope===rui.scope));
   document.querySelectorAll('#r-show button').forEach(b=>b.classList.toggle('active', b.dataset.show===rui.show));
+  const nCheck=liveRecipes().filter(r=>r.needsReview && !r.pending).length;
+  $('r-show-check').textContent='Check this'+(nCheck?' ('+nCheck+')':'');
+  $('r-show-check').classList.toggle('hide', !nCheck && rui.show!=='check');
   const cats=uniq(liveRecipes().map(r=>r.category));
   $('r-cat').innerHTML='<option value="">All kinds</option>'+cats.map(c=>'<option'+(c===rui.cat?' selected':'')+'>'+esc(c)+'</option>').join('');
   $('r-sort').value=rui.sort;
@@ -161,7 +164,7 @@ function renderRecipes(){
   // filters on (same look as the Library's)
   const on=[]; const q=$('r-q').value.trim();
   if(q) on.push({ id:'q', label:({all:'Search',title:'Name',ing:'Ingredient'}[rui.scope])+': “'+q+'”' });
-  if(rui.show) on.push({ id:'show', label:rui.show==='fav'?'Favorites':'Want to make' });
+  if(rui.show) on.push({ id:'show', label:rui.show==='fav'?'Favorites':rui.show==='check'?'Check this':'Want to make' });
   if(rui.cat) on.push({ id:'cat', label:'Kind: '+rui.cat });
   if(rui.book){ const b=byId(rui.book); on.push({ id:'book', label:'Cookbook: '+(b?b.title:'?') }); }
   for(const d of (rui.diet||[])) on.push({ id:'diet:'+d, label:DIET_NAME[d]+(rui.dietStrict?' only':'') });
@@ -185,7 +188,7 @@ function renderRecipes(){
     +'<span class="rc-meta">'+esc(rSourceLine(r))+'</span>'
     +'<span class="rc-meta">'+esc([rTime(r), r.servings?'serves '+r.servings:''].filter(Boolean).join(' · '))+'</span>'
     +'<span class="chips">'+(r.favorite?'<span class="chip stars">♥ Favorite</span>':'')+(r.want?'<span class="chip reading">Want to make</span>':'')
-      +(r.pending?'<span class="chip review">Waiting for Claude</span>':'')+(r.needsReview&&!r.pending?'<span class="chip review">Check this</span>':'')
+      +(r.pending?'<span class="chip review">Waiting for Claude</span>':'')+(r.reread?'<span class="chip review">Waiting for Claude to re-read</span>':r.needsReview&&!r.pending?'<span class="chip review">Check this</span>':'')
       +((r.made||[]).length?'<span class="chip read">Made '+r.made.length+'×</span>':'')+dietBadges(r)+'</span>'
     +'</div></button>').join('');
   renderGrocBadge();
@@ -270,6 +273,11 @@ function drawRecipe(){
   $('rc-want').classList.toggle('on', !!r.want); $('rc-want').textContent=r.want?'✓ Want to make':'Want to make';
   $('rc-pending').classList.toggle('hide', !r.pending);
   $('rc-pending').innerHTML=r.pending ? (r.pending==='link' ? 'This link couldn’t be read here. <b>Claude will fill it in</b> next time you say “check the recipes”.' : 'The photos are with Claude, waiting to be read.') : '';
+  // Claude wasn't sure of some of it: offer another photo (a closer one of the unclear part) so it can be read again
+  const unclear=!!r.needsReview && !r.pending;
+  $('rc-unclear').classList.toggle('hide', !unclear);
+  $('rc-unclear-txt').textContent=r.reread ? 'Your extra photo is with Claude. It will re-read this recipe next time you say “check the recipes”.' : 'Some of this wasn’t clear (see the notes below). A closer photo of the unclear part lets Claude read it again.';
+  $('rc-reread').textContent=r.reread ? '📷 Take another photo' : '📷 Take another photo to re-read';
   document.querySelectorAll('#rc-scale button').forEach(b=>b.classList.toggle('active', +b.dataset.k===rScale));
   $('rc-scaled').classList.toggle('hide', !rFor || rScale===1);
   $('rc-scaled').textContent=rFor ? 'Amounts for '+rFor+' '+(rFor===1?'person':'people')+' (recipe serves '+r.servings+')' : '';
@@ -296,6 +304,18 @@ $('rc-madeit').onclick=()=>{
 };
 $('rc-cook').onclick=()=>{ const r=recipeById(rCur); if(r) openCooking(r, rScale); };
 $('rc-groc').onclick=()=>{ const r=recipeById(rCur); if(!r) return; const n=addToGrocery(r, rScale); toast(n ? n+' item'+(n===1?'':'s')+' added to the grocery list' : 'No ingredients to add'); };
+$('rc-reread').onclick=async()=>{
+  const r=recipeById(rCur); if(!r) return;
+  if(!cloudOn()){ toast('Connect the library first (Epilogue → Data & Sync), so the photo can reach Claude.'); return; }
+  const id=r.id, title=r.title||'recipe';
+  await writeScanNote({ reread:id, title, source:r.source||'' });   // tells Claude which recipe these photos add to
+  closeRecipe();
+  openShelfCam({ room:'Reread '+title, bookcase:'Recipe 1', kind:'recipe', recipe:true, build:true, optional:true, finishLabel:'Done',
+    fallback:()=>{ $('r-file').click(); },
+    onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(!n) return;
+      const x=recipeById(id); if(x){ x.reread=true; x.updatedAt=Date.now(); RIDX.delete(x); rcommit(); }
+      toast(n+' photo'+(n===1?'':'s')+' sent. Claude re-reads “'+title+'” next time you ask.'); } });
+};
 $('rc-edit').onclick=()=>{ const r=recipeById(rCur); if(r) openRecipeForm(r); };
 $('rc-share').onclick=async()=>{
   const r=recipeById(rCur); if(!r) return;

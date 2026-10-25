@@ -255,3 +255,38 @@ test('recipe camera: "← Previous recipe" adds a missed page to the recipe befo
   await page.click('#cam-next'); await expect(page.locator('#cam-where-txt')).toHaveText('Recipe 4');
   await page.click('#cam-finish');
 });
+
+test('a recipe marked unclear offers another photo; it is sent with a note naming the recipe and the recipe waits for a re-read', async ({ page }) => {
+  const net = await mockNet(page);
+  seedRemote(net, [{ id: 'rJam', title: 'Jubilee Jumbles', source: 'card', ingredients: ['2 cups flour'], steps: ['Bake.'], notes: 'Couldn’t read for sure: the oven temperature', needsReview: true, addedAt: 1, updatedAt: 1 },
+    { id: 'rOk', title: 'Clear Soup', ingredients: ['water'], steps: ['Boil.'], addedAt: 1, updatedAt: 1 }]);
+  await openApp(page, { dropbox: true }); await openRecipes(page);
+  await expect(page.locator('#r-results .rc-item')).toHaveCount(2, { timeout: 8000 });
+  await page.click('#r-results .rc-item >> text=Clear Soup'); await expect(page.locator('#rc-unclear')).toBeHidden(); await page.click('#rc-close');
+  await page.click('#r-results .rc-item >> text=Jubilee Jumbles');
+  await expect(page.locator('#rc-unclear')).toBeVisible();
+  await page.click('#rc-reread');
+  await page.waitForSelector('#cam-bg.open');
+  await page.waitForFunction(() => document.getElementById('cam-video').videoWidth > 0, null, { timeout: 15000 });
+  await page.click('#cam-shutter');
+  await expect.poll(() => net.uploads.filter(u => u.path.includes('/photos/inbox/') && u.path.endsWith('.jpg')).length, { timeout: 10000 }).toBe(1);
+  await page.click('#cam-finish');
+  const note = net.uploads.find(u => /recipe-info NOTE\.txt$/.test(u.path));
+  expect(note.body).toContain('"reread":"rJam"');
+  expect(net.uploads.find(u => u.path.endsWith('.jpg')).path).toContain('Reread-Jubilee-Jumbles');
+  await expect.poll(() => recipeUploads(net).length, { timeout: 10000 }).toBeGreaterThan(0);
+  await expect(page.locator('#r-results')).toContainText('Waiting for Claude to re-read');
+});
+
+test('"Check this" filter isolates recipes Claude wasn’t sure of, and shows as a filter that is on', async ({ page }) => {
+  const net = await mockNet(page);
+  seedRemote(net, [{ id: 'rA', title: 'Jumbles', ingredients: ['x'], needsReview: true, addedAt: 1, updatedAt: 1 }, { id: 'rB', title: 'Soup', ingredients: ['y'], addedAt: 1, updatedAt: 1 }]);
+  await openApp(page, { dropbox: true }); await openRecipes(page);
+  await expect(page.locator('#r-results .rc-item')).toHaveCount(2, { timeout: 8000 });
+  await expect(page.locator('#r-show-check')).toHaveText('Check this (1)');
+  await page.click('#r-show-check');
+  await expect(page.locator('#r-results .rc-item')).toHaveCount(1);
+  await expect(page.locator('#r-results')).toContainText('Jumbles');
+  await expect(page.locator('#r-filter-bar')).toContainText('Check this');
+  await page.click('#r-show [data-show=""]'); await expect(page.locator('#r-results .rc-item')).toHaveCount(2);
+});

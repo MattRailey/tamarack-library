@@ -196,7 +196,7 @@
           </div>
         </div>
         <div class="search-row rc-row2">
-          <div class="seg" id="r-show"><button data-show="" class="active">All</button><button data-show="fav">♥ Favorites</button><button data-show="want">Want to make</button></div>
+          <div class="seg" id="r-show"><button data-show="" class="active">All</button><button data-show="fav">♥ Favorites</button><button data-show="want">Want to make</button><button data-show="check" id="r-show-check">Check this</button></div>
           <select id="r-sort" aria-label="Sort recipes"><option value="title">Sort: Name</option><option value="added">Sort: Recently added</option><option value="made">Sort: Recently made</option></select>
         </div>
         <div class="rc-diet-row" id="r-diet" role="group" aria-label="Diet"><button class="secondary" data-diet="dairy" aria-pressed="false">Dairy-free</button><button class="secondary" data-diet="corn" aria-pressed="false">Corn-free</button><button class="secondary" data-diet="gluten" aria-pressed="false">Gluten-free</button></div>
@@ -645,6 +645,7 @@
       <div class="chips" id="rc-tags"></div>
       <div class="rc-dietbox" id="rc-diet"></div>
       <p class="note rc-pending hide" id="rc-pending"></p>
+      <div class="rc-pending hide" id="rc-unclear"><span id="rc-unclear-txt"></span> <button class="secondary" id="rc-reread">📷 Take another photo to re-read</button></div>
       <div class="row rc-acts">
         <button id="rc-cook">🍳 Cook</button>
         <button class="secondary rc-tog" id="rc-fav">♡ Favorite</button>

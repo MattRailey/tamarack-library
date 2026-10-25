@@ -9,7 +9,8 @@
 //
 // recipes-in.json (Claude writes it while reading the photos / pages) is a list, one entry per recipe:
 //   { "photos": ["2026-10-24 181500 Grandma Recipe-1 recipe 001.jpg", "… 002.jpg"],   pages in order (none for a link)
-//     "fill": "r…",                       optional: the id of a recipe waiting for Claude (a link) — filled in place
+//     "fill": "r…",                       optional: the id of a recipe waiting for Claude (a link, or "Reread" photos sent for
+//                                         a recipe marked unclear; see the recipe-info NOTE) — filled in place
 //     "title": "Cinnamon Rolls", "from": "Grandma Railey", "source": "card|family|cookbook|web|magazine|other",
 //     "book": "Joy of Cooking", "page": "42",           a cookbook in the library: matched to its book by title
 //     "url": "", "author": "", "servings": "12 rolls", "prep": "20 min", "cook": "25 min", "total": "2 hr",
@@ -28,7 +29,7 @@ import { pathToFileURL } from 'node:url';
 
 const FILE = 'recipes.json', CATALOG = 'tamarack-library.json';
 const ORDER = ['id','title','from','source','bookId','bookTitle','page','url','author','servings','prep','cook','total','category','cuisine','tags',
-  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
+  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','reread','needsReview','addedAt','updatedAt'];
 const FIELDS = ['title','from','source','page','url','author','servings','prep','cook','total','category','cuisine','tags','about','ingredients','steps','notes','diet'];
 export const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 export const normKey = s => norm(s).replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -73,7 +74,11 @@ export function applyRecipes(store, entries, opts = {}) {
     if (e.fill && out.recipes.some(x => x.id === e.fill && x.deleted)) { log.problems.push(e.title + ': skipped — that link (' + e.fill + ') was deleted in the app'); return; }
     let r = e.fill && out.recipes.find(x => x.id === e.fill && !x.deleted);
     if (e.fill && !r) { log.problems.push(e.title + ': no recipe ' + e.fill + ' to fill (added as new)'); }
-    if (r) { Object.assign(r, f); delete r.pending; r.needsReview = !!(e.needsReview || unsure); r.updatedAt = now; log.filled.push(r.title); }
+    if (r) {
+      // a re-read (extra photos sent for a recipe marked unclear): the new reading replaces the old doubt
+      if (r.reread || !f.notes) r.notes = String(r.notes || '').split('\n').filter(l => !/^Couldn’t read for sure:/.test(l)).join('\n').trim() || undefined;
+      if (!r.notes) delete r.notes;
+      Object.assign(r, f); delete r.pending; delete r.reread; r.needsReview = !!(e.needsReview || unsure); r.updatedAt = now; log.filled.push(r.title); }
     else {
       const dup = out.recipes.find(x => !x.deleted && normKey(x.title) === normKey(f.title) && (x.bookId || x.from || '') === (f.bookId || f.from || ''));
       r = Object.assign({ id: rid() + i, addedAt: now, updatedAt: now }, f, { needsReview: !!(e.needsReview || unsure || dup) });
@@ -96,6 +101,7 @@ export function run(dir, inFile, opts = {}) {
     for (const f of waiting) out.push('  ' + (done.has(f) ? '[done before] ' : '') + f);
     for (const n of inbox(dir).filter(f => / recipe-info NOTE\.txt$/.test(f))) out.push('  note: ' + n + ' → ' + fs.readFileSync(path.join(dir, 'photos', 'inbox', n), 'utf8').trim());
     const pend = cur.recipes.filter(r => !r.deleted && r.pending);
+    for (const r of cur.recipes.filter(r => !r.deleted && r.reread)) out.push('  re-read wanted: ' + r.id + '  ' + r.title + ' (extra photos are in the inbox with a “Reread” name; use fill:' + r.id + ')');
     out.push(pend.length + ' recipe(s) waiting for Claude (links):');
     for (const r of pend) out.push('  ' + r.id + '  ' + (r.url || r.title));
     return { text: out.join('\n') };
