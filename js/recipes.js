@@ -16,7 +16,7 @@ const RUI_KEY='tamarack_library_recipes_ui'+LIB_NS;        // search scope, filt
 const GROC_KEY='tamarack_library_grocery'+LIB_NS;          // grocery list, kept on this phone
 const RCP_SOURCES={ card:'Recipe card or sheet', cookbook:'Cookbook', web:'Website', magazine:'Magazine or clipping', family:'Family recipe', other:'Other' };
 const RCP_ORDER=['id','title','from','source','bookId','bookTitle','page','url','author','servings','prep','cook','total','category','cuisine','tags',
-  'about','ingredients','steps','notes','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
+  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
 
 function emptyRecipes(){ return { format:'tamarack-recipes', version:1, updatedAt:0, recipes:[] }; }
 function validRecipes(s){ return !!s && typeof s==='object' && Array.isArray(s.recipes); }
@@ -110,7 +110,7 @@ function filteredRecipes(){
   let q=words($('r-q').value).split(' ').filter(Boolean);
   if(q.some(t=>!STOP.has(t))) q=q.filter(t=>!STOP.has(t));
   const pool=liveRecipes().filter(r=>(!rui.show || (rui.show==='fav' ? r.favorite : rui.show==='want' ? r.want : true))
-    && (!rui.cat || r.category===rui.cat) && (!rui.book || r.bookId===rui.book));
+    && (!rui.cat || r.category===rui.cat) && (!rui.book || r.bookId===rui.book) && dietOk(r));
   const out=[];
   for(const fuzzy of [false, true]){
     if(fuzzy && (out.length || !q.length)) break;
@@ -164,6 +164,8 @@ function renderRecipes(){
   if(rui.show) on.push({ id:'show', label:rui.show==='fav'?'Favorites':'Want to make' });
   if(rui.cat) on.push({ id:'cat', label:'Kind: '+rui.cat });
   if(rui.book){ const b=byId(rui.book); on.push({ id:'book', label:'Cookbook: '+(b?b.title:'?') }); }
+  for(const d of (rui.diet||[])) on.push({ id:'diet:'+d, label:DIET_NAME[d]+(rui.dietStrict?' only':'') });
+  renderDietRow();
   const bar=$('r-filter-bar'); bar.classList.toggle('hide', !on.length);
   bar.innerHTML=on.length ? '<span class="fb-label">Filters on:</span>'+on.map(f=>'<button class="fb-chip" data-roff="'+f.id+'">'+esc(f.label)+' <span aria-hidden="true">×</span></button>').join('')+'<button class="fb-clear" data-rclear>Clear filters</button>' : '';
   $('r-q').classList.toggle('filter-on', !!q); $('r-clear-q').classList.toggle('hide', !q);
@@ -184,7 +186,7 @@ function renderRecipes(){
     +'<span class="rc-meta">'+esc([rTime(r), r.servings?'serves '+r.servings:''].filter(Boolean).join(' · '))+'</span>'
     +'<span class="chips">'+(r.favorite?'<span class="chip stars">♥ Favorite</span>':'')+(r.want?'<span class="chip reading">Want to make</span>':'')
       +(r.pending?'<span class="chip review">Waiting for Claude</span>':'')+(r.needsReview&&!r.pending?'<span class="chip review">Check this</span>':'')
-      +((r.made||[]).length?'<span class="chip read">Made '+r.made.length+'×</span>':'')+'</span>'
+      +((r.made||[]).length?'<span class="chip read">Made '+r.made.length+'×</span>':'')+dietBadges(r)+'</span>'
     +'</div></button>').join('');
   renderGrocBadge();
 }
@@ -195,10 +197,10 @@ document.querySelectorAll('#r-scope button').forEach(b=>b.onclick=()=>{ rui.scop
 document.querySelectorAll('#r-show button').forEach(b=>b.onclick=()=>{ rui.show=b.dataset.show; saveRui(); renderRecipes(); });
 $('r-cat').onchange=()=>{ rui.cat=$('r-cat').value; saveRui(); renderRecipes(); };
 $('r-sort').onchange=()=>{ rui.sort=$('r-sort').value; saveRui(); renderRecipes(); };
-function clearRecipeFilters(){ $('r-q').value=''; rui.show=''; rui.cat=''; rui.book=''; saveRui(); renderRecipes(); }
+function clearRecipeFilters(){ $('r-q').value=''; rui.show=''; rui.cat=''; rui.book=''; rui.diet=[]; rui.dietStrict=false; saveRui(); renderRecipes(); }
 document.addEventListener('click', e=>{
   if(e.target.closest('[data-rclear]')){ clearRecipeFilters(); return; }
-  const off=e.target.closest('[data-roff]'); if(off){ const k=off.dataset.roff; if(k==='q') $('r-q').value=''; else rui[k]=''; saveRui(); renderRecipes(); return; }
+  const off=e.target.closest('[data-roff]'); if(off){ const k=off.dataset.roff; if(k==='q') $('r-q').value=''; else if(k.startsWith('diet:')) rui.diet=(rui.diet||[]).filter(x=>x!==k.slice(5)); else rui[k]=''; saveRui(); renderRecipes(); return; }
 });
 $('r-results').onclick=e=>{ const it=e.target.closest('[data-rid]'); if(it) openRecipe(it.dataset.rid); };
 
@@ -247,6 +249,7 @@ let rFor=0;   // people, when opened from the meal plan
 function openRecipe(id, opts){
   const r=recipeById(id); if(!r) return;
   opts=opts||{};
+  if(rCur!==id) dietOpen=false;
   rCur=id; rScale=opts.scale>0 ? opts.scale : 1; rFor=opts.people||0;
   $('rc-modal').classList.remove('editing');
   drawRecipe();
@@ -261,6 +264,7 @@ function drawRecipe(){
     safeUrl(r.url) ? '<a href="'+esc(safeUrl(r.url))+'" target="_blank" rel="noopener">'+esc(hostOf(r.url)||'Website')+' ↗</a>' : (!bk && !r.bookTitle && r.source ? esc(RCP_SOURCES[r.source]||'') : '')].filter(Boolean).join(' · ');
   $('rc-facts').innerHTML=[r.servings?'<span><small>Serves</small>'+esc(r.servings)+'</span>':'', r.prep?'<span><small>Prep</small>'+esc(r.prep)+'</span>':'',
     r.cook?'<span><small>Cook</small>'+esc(r.cook)+'</span>':'', r.total?'<span><small>Total</small>'+esc(r.total)+'</span>':''].join('');
+  renderRecipeDiet(r);
   $('rc-tags').innerHTML=[r.category, r.cuisine].concat(r.tags||[]).filter(Boolean).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
   $('rc-fav').classList.toggle('on', !!r.favorite); $('rc-fav').textContent=r.favorite?'♥ Favorite':'♡ Favorite';
   $('rc-want').classList.toggle('on', !!r.want); $('rc-want').textContent=r.want?'✓ Want to make':'Want to make';
@@ -282,7 +286,7 @@ $('rc-close').onclick=closeRecipe;
 function closeRecipe(){ $('rc-bg').classList.remove('open'); unlockPage(); rCur=null; }
 $('rc-bg').addEventListener('click', e=>{ if(e.target===$('rc-bg')) closeRecipe(); });
 document.querySelectorAll('#rc-scale button').forEach(b=>b.onclick=()=>{ rScale=+b.dataset.k; rFor=0; drawRecipe(); });
-function rUpdate(fn){ const r=recipeById(rCur); if(!r){ drawRecipe(); return; } fn(r); r.updatedAt=Date.now(); RIDX.delete(r); rcommit(); drawRecipe(); }
+function rUpdate(fn){ const r=recipeById(rCur); if(!r){ drawRecipe(); return; } fn(r); r.updatedAt=Date.now(); RIDX.delete(r); DIET_CACHE.delete(r); rcommit(); drawRecipe(); }
 $('rc-fav').onclick=()=>rUpdate(r=>{ r.favorite=!r.favorite; });
 $('rc-want').onclick=()=>rUpdate(r=>{ r.want=!r.want; });
 $('rc-madeit').onclick=()=>{
@@ -334,6 +338,7 @@ function openRecipeForm(r){
   const bk=v.bookId && byId(v.bookId); set('rf-book', bk ? bk.title : v.bookTitle||''); set('rf-page', v.page); set('rf-url', v.url);
   set('rf-servings', v.servings); set('rf-prep', v.prep); set('rf-cook', v.cook); set('rf-total', v.total);
   set('rf-cat', v.category); set('rf-tags', (v.tags||[]).join(', '));
+  for(const d of ['dairy','corn','gluten']) $('rf-diet-'+d).checked=(v.diet||[]).includes(d);
   set('rf-ing', (v.ingredients||[]).join('\n')); set('rf-steps', (v.steps||[]).join('\n')); set('rf-notes', v.notes);
   cookbookOptions(); rfSource();
   $('rf-del').classList.toggle('hide', !r);
@@ -366,10 +371,11 @@ $('rf-save').onclick=()=>{
     url: src==='web' ? (asUrl($('rf-url').value)||'') : '',
     servings:$('rf-servings').value.trim(), prep:$('rf-prep').value.trim(), cook:$('rf-cook').value.trim(), total:$('rf-total').value.trim(),
     category:$('rf-cat').value.trim(), tags:$('rf-tags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    diet:['dairy','corn','gluten'].filter(d=>$('rf-diet-'+d).checked),
     ingredients:splitLines($('rf-ing').value), steps:splitLines($('rf-steps').value, true), notes:$('rf-notes').value.trim() };
   const now=Date.now();
   let r=rEditId && recipeById(rEditId);
-  if(r){ Object.assign(r, fields); if(r.pending && fields.ingredients.length){ delete r.pending; } r.updatedAt=now; RIDX.delete(r); }
+  if(r){ Object.assign(r, fields); if(r.pending && fields.ingredients.length){ delete r.pending; } r.updatedAt=now; RIDX.delete(r); DIET_CACHE.delete(r); }
   else { r=Object.assign({ id:rid(), addedAt:now, updatedAt:now }, fields); rstore.recipes.push(r); }
   rcommit(); rCur=r.id; rScale=1; $('rc-modal').classList.remove('editing'); drawRecipe(); $('rc-modal').scrollTop=0; toast('Recipe saved');
 };

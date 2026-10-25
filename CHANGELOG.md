@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5 — 2026-10-24 · Dairy-free, corn-free, gluten-free
+
+- **Filters:** Dairy-free, Corn-free, Gluten-free under the recipe search (any mix). They show recipes that are free, or can be with swaps ("Dairy-free with 1 swap"); **Only ones that are already free** leaves the swaps out. Recipes with no easy swap (cornmeal for corn-free) are left out.
+- **Show options** in each recipe: every ingredient to swap and what to use (milk → oat, almond, soy or coconut milk; flour → 1:1 gluten-free flour; cornstarch → arrowroot…). Hidden corn (baking powder, powdered sugar, oil, vinegar, vanilla) is "check the label".
+- **Fine as it is:** tick Dairy-free / Corn-free / Gluten-free in a recipe's Edit form to override the check.
+
 ## 2.4.1 — 2026-10-24 · Previous recipe
 
 - **← Previous recipe** in the recipe camera: missed a page? Go back one; the photo joins that recipe (same name, next number). **Next recipe →** then goes on past the last recipe with photos.

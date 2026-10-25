@@ -28,8 +28,8 @@ import { pathToFileURL } from 'node:url';
 
 const FILE = 'recipes.json', CATALOG = 'tamarack-library.json';
 const ORDER = ['id','title','from','source','bookId','bookTitle','page','url','author','servings','prep','cook','total','category','cuisine','tags',
-  'about','ingredients','steps','notes','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
-const FIELDS = ['title','from','source','page','url','author','servings','prep','cook','total','category','cuisine','tags','about','ingredients','steps','notes'];
+  'about','ingredients','steps','notes','diet','favorite','want','rating','made','photos','image','pending','needsReview','addedAt','updatedAt'];
+const FIELDS = ['title','from','source','page','url','author','servings','prep','cook','total','category','cuisine','tags','about','ingredients','steps','notes','diet'];
 export const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 export const normKey = s => norm(s).replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const sha1 = b => crypto.createHash('sha1').update(b).digest('hex');
