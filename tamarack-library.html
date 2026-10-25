@@ -549,14 +549,15 @@
   <div class="modal scan-modal">
     <button class="modal-close" id="ph-close" aria-label="Close">&times;</button>
     <h3>Send photos to Claude</h3>
-    <p class="note" style="margin-top:0;">Snap a whole shelf, a close-up of spines, or a book’s title page. The photos go to <b>photos/inbox</b> in the <span class="cfg-folder">Railey Library</span> Dropbox folder, labeled with where they were taken — next time you chat, say “check the photo inbox” and Claude adds or fixes the books.</p>
+    <p class="note" style="margin-top:0;">Snap a whole shelf, a close-up of spines, or a book’s title page. The photos go to <b>photos/inbox</b> in the <span class="cfg-folder">Railey Library</span> Dropbox folder, labeled with where they were taken. Don’t know where they go yet? Leave the place blank and Claude will put them in later. Next time you chat, say “check the photo inbox” and Claude adds or fixes the books.</p>
     <div class="grid">
-      <div><label>Room</label><input id="ph-room" list="dl-room"></div>
-      <div><label>Bookcase or bay</label><input id="ph-case" list="dl-case" placeholder="e.g. Tall oak · N1"></div>
+      <div><label>Room (optional)</label><input id="ph-room" list="dl-room"></div>
+      <div><label>Bookcase or bay (optional)</label><input id="ph-case" list="dl-case" placeholder="e.g. Tall oak · N1"></div>
       <div><label>Shelf (optional)</label><input id="ph-shelf" list="dl-shelf"></div>
       <div><label>What is it?</label><select id="ph-kind"><option value="shelf">Whole shelf</option><option value="spines">Close-up of spines</option><option value="recheck">Recheck (books already in the library)</option><option value="book">One book (cover / title page)</option><option value="other">Something else</option></select></div>
       <div style="grid-column:1/-1;"><label>Note for Claude (optional)</label><input id="ph-note" placeholder="e.g. left half of shelf 2 · these are new from the thrift store"></div>
     </div>
+    <p class="note" style="margin:8px 0 0;">Not sure where they go? <a href="#" id="ph-noloc">Clear the place</a> and just shoot.</p>
     <div class="row" style="margin-top:12px;"><button id="ph-cam">📷 Open camera</button><button class="secondary" id="ph-take">Choose photos</button></div>
     <input type="file" id="ph-file" accept="image/*" multiple class="hide">
     <div id="ph-status" class="note"></div>
@@ -600,7 +601,7 @@
     <label for="ca-room">Room</label><input id="ca-room" list="dl-room" autocomplete="off">
     <label for="ca-case" style="margin-top:10px;">Bookcase or bay</label><input id="ca-case" list="dl-case" autocomplete="off" placeholder="e.g. N2">
     <p class="wz-err hide" id="ca-err"></p>
-    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="ca-cancel">Cancel</button><button id="ca-start">Start</button></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;"><button class="secondary" id="ca-cancel">Cancel</button><button class="secondary hide" id="ca-none">No location yet</button><button id="ca-start">Start</button></div>
   </div>
 </div>
 <!-- loan a book out -->

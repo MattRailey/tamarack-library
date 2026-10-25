@@ -5,7 +5,7 @@
    served from the device. Dropbox, book-lookup and cover requests are never touched here.
 
    When you add, rename or remove an app file, update APP_FILES and bump VERSION. */
-const VERSION = 'railey-library-v22';
+const VERSION = 'railey-library-v23';
 const APP_FILES = [
   'tamarack-library.html',
   'css/app.css',

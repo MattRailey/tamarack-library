@@ -31,11 +31,12 @@ function openPhotos(){
   $('ph-bg').classList.add('open'); lockPage(); renderRetry(); renderSentLog();
 }
 $('btn-photos').onclick=openPhotos;
+$('ph-noloc').onclick=e=>{ e.preventDefault(); $('ph-room').value=''; $('ph-case').value=''; $('ph-shelf').value=''; $('ph-room').focus(); };
 $('ph-close').onclick=()=>{ $('ph-bg').classList.remove('open'); unlockPage(); };
 $('ph-cam').onclick=()=>{
   const loc={ room:$('ph-room').value.trim(), bookcase:$('ph-case').value.trim(), shelf:$('ph-shelf').value.trim(), kind:$('ph-kind').value };
   ui.phLoc=loc; lsSet(UI_KEY, JSON.stringify(ui));
-  openShelfCam(Object.assign({}, loc, { build:true, finishLabel:'Done', fallback:()=>$('ph-file').click(),
+  openShelfCam(Object.assign({}, loc, { build:true, optional:loc.kind!=='recheck', finishLabel:'Done', fallback:()=>$('ph-file').click(),
     onFinish:cases=>{ const n=cases.reduce((s,c)=>s+c.n,0); if(n) $('ph-status').textContent=n+' photo'+(n===1?'':'s')+' sent. They’re waiting for Claude to read them; the books show up here once that’s done.';
       // pick up where the camera left off next time
       const L=ui.phLoc||{}; $('ph-room').value=L.room||''; $('ph-case').value=L.bookcase||''; renderRetry(); renderSentLog(); } }));
