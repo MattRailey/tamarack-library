@@ -48,18 +48,20 @@ function mergeRecipes(a, b){
   const sa=a.settings||{}, sb=b.settings||{};
   const out={ format:'tamarack-recipes', version:1, updatedAt:Math.max(a.updatedAt||0, b.updatedAt||0), recipes:mergeById(a.recipes, b.recipes) };
   const plan=mergeById(a.plan, b.plan); if(plan.length) out.plan=plan;
+  const trips=mergeById(a.trips, b.trips); if(trips.length) out.trips=trips;
   const st=(sb.updatedAt||0)>(sa.updatedAt||0) ? sb : (a.settings||b.settings); if(st) out.settings=st;
   return out;
 }
 function rsig(s){
   const ids=arr=>(arr||[]).map(r=>r.id+':'+(r.updatedAt||0)+(r.deleted?'x':'')).sort().join('|');
-  return ids(s.recipes)+'#'+ids(s.plan)+'#'+((s.settings||{}).updatedAt||0);
+  return ids(s.recipes)+'#'+ids(s.plan)+'#'+ids(s.trips)+'#'+((s.settings||{}).updatedAt||0);
 }
 function rcommit(){ rstore.updatedAt=Date.now(); rSaveLocal(); renderRecipes(); rSchedule(); }
 function readableRecipes(s){
   const tidy=r=>{ if(r.deleted) return r; const o={}; for(const k of RCP_ORDER) if(k in r && r[k]!=='' && r[k]!=null) o[k]=r[k]; for(const k in r) if(!(k in o) && r[k]!=='' && r[k]!=null) o[k]=r[k]; return o; };
   const o={ format:'tamarack-recipes', version:1, updatedAt:s.updatedAt, recipes:s.recipes.map(tidy) };
   if((s.plan||[]).length) o.plan=s.plan.slice().sort((x,y)=>String(x.date||'').localeCompare(String(y.date||'')));
+  if((s.trips||[]).length) o.trips=s.trips;
   if(s.settings) o.settings=s.settings;
   return JSON.stringify(o, null, 2);
 }

@@ -105,3 +105,25 @@ test('plans from two phones merge; amounts add up sensibly', async ({ page }) =>
   expect(shop).toEqual(['3 eggs', '1 cup rice', '2 chicken breasts', '2 cups milk']);
   expect(r.serv).toEqual([12, 4, 24, 8, 0, 0]);
 });
+
+test('trips: plan a camping trip, add meals by day, get the trip ingredients and the menu', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  await page.click('nav [data-panel="recipes"]');
+  await page.click('#r-view [data-rv="trips"]');
+  await page.click('#tr-new');
+  await page.fill('#trm-name', 'Wallowa camping'); await page.fill('#trm-start', '2026-11-06'); await page.fill('#trm-days', '3'); await page.fill('#trm-people', '5');
+  await page.click('#trm-save');
+  await expect(page.locator('#tr-title')).toHaveText('Wallowa camping');
+  await expect(page.locator('#tr-days .mp-day')).toHaveCount(3);
+  await page.click('#tr-days .mp-day:first-child [data-meal="dinner"]');
+  await expect(page.locator('#mpk-people')).toHaveValue('5');
+  await page.fill('#mpk-q', 'Foil packets'); await page.click('#mpk-list [data-note]');
+  await expect(page.locator('#tr-days .mp-item')).toContainText(['Foil packets×']);
+  // trip meals do not show up in the weekly plan
+  await page.click('#r-view [data-rv="plan"]');
+  await expect(page.locator('#mp-days .mp-item')).toHaveCount(0);
+  await page.click('#r-view [data-rv="trips"]');
+  await page.click('#tr-meals');
+  await expect(page.locator('#trmenu-text')).toContainText('Day 1');
+  await expect(page.locator('#trmenu-text')).toContainText('Dinner: Foil packets');
+});
