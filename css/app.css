@@ -821,3 +821,7 @@ button.linkish, button.linkish:hover{ background:none !important; border:none !i
 .diet-opts ul{ margin:0 0 4px; padding-left:18px; font-size:.88rem; }
 .diet-opts li{ margin:4px 0; line-height:1.4; }
 .rf-diet{ gap:14px; flex-wrap:wrap; margin-top:4px; }
+
+/* sharpest-frame shots: the shutter shows it's working; a blurry one is outlined */
+#cam-shutter.busy{ opacity:.6; transform:scale(.94); transition:transform .1s; }
+.cam-th.blurry{ outline:3px solid #e0a43a; outline-offset:-3px; }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.1 — 2026-10-24 · Sharper photos
+
+- **Each tap keeps the sharpest frame.** Up close the phone refocuses and an iPhone switches lenses by itself (the blur that snaps back). Each tap now watches for about a quarter second and keeps the sharpest picture; taps in a row queue up, none are lost.
+- **Blurry shot warning:** a shot much softer than the ones before it is outlined, with "Tap ↺ Redo last to take it again."
+- Recipe camera tip: hold the phone about a foot away and keep it still.
+
 ## 2.5 — 2026-10-24 · Dairy-free, corn-free, gluten-free
 
 - **Filters:** Dairy-free, Corn-free, Gluten-free under the recipe search (any mix). They show recipes that are free, or can be with swaps ("Dairy-free with 1 swap"); **Only ones that are already free** leaves the swaps out. Recipes with no easy swap (cornmeal for corn-free) are left out.

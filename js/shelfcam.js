@@ -42,6 +42,8 @@ async function openShelfCam(opts){
   }catch(e){ return camNoCamera(e); }
   if(!cam || !$('cam-bg').classList.contains('open')){ cam && cam.stream && cam.stream.getTracks().forEach(t=>t.stop()); return; }
   const v=$('cam-video'); v.srcObject=cam.stream; v.setAttribute('playsinline',''); try{ await v.play(); }catch(e){}
+  camFocus(cam.stream);
+  if(cam.opts.recipe) $('cam-msg').textContent='Hold the phone about a foot away and keep it still; each tap keeps the sharpest moment.';
   // no place yet: ask for it before the first photo
   if(cam && !opts.optional && (!$('cam-room').value || !$('cam-case').value)) camChange('Which bookcase are you photographing?', $('cam-case').value);
 }
@@ -81,6 +83,11 @@ async function camChange(title, suggest){
   const p=await camAsk(title, $('cam-room').value, suggest);
   if(p && cam){ camSetPlace(p); $('cam-msg').textContent=p.bookcase ? 'Now photographing '+p.bookcase+'.' : 'No location: Claude will place these later.'; }
 }
+// keep refocusing on its own (Chrome/Android honour this; Safari picks its own focus and ignores it)
+function camFocus(stream){
+  try{ const t=stream && stream.getVideoTracks()[0], caps=t && t.getCapabilities ? t.getCapabilities() : {};
+    if(caps.focusMode && caps.focusMode.includes('continuous')) t.applyConstraints({ advanced:[{ focusMode:'continuous' }] }).catch(()=>{}); }catch(e){}
+}
 function camNoCamera(e){
   const why=e && e.name==='NotAllowedError' ? 'Camera permission was turned down.' : 'This browser can’t open the camera here.';
   const o=cam.opts; closeShelfCam(true);
@@ -107,21 +114,63 @@ function camButtons(){ if(!cam) return; const bc=$('cam-case').value.trim();
   $('cam-next').classList.toggle('hide', !cam.opts.build || (!!cam.opts.optional && !bc)); }   // no bookcase named: nothing to finish with
 
 /* One frame from the video at full size, shrunk to the usual shelf-photo size (photos.js PHOTO_SIZE). */
-function camGrab(){
-  const v=$('cam-video'); if(!v.videoWidth) return Promise.resolve(null);
+/* The sharpest of a few frames. Up close the phone refocuses, and an iPhone switches lenses by itself (the blur that
+   "snaps back"), so one frame grabbed at the tap can catch it mid-blur. Each tap watches for ~¼ s (taps in a row queue up), scores each frame
+   (frameSharpness: how strong the edges are in the middle of the picture) and keeps the best. → { blob, score } */
+const SHARP_FRAMES=4, SHARP_GAP=80;
+function frameSharpness(src, w, h){
+  // the middle 60% of the frame, shrunk to 240 px wide, in grey; then the average squared Laplacian (edge strength)
+  const W=240, H=Math.max(3, Math.round(W*h/w)), c=frameSharpness.c||(frameSharpness.c=document.createElement('canvas'));
+  c.width=W; c.height=H; const x=c.getContext('2d', { willReadFrequently:true });
+  x.drawImage(src, w*0.2, h*0.2, w*0.6, h*0.6, 0, 0, W, H);
+  const d=x.getImageData(0, 0, W, H).data, g=new Float32Array(W*H);
+  for(let i=0;i<W*H;i++) g[i]=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];
+  let s=0, n=0;
+  for(let y=1;y<H-1;y++) for(let xx=1;xx<W-1;xx++){ const i=y*W+xx, l=4*g[i]-g[i-1]-g[i+1]-g[i-W]-g[i+W]; s+=l*l; n++; }
+  return n ? s/n : 0;
+}
+async function camGrab(){
+  const v=$('cam-video'); if(!v.videoWidth) return null;
   const [max, q]=PHOTO_SIZE[cam.opts.kind||'shelf']||PHOTO_SIZE.shelf;
   const k=Math.min(1, max/Math.max(v.videoWidth, v.videoHeight));
-  const c=document.createElement('canvas'); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k);
-  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
-  return new Promise(res=>c.toBlob(res, 'image/jpeg', q));
+  const W=Math.round(v.videoWidth*k), H=Math.round(v.videoHeight*k);
+  let best=null, bestScore=-1, spare=null;
+  for(let i=0;i<SHARP_FRAMES;i++){
+    if(i) await new Promise(r=>setTimeout(r, SHARP_GAP));
+    if(!v.videoWidth) break;
+    const c=spare||document.createElement('canvas'); c.width=W; c.height=H;
+    c.getContext('2d').drawImage(v, 0, 0, W, H);
+    let sc=0; try{ sc=frameSharpness(c, W, H); }catch(e){ sc=0; }
+    if(sc>bestScore){ spare=best; best=c; bestScore=sc; } else spare=c;
+  }
+  if(!best) return null;
+  const blob=await new Promise(res=>best.toBlob(res, 'image/jpeg', q));
+  return blob ? { blob, score:bestScore } : null;
 }
-async function camShoot(){
+// A shot much softer than this camera's usual is called out (after a few shots, so there's a usual to compare with).
+function camBlurry(score){
+  const L=(cam.scores=cam.scores||[]);
+  const sorted=L.slice().sort((a,b)=>a-b), med=sorted.length ? sorted[Math.floor(sorted.length/2)] : 0;
+  const blurry=L.length>=2 && med>0 && score<med*0.4;
+  if(!blurry) { L.push(score); if(L.length>12) L.shift(); }
+  return blurry;
+}
+// taps queue up: each one is taken in turn, none is lost while the one before it is still choosing its frame
+function camShoot(){
+  if(!cam) return;
+  $('cam-flash').classList.remove('go'); void $('cam-flash').offsetWidth; $('cam-flash').classList.add('go');
+  const me=cam; me.shots=(me.shots||Promise.resolve()).then(()=>cam===me && camShootNow()).catch(()=>{});
+  return me.shots;
+}
+async function camShootNow(){
   if(!cam) return;
   const loc=camLoc();
   if(!cam.opts.optional && (!loc.room || !loc.bookcase)){ camChange('Which bookcase are you photographing?', loc.bookcase); return; }
-  $('cam-msg').textContent='';
-  const blob=await camGrab(); if(!blob){ $('cam-msg').textContent='The camera isn’t ready yet. Try again in a second.'; return; }
-  $('cam-flash').classList.remove('go'); void $('cam-flash').offsetWidth; $('cam-flash').classList.add('go');
+  $('cam-msg').textContent=''; $('cam-shutter').classList.add('busy');
+  let got=null; try{ got=await camGrab(); }finally{ $('cam-shutter').classList.remove('busy'); }
+  if(!cam) return;
+  if(!got){ $('cam-msg').textContent='The camera isn’t ready yet. Try again in a second.'; return; }
+  const blob=got.blob, blurry=camBlurry(got.score);
   if(cam.redo && cam.last) return camRedo(blob);
   // a new bookcase (or room) starts a new name and count
   const key=loc.room+'|'+loc.bookcase;
@@ -137,6 +186,7 @@ async function camShoot(){
   const th=$('cam-thumbs').firstElementChild; while($('cam-thumbs').children.length>6) $('cam-thumbs').lastElementChild.remove();
   cam.sending++; camCount(); cam.opts.onUpdate && cam.opts.onUpdate(cam.cases);
   const rec={ path, th, rev:null, state:'sending' }; cam.last=rec; camRedoBtn();
+  if(blurry){ th.classList.add('blurry'); $('cam-msg').textContent='That one looks blurry. Tap ↺ Redo last to take it again.'; }
   // one at a time, in order, while the next photo is being taken
   const me=cam;
   me.chain=me.chain.then(async()=>{
