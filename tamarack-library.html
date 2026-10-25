@@ -395,7 +395,7 @@
         </ul>
         <h3>Recipes</h3>
         <ul>
-          <li><b>Adding is quick.</b> Tap <b>+</b> and the camera opens: photograph the card or page (every page of it), tap <b>Next recipe →</b> for the next one, then <b>Done</b>. Claude reads them, splits out the ingredients and steps, and keeps the original photo with each recipe. Say “check the recipes” next time you chat.</li>
+          <li><b>Adding is quick.</b> Tap <b>+</b> and the camera opens: photograph the card or page (every page of it), tap <b>Next recipe →</b> for the next one, then <b>Done</b>. Missed a page? <b>← Previous recipe</b> goes back one and the photo joins that recipe. Claude reads them, splits out the ingredients and steps, and keeps the original photo with each recipe. Say “check the recipes” next time you chat.</li>
           <li><b>From a website:</b> paste the link into the search box and tap <b>Add this recipe</b> (or <b>🔗 Link</b> → <b>Paste and add</b>). Most sites come straight in; any that can’t wait for Claude.</li>
           <li><b>📚 Cookbook</b> asks which book (from your library) and the page, then opens the camera. The recipe links to the book, and the book shows its recipes.</li>
           <li><b>Search</b> works like the library: <b>Ingredient</b> finds what you can make with what’s in the fridge (“chicken rice”).</li>
@@ -807,7 +807,7 @@
   <div class="cam-bottom">
     <div class="cam-left"><button class="cam-redo" id="cam-redo" disabled>↺ Redo last</button><div class="cam-thumbs" id="cam-thumbs"></div></div>
     <button class="cam-shutter" id="cam-shutter" aria-label="Take photo"></button>
-    <div class="cam-acts"><button class="secondary" id="cam-next">Finished with this bookcase →</button><button id="cam-finish">Done</button></div>
+    <div class="cam-acts"><button class="secondary hide" id="cam-prevrec">← Previous recipe</button><button class="secondary" id="cam-next">Finished with this bookcase →</button><button id="cam-finish">Done</button></div>
   </div>
 </div>
 <!-- which bookcase: asked before the first photo, for the next bookcase, or to change it -->
