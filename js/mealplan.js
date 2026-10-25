@@ -191,17 +191,25 @@ let mpIng=[], mpIngLabel='';
 function weekEntries(){ const end=addDays(mpWeek||weekStart(), 6); return planList().filter(p=>p.date>=(mpWeek||weekStart()) && p.date<=end); }
 $('mp-ing').onclick=()=>openIng(weekEntries(), 'Week of '+fromYmd(mpWeek).toLocaleDateString(undefined,{ month:'short', day:'numeric' }), 'Ingredients for the week');
 function openIng(entries, label, title){
-  mpIngLabel=label; $('mi-h').textContent=title;
+  mpIngSolo=false; mpIngLabel=label; $('mi-h').textContent=title;
   mpIng=entryItems(entries).map(x=>Object.assign({ need:false }, x));
   const unk=entries.filter(p=>p.recipeId).map(p=>recipeById(p.recipeId)).filter(r=>r && !servingsNum(r.servings));
   $('mi-note').textContent='Amounts are for the people planned at each meal. Tick what you need to buy.'
     +(unk.length ? ' Not scaled (the recipe doesn’t say how many it serves): '+[...new Set(unk.map(r=>r.title))].join(', ')+'.' : '');
   renderWeekIng(); $('mi-bg').classList.add('open'); lockPage();
 }
+// a single recipe's 🛒: tick what you need and send it to your cart (share/copy); nothing is saved for later
+function openRecipeIng(r, k){
+  mpIngLabel=r.title; $('mi-h').textContent='Groceries for '+(r.title||'this recipe');
+  mpIng=combineIngredients((r.ingredients||[]).map(s=>({ line:scaleLine(String(s), k||1), from:r.title }))).map(x=>Object.assign({ need:false }, x));
+  $('mi-note').textContent='Tick what you need to buy, then send it to your cart.';
+  mpIngSolo=true; renderWeekIng(); $('mi-bg').classList.add('open'); lockPage();
+}
+let mpIngSolo=false;
 function renderWeekIng(){
   $('mi-list').innerHTML=mpIng.length ? mpIng.map((x,i)=>'<label class="gr-item mi-item'+(x.need?' need':'')+'"><input type="checkbox" data-mi="'+i+'"'+(x.need?' checked':'')+'> <span>'+esc(x.text)+'<small class="mi-from">'+esc(x.from.join(', '))+'</small></span></label>').join('')
     : '<p class="note">Nothing planned with a recipe yet.</p>';
-  const n=mpIng.filter(x=>x.need).length; $('mi-add').textContent=n ? 'Add '+n+' to the shopping list' : 'Tick what you need'; $('mi-add').disabled=!n;
+  const n=mpIng.filter(x=>x.need).length; $('mi-add').textContent=n ? 'Add '+n+' to the shopping list' : 'Tick what you need'; $('mi-add').disabled=!n; $('mi-add').classList.toggle('hide', mpIngSolo); $('mi-share').textContent=mpIngSolo ? (n ? 'Send '+n+' to cart' : 'Tick what you need') : 'Share or copy'; $('mi-share').classList.toggle('secondary', !mpIngSolo);
   $('mi-all').textContent=mpIng.length && mpIng.every(x=>x.need) ? 'Untick all' : 'Tick all';
 }
 $('mi-list').onchange=e=>{ const c=e.target.closest('[data-mi]'); if(!c) return; mpIng[+c.dataset.mi].need=c.checked; renderWeekIng(); };

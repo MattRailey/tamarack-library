@@ -322,7 +322,7 @@ $('rc-madeit').onclick=()=>{
   toast('Marked as made today');
 };
 $('rc-cook').onclick=()=>{ const r=recipeById(rCur); if(r) openCooking(r, rScale); };
-$('rc-groc').onclick=()=>{ const r=recipeById(rCur); if(!r) return; const n=addToGrocery(r, rScale); toast(n ? n+' item'+(n===1?'':'s')+' added to the grocery list' : 'No ingredients to add'); };
+$('rc-groc').onclick=()=>{ const r=recipeById(rCur); if(!r) return; if(!(r.ingredients||[]).some(s=>!/^##\s/.test(s))){ toast('No ingredients to add'); return; } openRecipeIng(r, rScale); };
 $('rc-reread').onclick=async()=>{
   const r=recipeById(rCur); if(!r) return;
   if(!cloudOn()){ toast('Connect the library first (Epilogue → Data & Sync), so the photo can reach Claude.'); return; }
