@@ -21,7 +21,7 @@ const RCP_ORDER=['id','title','from','source','bookId','bookTitle','page','url',
 function emptyRecipes(){ return { format:'tamarack-recipes', version:1, updatedAt:0, recipes:[] }; }
 function validRecipes(s){ return !!s && typeof s==='object' && Array.isArray(s.recipes); }
 let rstore=emptyRecipes();
-let rui={ scope:'all', show:'', cat:'', sort:'title', book:'' };
+let rui={ scope:'all', show:'', cat:'', sort:'title', book:'', time:'' };
 try{ Object.assign(rui, JSON.parse(lsGet(RUI_KEY)||'{}')); }catch(e){}
 function saveRui(){ lsSet(RUI_KEY, JSON.stringify(rui)); }
 
@@ -112,7 +112,7 @@ function filteredRecipes(){
   let q=words($('r-q').value).split(' ').filter(Boolean);
   if(q.some(t=>!STOP.has(t))) q=q.filter(t=>!STOP.has(t));
   const pool=liveRecipes().filter(r=>(!rui.show || (rui.show==='fav' ? r.favorite : rui.show==='want' ? r.want : rui.show==='check' ? (r.needsReview && !r.pending) : true))
-    && (!rui.cat || r.category===rui.cat) && (!rui.book || r.bookId===rui.book) && dietOk(r));
+    && (!rui.cat || r.category===rui.cat) && (!rui.time || (rMins(r)!=null && rMins(r)<=+rui.time)) && (!rui.book || r.bookId===rui.book) && dietOk(r));
   const out=[];
   for(const fuzzy of [false, true]){
     if(fuzzy && (out.length || !q.length)) break;
@@ -134,6 +134,19 @@ function filteredRecipes(){
 }
 
 /* ---------------- the list ---------------- */
+// minutes from free text like "15 min", "1 hr 55 min", "About 1 hour", "5-10 min" (upper end); total, else prep+cook
+function minsOf(t){
+  t=String(t||'').toLowerCase(); if(!/\d/.test(t)) return null;
+  t=t.replace(/(\d+)\s*(?:-|–|to)\s*(\d+)/g,'$2').replace(/(\d+)\s*½/g,'$1.5').replace(/½/g,'0.5');
+  let m=0, hit=false, x; const re=/(\d+(?:\.\d+)?)\s*(days?|d\b|hours?|hrs?|h\b|minutes?|mins?|m\b)/g;
+  while((x=re.exec(t))){ hit=true; const n=+x[1], u=x[2][0]; m+= u==='d'?n*1440 : u==='h'?n*60 : n; }
+  return hit ? Math.round(m) : null;
+}
+function rMins(r){
+  const t=minsOf(r.total); if(t!=null) return t;
+  const a=minsOf(r.prep), b=minsOf(r.cook);
+  return (a==null && b==null) ? null : (a||0)+(b||0);
+}
 function rTime(r){ return r.total || [r.prep && 'prep '+r.prep, r.cook && 'cook '+r.cook].filter(Boolean).join(' · '); }
 function rSourceLine(r){
   const bk=r.bookId && byId(r.bookId);
@@ -160,7 +173,7 @@ function renderRecipes(){
   $('r-show-check').classList.toggle('hide', !nCheck && rui.show!=='check');
   const cats=uniq(liveRecipes().map(r=>r.category));
   $('r-cat').innerHTML='<option value="">All kinds</option>'+cats.map(c=>'<option'+(c===rui.cat?' selected':'')+'>'+esc(c)+'</option>').join('');
-  $('r-sort').value=rui.sort;
+  $('r-sort').value=rui.sort; $('r-time').value=rui.time||'';
   fillDatalist('dl-rcat', uniq(liveRecipes().map(r=>r.category).concat(['Breakfast','Lunch','Dinner','Bread','Main dish','Side dish','Soup','Salad','Dessert','Cookies','Snack','Drink','Canning','Appetizer','Candy'])));
   fillDatalist('dl-rfrom', uniq(liveRecipes().map(r=>r.from)));
   // filters on (same look as the Library's)
@@ -168,6 +181,7 @@ function renderRecipes(){
   if(q) on.push({ id:'q', label:({all:'Search',title:'Name',ing:'Ingredient'}[rui.scope])+': “'+q+'”' });
   if(rui.show) on.push({ id:'show', label:rui.show==='fav'?'Favorites':rui.show==='check'?'Check this':'Want to make' });
   if(rui.cat) on.push({ id:'cat', label:'Kind: '+rui.cat });
+  if(rui.time) on.push({ id:'time', label:'Ready in '+TIME_NAME[rui.time] });
   if(rui.book){ const b=byId(rui.book); on.push({ id:'book', label:'Cookbook: '+(b?b.title:'?') }); }
   for(const d of (rui.diet||[])) on.push({ id:'diet:'+d, label:DIET_NAME[d]+(rui.dietStrict?' only':'') });
   renderDietRow();
@@ -200,9 +214,11 @@ $('r-q').addEventListener('input', ()=>{ clearTimeout(_rqT); _rqT=setTimeout(ren
 $('r-clear-q').onclick=()=>{ $('r-q').value=''; renderRecipes(); $('r-q').focus(); };
 document.querySelectorAll('#r-scope button').forEach(b=>b.onclick=()=>{ rui.scope=b.dataset.scope; saveRui(); renderRecipes(); });
 document.querySelectorAll('#r-show button').forEach(b=>b.onclick=()=>{ rui.show=b.dataset.show; saveRui(); renderRecipes(); });
+const TIME_NAME={15:'15 min or less',30:'30 min or less',45:'45 min or less',60:'1 hour or less',90:'1½ hours or less',120:'2 hours or less'};
+$('r-time').onchange=()=>{ rui.time=$('r-time').value; saveRui(); renderRecipes(); };
 $('r-cat').onchange=()=>{ rui.cat=$('r-cat').value; saveRui(); renderRecipes(); };
 $('r-sort').onchange=()=>{ rui.sort=$('r-sort').value; saveRui(); renderRecipes(); };
-function clearRecipeFilters(){ $('r-q').value=''; rui.show=''; rui.cat=''; rui.book=''; rui.diet=[]; rui.dietStrict=false; saveRui(); renderRecipes(); }
+function clearRecipeFilters(){ $('r-q').value=''; rui.show=''; rui.cat=''; rui.time=''; rui.book=''; rui.diet=[]; rui.dietStrict=false; saveRui(); renderRecipes(); }
 document.addEventListener('click', e=>{
   if(e.target.closest('[data-rclear]')){ clearRecipeFilters(); return; }
   const off=e.target.closest('[data-roff]'); if(off){ const k=off.dataset.roff; if(k==='q') $('r-q').value=''; else if(k.startsWith('diet:')) rui.diet=(rui.diet||[]).filter(x=>x!==k.slice(5)); else rui[k]=''; saveRui(); renderRecipes(); return; }
@@ -273,7 +289,7 @@ function drawRecipe(){
   $('rc-tags').innerHTML=[r.category, r.cuisine].concat(r.tags||[]).filter(Boolean).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
   $('rc-fav').classList.toggle('on', !!r.favorite); $('rc-fav').textContent=r.favorite?'♥ Favorite':'♡ Favorite';
   $('rc-want').classList.toggle('on', !!r.want); $('rc-want').textContent=r.want?'✓ Want to make':'Want to make';
-  $('rc-pending').classList.toggle('hide', !r.pending);
+  $('rc-pending').classList.toggle('hide', !r.pending); $('rc-pend-acts').classList.toggle('hide', !r.pending);
   $('rc-pending').innerHTML=r.pending ? (r.pending==='link' ? 'This link couldn’t be read here. <b>Claude will fill it in</b> next time you say “check the recipes”.' : 'The photos are with Claude, waiting to be read.') : '';
   // Claude wasn't sure of some of it: offer another photo (a closer one of the unclear part) so it can be read again
   const unclear=!!r.needsReview && !r.pending;
@@ -318,6 +334,7 @@ $('rc-reread').onclick=async()=>{
       const x=recipeById(id); if(x){ x.reread=true; x.updatedAt=Date.now(); RIDX.delete(x); rcommit(); }
       toast(n+' photo'+(n===1?'':'s')+' sent. Claude re-reads “'+title+'” next time you ask.'); } });
 };
+$('rc-pend-edit').onclick=()=>$('rc-edit').onclick(); $('rc-pend-del').onclick=()=>$('rc-del').onclick();
 $('rc-edit').onclick=()=>{ const r=recipeById(rCur); if(r) openRecipeForm(r); };
 $('rc-share').onclick=async()=>{
   const r=recipeById(rCur); if(!r) return;
