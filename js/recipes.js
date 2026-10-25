@@ -155,14 +155,11 @@ function rSourceLine(r){
   return [r.from, book ? book+(r.page?', p. '+r.page:'') : (r.source==='web' && r.url ? hostOf(r.url) : RCP_SOURCES[r.source]||'')].filter(Boolean).join(' · ');
 }
 function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./,''); }catch(e){ return ''; } }
-const FOOD_ICONS=[[/french toast|pancake|waffle|breakfast|omelet|egg|granola|oatmeal/,'🥞'],[/cookie|brownie|bar\b|bars\b|fudge|candy|caramel|dessert|cake|pie\b|cobbler|crisp|pudding|cupcake|frosting|truffle/,'🍪'],[/bread|roll|biscuit|muffin|scone|loaf|bun\b/,'🍞'],[/soup|stew|chili|broth|chowder/,'🍲'],[/salad|slaw|vegetable|veggie|beet|squash/,'🥗'],[/taco|burrito|enchilada|empanada|mexican/,'🌮'],[/pizza/,'🍕'],[/pasta|spaghetti|lasagna|noodle|mac\b/,'🍝'],[/chicken|turkey|pork|beef|steak|lamb|meatball|roast|ham\b|ribs|sausage|bacon/,'🍗'],[/fish|salmon|shrimp|seafood|tuna/,'🐟'],[/jam|jelly|canning|pickle|preserve|syrup|salsa/,'🫙'],[/drink|smoothie|lemonade|tea\b|cocoa|juice|punch/,'🥤'],[/dip|appetizer|snack|pate|pâté|cheese/,'🧀']];
-function foodIcon(r){ const t=(r.title+' '+(r.category||'')).toLowerCase(); for(const [re,e] of FOOD_ICONS) if(re.test(t)) return e; return '🍽️'; }
+// only a real picture of the dish (from its website) is shown; otherwise no picture at all
 function rThumb(r){
-  if(/^https:\/\//.test(r.image||'')){ const ph=rIcon(r);
-    return '<img loading="lazy" alt="" src="'+esc(r.image)+'" data-ph="'+esc(ph)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph">'; }
-  return rIcon(r);
+  if(!/^https:\/\//.test(r.image||'')) return '';
+  return '<div class="rc-thumb"><img loading="lazy" alt="" src="'+esc(r.image)+'" onerror="if(this.parentNode)this.parentNode.remove()"></div>';
 }
-function rIcon(r){ return '<div class="ph rc-icon" style="background-color:'+CLOTH[hue(r.title||'?')%CLOTH.length]+'">'+foodIcon(r)+'</div>'; }
 function renderRecipes(){
   if(!$('recipes')) return;
   if(typeof renderTodayPlan==='function'){ renderTodayPlan(); renderPlan(); }
@@ -200,7 +197,7 @@ function renderRecipes(){
   $('r-waiting').textContent=waiting ? waiting+' waiting for Claude to read (links or photos sent). Say “check the recipes” next time you chat.' : '';
   if(!all){ $('r-results').innerHTML='<div class="card empty rc-empty"><b>No recipes yet.</b><br>Tap <b>+</b> to photograph recipe cards or cookbook pages, paste a link, or type one in.</div>'; renderGrocBadge(); return; }
   if(!list.length){ $('r-results').innerHTML='<div class="card empty">No recipes match. <button class="secondary" data-rclear>Clear filters</button></div>'; renderGrocBadge(); return; }
-  $('r-results').innerHTML=list.map(r=>'<button class="rc-item" data-rid="'+esc(r.id)+'"><div class="rc-thumb">'+rThumb(r)+'</div><div class="rc-txt">'
+  $('r-results').innerHTML=list.map(r=>'<button class="rc-item" data-rid="'+esc(r.id)+'">'+rThumb(r)+'<div class="rc-txt">'
     +'<b>'+esc(r.title||'(untitled)')+'</b>'
     +'<span class="rc-meta">'+esc(rSourceLine(r))+'</span>'
     +'<span class="rc-meta">'+esc([rTime(r), r.servings?'serves '+r.servings:''].filter(Boolean).join(' · '))+'</span>'
