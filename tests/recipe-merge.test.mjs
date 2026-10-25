@@ -96,3 +96,13 @@ test('bringing recipes in keeps the meal plan and settings in recipes.json', () 
   assert.equal(out.plan.length, 1); assert.equal(out.plan[0].people, 5); assert.equal(out.settings.people, 5);
   assert.ok(out.recipes.some(r => r.title === 'Soup'));
 });
+
+test('a re-read fills the recipe in place, drops the old "couldn’t read" line, and clears the waiting flag', () => {
+  const st = { recipes: [{ id: 'rJam', title: 'Jumbles', favorite: true, reread: true, needsReview: true, notes: 'Grandma’s\nCouldn’t read for sure: the oven temperature', ingredients: ['2 cups flour'], photos: ['recipes/rJam-1.jpg'], updatedAt: 1 }] };
+  const r = applyRecipes(st, [{ fill: 'rJam', title: 'Jumbles', ingredients: ['2 cups flour'], steps: ['Bake at 350°F.'], photos: ['2026-10-24 190000 Reread-Jumbles Recipe-1 recipe.jpg'] }], { now: 9 });
+  const j = r.store.recipes[0];
+  assert.equal(j.reread, undefined); assert.equal(j.needsReview, false); assert.equal(j.favorite, true);
+  assert.equal(j.notes, 'Grandma’s'); assert.equal(j.photos.length, 2); assert.equal(r.store.recipes.length, 1);
+  const again = applyRecipes(st, [{ fill: 'rJam', title: 'Jumbles', ingredients: ['x'], unsure: 'sugar amount' }], { now: 9 });
+  assert.equal(again.store.recipes[0].needsReview, true); assert.match(again.store.recipes[0].notes, /sugar amount/); assert.doesNotMatch(again.store.recipes[0].notes, /oven temperature/);
+});

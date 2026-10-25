@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.2 — 2026-10-24 · Re-read an unclear recipe
+
+- **Check this** is a filter button under the recipe search (shows how many), so you can work through just those.
+- A recipe marked **Check this** now has **📷 Take another photo to re-read**. The photo goes to Claude with a note saying which recipe it belongs to; the recipe shows "Waiting for Claude to re-read" until Claude reads it again, then the old "couldn't read for sure" note is replaced. `tools/recipe-merge.mjs` fills it in place (`fill:<id>`), keeping favorites, ratings and the original photos.
+
 ## 2.5.1 — 2026-10-24 · Sharper photos
 
 - **Each tap keeps the sharpest frame.** Up close the phone refocuses and an iPhone switches lenses by itself (the blur that snaps back). Each tap now watches for about a quarter second and keeps the sharpest picture; taps in a row queue up, none are lost.
