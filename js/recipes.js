@@ -97,6 +97,7 @@ function rStatus(t){ const e=$('r-status'); if(e){ e.textContent=t; e.classList.
 
 /* ---------------- search ---------------- */
 const RIDX=new WeakMap();
+function urlWords(u){ try{ return decodeURIComponent(new URL(u).pathname).replace(/[-_\/]+/g,' ').replace(/\b[a-z]?\d{5,}\w*\b/g,' '); }catch(e){ return ''; } }
 function lines(a){ return (Array.isArray(a)?a:[]).filter(x=>!/^##\s/.test(String(x))).join(' '); }
 function recipeIndex(r){
   let ix=RIDX.get(r); if(ix) return ix;
@@ -104,7 +105,7 @@ function recipeIndex(r){
   const bk=r.bookId && byId(r.bookId);
   ix={ title:[F(10, r.title)], ing:[F(8, lines(r.ingredients))], titleStr:' '+words(r.title)+' ' };
   ix.all=ix.title.concat(ix.ing, [F(5, (r.tags||[]).join(' ')), F(5, r.category), F(4, r.cuisine), F(4, r.from), F(3, r.author),
-    F(3, bk ? bk.title : r.bookTitle), F(2, r.about), F(1, lines(r.steps)), F(1, r.notes), F(1, RCP_SOURCES[r.source]||'')]);
+    F(3, bk ? bk.title : r.bookTitle), F(2, r.about), F(1, lines(r.steps)), F(1, r.notes), F(1, RCP_SOURCES[r.source]||''), F(2, urlWords(r.url))]);
   RIDX.set(r, ix); return ix;
 }
 function lastMade(r){ const m=(r.made||[]).map(x=>x.date||'').sort(); return m[m.length-1]||''; }
@@ -154,14 +155,14 @@ function rSourceLine(r){
   return [r.from, book ? book+(r.page?', p. '+r.page:'') : (r.source==='web' && r.url ? hostOf(r.url) : RCP_SOURCES[r.source]||'')].filter(Boolean).join(' · ');
 }
 function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./,''); }catch(e){ return ''; } }
+const FOOD_ICONS=[[/french toast|pancake|waffle|breakfast|omelet|egg|granola|oatmeal/,'🥞'],[/cookie|brownie|bar\b|bars\b|fudge|candy|caramel|dessert|cake|pie\b|cobbler|crisp|pudding|cupcake|frosting|truffle/,'🍪'],[/bread|roll|biscuit|muffin|scone|loaf|bun\b/,'🍞'],[/soup|stew|chili|broth|chowder/,'🍲'],[/salad|slaw|vegetable|veggie|beet|squash/,'🥗'],[/taco|burrito|enchilada|empanada|mexican/,'🌮'],[/pizza/,'🍕'],[/pasta|spaghetti|lasagna|noodle|mac\b/,'🍝'],[/chicken|turkey|pork|beef|steak|lamb|meatball|roast|ham\b|ribs|sausage|bacon/,'🍗'],[/fish|salmon|shrimp|seafood|tuna/,'🐟'],[/jam|jelly|canning|pickle|preserve|syrup|salsa/,'🫙'],[/drink|smoothie|lemonade|tea\b|cocoa|juice|punch/,'🥤'],[/dip|appetizer|snack|pate|pâté|cheese/,'🧀']];
+function foodIcon(r){ const t=(r.title+' '+(r.category||'')).toLowerCase(); for(const [re,e] of FOOD_ICONS) if(re.test(t)) return e; return '🍽️'; }
 function rThumb(r){
-  const ph='<div class="ph" style="background-color:'+CLOTH[hue(r.title||'?')%CLOTH.length]+'">'+esc(initials(r.title||'?'))+'</div>';
-  const p=(r.photos||[])[0];
-  if(p && !/^\/|\.\./.test(p)){ const full=rcpFull(p); if(coverBlobs.has(full)) return '<img alt="" src="'+esc(coverBlobs.get(full))+'">'; loadCover(full);
-    return '<img alt="" data-dbx="'+esc(full)+'" data-ph="'+esc(ph)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph">'; }
-  if(/^https:\/\//.test(r.image||'')) return '<img loading="lazy" alt="" src="'+esc(r.image)+'" data-ph="'+esc(ph)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph">';
-  return ph;
+  if(/^https:\/\//.test(r.image||'')){ const ph=rIcon(r);
+    return '<img loading="lazy" alt="" src="'+esc(r.image)+'" data-ph="'+esc(ph)+'" onerror="if(this.parentNode)this.parentNode.innerHTML=this.dataset.ph">'; }
+  return rIcon(r);
 }
+function rIcon(r){ return '<div class="ph rc-icon" style="background-color:'+CLOTH[hue(r.title||'?')%CLOTH.length]+'">'+foodIcon(r)+'</div>'; }
 function renderRecipes(){
   if(!$('recipes')) return;
   if(typeof renderTodayPlan==='function'){ renderTodayPlan(); renderPlan(); }
@@ -485,6 +486,7 @@ $('ra-paste').onclick=async()=>{
   if(!asUrl(t)){ $('ra-msg').textContent='There’s no link to paste. Copy the recipe’s address first (Share → Copy link), or paste it in the box.'; $('ra-url').focus(); return; }
   $('ra-url').value=t.trim(); addFromLink(t);
 };
+function linkTitle(u){ const w=urlWords(u).replace(/\b(how to make|recipe|recipes|food cooking)\b/gi,' ').trim().split(/\s+/).filter(Boolean); return w.length>1 ? w.map(x=>x[0].toUpperCase()+x.slice(1)).join(' ') : hostOf(u)+' recipe'; }
 async function addFromLink(raw){
   const url=asUrl(raw);
   if(!url){ $('ra-msg').textContent='That doesn’t look like a web address.'; return; }
@@ -502,7 +504,7 @@ async function addFromLink(raw){
     r=Object.assign({ id:rid(), source:'web', url, addedAt:now, updatedAt:now }, got);
     toast('Recipe added');
   } else {
-    r={ id:rid(), title:hostOf(url)+' recipe', source:'web', url, pending:'link', addedAt:now, updatedAt:now };
+    r={ id:rid(), title:linkTitle(url), source:'web', url, pending:'link', addedAt:now, updatedAt:now };
     toast('Saved. Claude will fill this one in next time you ask.');
   }
   rstore.recipes.push(r); $('r-q').value=''; rcommit(); $('ra-url').value=''; closeRAdd(); openRecipe(r.id);
