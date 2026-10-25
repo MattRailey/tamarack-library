@@ -800,9 +800,9 @@ body.has-timers .rc-modal{ margin-bottom:var(--tm-h, 0px); }
 .mpk-pl{ display:flex; align-items:center; gap:6px; font-size:.85rem; margin:0; white-space:nowrap; }
 .mpk-pl input{ width:64px; min-height:40px; }
 .mpk-list{ margin-top:10px; display:flex; flex-direction:column; gap:6px; max-height:55vh; overflow:auto; }
-.mpk-item, .mpk-note{ text-align:left; background:#fffdf9; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:9px 12px; min-height:0; }
-.mpk-item b{ display:block; font-family:var(--serif); font-size:1.05rem; color:var(--navy); }
-.mpk-item span{ font-size:.75rem; color:var(--steel); }
+.mpk-item, .mpk-note{ flex:none; display:block; width:100%; height:auto; white-space:normal; overflow-wrap:anywhere; text-align:left; background:#fffdf9; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:9px 12px; min-height:0; }
+.mpk-item b{ display:block; line-height:1.25; font-family:var(--serif); font-size:1.05rem; color:var(--navy); }
+.mpk-item span{ display:block; margin-top:2px; font-size:.75rem; color:var(--steel); }
 .mpk-note{ border-style:dashed; color:var(--blueprint); font-weight:700; }
 .mpq{ max-width:460px; }
 .mi-from{ display:block; font-size:.72rem; color:var(--steel); }
