@@ -290,3 +290,13 @@ test('"Check this" filter isolates recipes Claude wasn’t sure of, and shows as
   await expect(page.locator('#r-filter-bar')).toContainText('Check this');
   await page.click('#r-show [data-show=""]'); await expect(page.locator('#r-results .rc-item')).toHaveCount(2);
 });
+
+test('time filter keeps recipes made within the chosen minutes', async ({ page }) => {
+  await mockNet(page); await openApp(page);
+  await page.evaluate(()=>{ const f=(id,t,x)=>Object.assign({id,title:t,updatedAt:Date.now(),addedAt:1,ingredients:['x'],steps:['y']},x);
+    rstore.recipes=[f('a','Quick',{total:'10 min'}),f('b','Medium',{prep:'15 min',cook:'1 hr'}),f('c','Slow',{total:'3 hrs 20 min'}),f('d','Unknown',{})]; renderRecipes(); });
+  await page.evaluate(()=>{ rui.time='30'; renderRecipes(); });
+  await expect(page.locator('#r-results .rc-item')).toHaveCount(1);
+  await page.evaluate(()=>{ rui.time='90'; renderRecipes(); });
+  await expect(page.locator('#r-results .rc-item')).toHaveCount(2);
+});
