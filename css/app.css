@@ -840,3 +840,14 @@ button.linkish, button.linkish:hover{ background:none !important; border:none !i
 #trm-notes{ width:100%; }
 
 .rc-thumb .rc-icon{ font-size:1.9rem; }
+/* cooking unit converter window */
+.uc-modal{ max-width:440px; }
+.uc-grid{ display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:end; margin:10px 0; }
+.uc-grid label, .uc-ing{ display:block; font-size:.8rem; color:var(--steel); }
+.uc-grid input, .uc-grid select, .uc-ing select{ width:100%; margin-top:4px; font-size:1rem; }
+.uc-grid label:first-child{ grid-column:1 / -1; }
+.uc-swap{ justify-self:center; min-height:40px; padding:6px 14px; }
+.uc-result{ margin:12px 0; padding:14px; border-radius:10px; background:rgba(127,127,127,.12); text-align:center; }
+.uc-out{ font-size:1.5rem; font-weight:700; word-break:break-word; }
+.uc-ing{ margin-top:6px; }
+#uc-bg{ touch-action:auto; }
